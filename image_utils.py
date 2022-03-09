@@ -93,5 +93,5 @@ def load_image(path: str) -> Image:
 
 # TODO: Add raw type support
 def save_image(image: Image, dir_path: str) -> None:
-    path = os.path.join(os.path.dirname(dir_path), _strip_extension(image.name), image.format.to_extension())
-    PImage.fromarray(image.data).save(path, image.format.value)
+    path = os.path.join(dir_path, _strip_extension(image.name)) + image.format.to_extension()
+    PImage.fromarray(image.data).save(path)
