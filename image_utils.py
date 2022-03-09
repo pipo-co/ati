@@ -7,6 +7,8 @@ from typing import Iterable, Tuple
 import numpy as np
 from PIL import Image as PImage
 
+raw_images_metadata_path: str = 'images/raw_metadata.csv'
+
 class ImageFormat(Enum):
     PGM     = 'pgm'
     PPM     = 'ppm'
@@ -77,21 +79,25 @@ def image_to_rgba_array(image: Image) -> np.ndarray:
     elif image.channels == 3:
         return _color_to_rgba(image.data)
 
-def _get_extension(path: str) -> str:
+def get_extension(path: str) -> str:
     return os.path.splitext(path)[1]
 
-def _strip_extension(path: str) -> str:
+def strip_extension(path: str) -> str:
     return os.path.splitext(path)[0]
+
+def append_to_filename(filename: str, s: str) -> str:
+    split = os.path.splitext(filename)
+    return split[0] + s + split[1]
 
 # height x width x channel
 # TODO: Add raw type support
 def load_image(path: str) -> Image:
     name = Image.name_from_path(path)
-    ext = _get_extension(path)
+    ext = get_extension(path)
 
     return Image(name, ImageFormat.from_extension(ext), np.asarray(PImage.open(path)))
 
 # TODO: Add raw type support
 def save_image(image: Image, dir_path: str) -> None:
-    path = os.path.join(dir_path, _strip_extension(image.name)) + image.format.to_extension()
+    path = os.path.join(dir_path, strip_extension(image.name)) + image.format.to_extension()
     PImage.fromarray(image.data).save(path)
