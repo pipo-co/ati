@@ -1,3 +1,4 @@
+import functools
 from typing import Dict
 
 import dearpygui.dearpygui as dpg
@@ -17,20 +18,41 @@ PRIMARY_WINDOW: str = 'primary'
 LOAD_IMAGE_DIALOG: str = 'load_image_dialog'
 SAVE_IMAGE_DIALOG: str = 'save_image_dialog'
 
+# Renderea errores en popup
+def render_error(func):
+    @functools.wraps(func)
+    def decorator(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            build_error_popup_from_error(e)
+            raise e
+    return decorator
+
+def build_error_popup(error_msg: str, popup_tag: int = 0) -> None:
+    with dpg.window(label='Error', no_move=True, no_resize=True, no_title_bar=True, pos=(0, 19), height=5, tag=popup_tag) as popup:
+        dpg.add_text(f'An Error Occurred: {error_msg}')
+        dpg.add_button(label='Close', width=50, height=30, callback=lambda: dpg.delete_item(popup))
+
+def build_error_popup_from_error(e: Exception) -> None:
+    popup_tag = id(e)
+    if not dpg.does_item_exist(popup_tag):
+        build_error_popup(str(e), popup_tag)
+
 # Creates window only if it doesn't exist
+@render_error
 def render_image_window(image_name: str):
     if dpg.does_alias_exist(f'image_{image_name}'):
         dpg.focus_item(f'image_{image_name}')
     else:
-        print('render')
-        with dpg.window(label=image_name, tag=f'window_{image_name}', no_resize=True, on_close=lambda: dpg.delete_item(f'window_{image_name}')):
+        with dpg.window(label=image_name, tag=f'window_{image_name}', pos=(100, 100), no_resize=True, on_close=lambda: dpg.delete_item(f'window_{image_name}')):
             dpg.add_image(image_name, tag=f'image_{image_name}')
             with dpg.menu_bar():
                 dpg.add_menu_item(label="Save Image", callback=lambda: dpg.show_item(LOAD_IMAGE_DIALOG))
                 # with dpg.menu(label="Apply Transformation"):
 
-
-def load_and_render_image(sender, app_data):
+@render_error
+def load_and_render_image(app_data):
     path = app_data['file_path_name']
     image_name = Image.name_from_path(path)
 
@@ -45,7 +67,7 @@ def load_and_render_image(sender, app_data):
     render_image_window(image_name)
 
 def build_load_image_dialog() -> None:
-    with dpg.file_dialog(label='Choose file to load...', tag=LOAD_IMAGE_DIALOG, default_path='images', directory_selector=False, show=False, modal=True, width=1024, height=512, callback=load_and_render_image):
+    with dpg.file_dialog(label='Choose file to load...', tag=LOAD_IMAGE_DIALOG, default_path='images', directory_selector=False, show=False, modal=True, width=1024, height=512, callback=lambda s, ad: load_and_render_image(ad)):
         dpg.add_file_extension(f'Image{{{",".join(valid_image_formats())}}}')
 
 def main():
@@ -78,4 +100,7 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        pass
