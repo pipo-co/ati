@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Iterable, Tuple
 
+import metadata_repo as metadata_repo
+
 import numpy as np
 from PIL import Image as PImage
 
@@ -89,11 +91,17 @@ def append_to_filename(filename: str, s: str) -> str:
     split = os.path.splitext(filename)
     return split[0] + s + split[1]
 
+
 # height x width x channel
-# TODO: Add raw type support
 def load_image(path: str) -> Image:
     name = Image.name_from_path(path)
     ext = get_extension(path)
+    if ext == '.RAW':
+        metadata = metadata_repo.get_metadata(name)
+        npimg = np.fromfile(path, dtype=np.uint8)
+        imageSize = (metadata.width, metadata.height)
+        npimg = npimg.reshape(imageSize)
+        return Image(name, ImageFormat.from_extension(ext), npimg) 
 
     return Image(name, ImageFormat.from_extension(ext), np.asarray(PImage.open(path)))
 
@@ -101,3 +109,7 @@ def load_image(path: str) -> Image:
 def save_image(image: Image, dir_path: str) -> None:
     path = os.path.join(dir_path, strip_extension(image.name)) + image.format.to_extension()
     PImage.fromarray(image.data).save(path)
+
+
+def load_metadata(path: str) -> None:
+    metadata_repo.load_metadata(path)

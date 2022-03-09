@@ -1,7 +1,7 @@
 import dearpygui.dearpygui as dpg
 
 from image_utils import raw_images_metadata_path
-from interface import build_load_image_dialog, LOAD_IMAGE_DIALOG, PRIMARY_WINDOW, TEXTURE_REGISTRY, IMAGES_MENU
+from interface import build_load_image_dialog, build_load_metadata_dialog, LOAD_IMAGE_DIALOG, SAVE_METADATA_DIALOG, PRIMARY_WINDOW, TEXTURE_REGISTRY, IMAGES_MENU
 
 
 def main():
@@ -15,6 +15,8 @@ def main():
     # File Dialog
     build_load_image_dialog()
 
+    build_load_metadata_dialog()
+
     with dpg.viewport_menu_bar():
         dpg.add_menu_item(label="Load New Image", callback=lambda: dpg.show_item(LOAD_IMAGE_DIALOG))
 
@@ -22,7 +24,7 @@ def main():
 
         with dpg.menu(label="Configuration"):
             dpg.add_text('Metadata file for raw images: ')
-            dpg.add_input_text(default_value=raw_images_metadata_path)
+            dpg.add_menu_item(label="Load Configuration file", callback=lambda: dpg.show_item(SAVE_METADATA_DIALOG))
 
     dpg.add_window(tag=PRIMARY_WINDOW)
 

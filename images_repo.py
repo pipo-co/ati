@@ -1,5 +1,4 @@
 from typing import Dict
-
 from image_utils import Image
 
 # In Memory Repo
@@ -13,3 +12,4 @@ def get_image(image_name: str) -> Image:
 
 def persist_image(image: Image) -> None:
     _loaded_images[image.name] = image
+

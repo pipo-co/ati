@@ -1,8 +1,9 @@
 import dearpygui.dearpygui as dpg
 
-from image_utils import image_to_rgba_array, load_image, valid_image_formats, Image, save_image
+from image_utils import image_to_rgba_array, load_image, load_metadata, valid_image_formats, Image, save_image, get_extension
 import images_repo as img_repo
 from interface_utils import render_error
+from metadata_repo import load_metadata
 from transformations import TRANSFORMATIONS
 
 # General Items
@@ -15,6 +16,8 @@ TEXTURE_REGISTRY: str = 'texture_registry'
 # Dialog Tags
 LOAD_IMAGE_DIALOG: str = 'load_image_dialog'
 SAVE_IMAGE_DIALOG: str = 'save_image_dialog'
+
+SAVE_METADATA_DIALOG: str = 'save_metadata_dialog'
 
 # Creates window only if it doesn't exist
 @render_error
@@ -53,6 +56,12 @@ def save_image_handler(app_data, image_name: str) -> None:
     save_image(image, dir_path)
     dpg.delete_item(f'{SAVE_IMAGE_DIALOG}_{image_name}')
 
+def load_metadata_handler(app_data):
+    path = app_data['file_path_name']
+    if get_extension(path) == '.csv':
+        load_metadata(path)
+
+
 # TODO: eliminar item tambien cuando se cancela
 def build_save_image_dialog(image_name: str) -> None:
     dpg.add_file_dialog(label=f'Choose where to save {image_name}...', tag=f'{SAVE_IMAGE_DIALOG}_{image_name}', default_path='images', directory_selector=True, modal=True, width=1024, height=512, user_data=image_name, callback=lambda s, ad, ud: save_image_handler(ad, ud))
@@ -60,3 +69,7 @@ def build_save_image_dialog(image_name: str) -> None:
 def build_load_image_dialog() -> None:
     with dpg.file_dialog(label='Choose file to load...', tag=LOAD_IMAGE_DIALOG, default_path='images', directory_selector=False, show=False, modal=True, width=1024, height=512, callback=lambda s, ad: load_image_handler(ad)):
         dpg.add_file_extension(f'Image{{{",".join(valid_image_formats())}}}')
+
+def build_load_metadata_dialog() -> None:
+    with dpg.file_dialog(label='Choose file to load...', tag=SAVE_METADATA_DIALOG, default_path='images', directory_selector=False, show=False, modal=True, width=1024, height=512, callback=lambda s, ad: load_metadata_handler(ad)):
+        dpg.add_file_extension('.csv')
