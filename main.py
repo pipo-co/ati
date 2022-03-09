@@ -1,42 +1,54 @@
-import os
 from typing import Dict
 
 import dearpygui.dearpygui as dpg
-import numpy as np
 
-from image_utils import image_to_rgba_array, open_image
+from image_utils import image_to_rgba_array, load_image, valid_image_formats, Image
 
-loaded_images: Dict[str, np.ndarray] = {}
+# Global Data
+raw_images_metadata_path: str = 'images/raw_metadata.csv'
+loaded_images: Dict[str, Image] = {}  # Images by name
 
-def print_me(sender):
-    print(f"Menu Item: {sender}")
+# General Tags
+PRIMARY_WINDOW: str = 'primary'
+
+# Registry Tags
+
+# Dialog Tags
+LOAD_IMAGE_DIALOG: str = 'load_image_dialog'
+SAVE_IMAGE_DIALOG: str = 'save_image_dialog'
 
 # Creates window only if it doesn't exist
-def render_image_window(image_tag: str):
-    if dpg.does_alias_exist(f'image_{image_tag}'):
+def render_image_window(image_name: str):
+    if dpg.does_alias_exist(f'image_{image_name}'):
         print('focus')
-        dpg.focus_item(f'image_{image_tag}')
+        dpg.focus_item(f'image_{image_name}')
     else:
         print('render')
-        with dpg.window(label=os.path.basename(image_tag), tag=f'window_{image_tag}', no_resize=True, on_close=lambda: dpg.delete_item(f'window_{image_tag}')):
-            dpg.add_image(image_tag, tag=f'image_{image_tag}')
+        with dpg.window(label=image_name, tag=f'window_{image_name}', no_resize=True, on_close=lambda: dpg.delete_item(f'window_{image_name}')):
+            dpg.add_image(image_name, tag=f'image_{image_name}')
+            with dpg.menu_bar():
+                dpg.add_menu_item(label="Save Image", callback=lambda: dpg.show_item(LOAD_IMAGE_DIALOG))
+                # with dpg.menu(label="Apply Transformation"):
 
-def load_image(sender, app_data):
+
+def load_and_render_image(sender, app_data):
     path = app_data['file_path_name']
+    print(path)
+    image_name = Image.name_from_path(path)
 
-    if path not in loaded_images:
-        image = open_image(path)
-        loaded_images[path] = image
+    if image_name not in loaded_images:
+        image = load_image(path)
+        loaded_images[image_name] = image
 
         image_vector = image_to_rgba_array(image)
-        image_shape = image.shape
-        width = image_shape[0]
-        height = image_shape[1]
-        dpg.add_static_texture(width, height, image_vector, tag=path, parent='texture_registry', user_data=path)
-        dpg.add_image_button(path, label=path, parent='images_menu', tag=f'button_{path}', user_data=path, width=128, height=128, callback=lambda s, ad, ud: render_image_window(ud))
+        dpg.add_static_texture(image.width, image.height, image_vector, tag=image_name, parent='texture_registry', user_data=image_name)
+        dpg.add_image_button(image_name, label=image_name, parent='images_menu', tag=f'button_{image_name}', user_data=image_name, width=128, height=128, callback=lambda s, ad, ud: render_image_window(ud))
 
-    render_image_window(path)
+    render_image_window(image_name)
 
+def build_load_image_dialog() -> None:
+    with dpg.file_dialog(label='Choose file to load...', tag=LOAD_IMAGE_DIALOG, default_path='images', directory_selector=False, show=False, modal=True, width=1024, height=512, callback=load_and_render_image):
+        dpg.add_file_extension(f'Image{{{",".join(valid_image_formats())}}}')
 
 def main():
     dpg.create_context()
@@ -46,33 +58,23 @@ def main():
     # Image Registry
     dpg.add_texture_registry(tag='texture_registry')
 
-    # Handler Registries
-    with dpg.item_handler_registry(tag='texture_registry_handler'):
-        dpg.add_item_activated_handler(callback=lambda sender, app_data, user_data: render_image_window(user_data))
-
     # File Dialog
-    with dpg.file_dialog(label='Choose file to load...', tag='file_dialog', default_path='images', directory_selector=False, show=False, modal=True, width=1024, height=512, callback=load_image):
-        dpg.add_file_extension("Image{.pgm,.PGM,.ppm,.PPM,.raw,.RAW}")
+    build_load_image_dialog()
 
     with dpg.viewport_menu_bar(tag='vp_menu_bar', label="Example Window"):
-        dpg.add_menu_item(label="Load New Image", callback=lambda: dpg.show_item('file_dialog'))
+        dpg.add_menu_item(label="Load New Image", callback=lambda: dpg.show_item(LOAD_IMAGE_DIALOG))
 
         dpg.add_menu(label="Images", tag='images_menu')
 
         with dpg.menu(label="Configuration"):
             dpg.add_text('Metadata file for raw images: ')
-            dpg.add_input_text(default_value='images/raw_metadata.csv')
+            dpg.add_input_text(default_value=raw_images_metadata_path)
 
-    with dpg.window(tag='primary', label="Example Window"):
-        with dpg.window(tag='another', label="Example Window"):
-            dpg.add_text("Hello, world")
-            dpg.add_button(label="Save")
-            dpg.add_input_text(label="string", default_value="Quick brown fox")
-            dpg.add_slider_float(label="float", default_value=0.273, max_value=1)
+    dpg.add_window(tag=PRIMARY_WINDOW)
 
     dpg.show_viewport()
     dpg.maximize_viewport()  # Max viewport size
-    dpg.set_primary_window('primary', True)
+    dpg.set_primary_window(PRIMARY_WINDOW, True)
     dpg.start_dearpygui()
     dpg.destroy_context()
 
