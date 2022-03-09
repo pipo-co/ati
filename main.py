@@ -20,7 +20,6 @@ SAVE_IMAGE_DIALOG: str = 'save_image_dialog'
 # Creates window only if it doesn't exist
 def render_image_window(image_name: str):
     if dpg.does_alias_exist(f'image_{image_name}'):
-        print('focus')
         dpg.focus_item(f'image_{image_name}')
     else:
         print('render')
@@ -33,7 +32,6 @@ def render_image_window(image_name: str):
 
 def load_and_render_image(sender, app_data):
     path = app_data['file_path_name']
-    print(path)
     image_name = Image.name_from_path(path)
 
     if image_name not in loaded_images:
@@ -41,8 +39,8 @@ def load_and_render_image(sender, app_data):
         loaded_images[image_name] = image
 
         image_vector = image_to_rgba_array(image)
-        dpg.add_static_texture(image.width, image.height, image_vector, tag=image_name, parent='texture_registry', user_data=image_name)
-        dpg.add_image_button(image_name, label=image_name, parent='images_menu', tag=f'button_{image_name}', user_data=image_name, width=128, height=128, callback=lambda s, ad, ud: render_image_window(ud))
+        dpg.add_static_texture(image.width, image.height, image_vector, tag=image_name, parent='texture_registry')
+        dpg.add_button(label=image_name, parent='images_menu', tag=f'button_{image_name}', user_data=image_name, callback=lambda s, ad, ud: render_image_window(ud))
 
     render_image_window(image_name)
 

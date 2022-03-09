@@ -21,12 +21,11 @@ class ImageFormat(Enum):
     @classmethod
     def from_str(cls, fmt):
         if fmt not in ImageFormat.values():
-            raise ValueError(f'{fmt} is not a supported image format')
+            raise ValueError(f'"{fmt}" is not a supported image format')
         return cls(fmt)
 
     @classmethod
     def from_extension(cls, ext):
-        print(ext)
         return cls.from_str((ext[1:] if len(ext) > 0 and ext[0] == '.' else ext).lower())
 
     def to_extension(self) -> str:
