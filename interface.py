@@ -64,7 +64,7 @@ def render_image_window(image_name: str):
                         if dpg.does_item_exist(f'image_{image_name}_selection'):
                             dpg.delete_item(f'image_{image_name}_selection')
                     
-                        dpg.draw_rectangle(usr_data['init_draw'], pixel, parent=window, tag=f'image_{image_name}_selection')
+                        dpg.draw_rectangle(usr_data['init_draw'], pixel, parent=window, tag=f'image_{image_name}_selection', color=(0xCC, 0x00, 0x66, 200))
 
                     dpg.show_item(f'image_{image_name}_pointer')
                     dpg.set_value(f'image_{image_name}_pointer', f"Pixel: {get_pixel_pos()}  Value: {img_meta.data[int(pixel[1])][int(pixel[0])]}")
