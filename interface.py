@@ -7,7 +7,7 @@ from image_utils import image_to_rgba_array, load_image, valid_image_formats, Im
     create_square_image, create_circle_image, CIRCLE_IMAGE_NAME, SQUARE_IMAGE_NAME
 import images_repo as img_repo
 from interface_utils import render_error
-from metadata_repo import load_metadata
+from metadata_repo import set_metadata_file
 from transformations import TRANSFORMATIONS
 from operations import OPERATIONS
 
@@ -140,8 +140,9 @@ def save_image_handler(app_data, image_name: str) -> None:
 
 def load_metadata_handler(app_data):
     path = app_data['file_path_name']
-    if get_extension(path) == '.csv':
-        load_metadata(path)
+    if not get_extension(path) == '.tsv':
+        raise ValueError('Metadata file must be a tsv')
+    set_metadata_file(path)
 
 # Generic function to create images
 def create_image(name: str, supplier: Callable[[], Image]) -> None:
@@ -168,4 +169,4 @@ def build_load_image_dialog() -> None:
 
 def build_load_metadata_dialog() -> None:
     with dpg.file_dialog(label='Choose file to load...', tag=SAVE_METADATA_DIALOG, default_path='images', directory_selector=False, show=False, modal=True, width=1024, height=512, callback=lambda s, ad: load_metadata_handler(ad)):
-        dpg.add_file_extension('.csv')
+        dpg.add_file_extension('.tsv')

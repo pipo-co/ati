@@ -1,19 +1,22 @@
 import dearpygui.dearpygui as dpg
 
-from interface import build_load_image_dialog, build_load_metadata_dialog, create_circle_handler, create_square_handler, LOAD_IMAGE_DIALOG, SAVE_METADATA_DIALOG, PRIMARY_WINDOW, TEXTURE_REGISTRY, IMAGES_MENU
-
+from interface import build_load_image_dialog, build_load_metadata_dialog, create_circle_handler, create_square_handler,\
+    LOAD_IMAGE_DIALOG, SAVE_METADATA_DIALOG, PRIMARY_WINDOW, TEXTURE_REGISTRY, IMAGES_MENU
+from metadata_repo import set_metadata_file
+DEFAULT_METADATA_PATH: str = 'images/raw_metadata.tsv'
 
 def main():
+    set_metadata_file(DEFAULT_METADATA_PATH)
+
     dpg.create_context()
     dpg.create_viewport(title='Analisis y Tratamiento de Imagenes')  # TODO: Add icons
     dpg.setup_dearpygui()
 
-    # Image Registry
+    # Registries
     dpg.add_texture_registry(tag=TEXTURE_REGISTRY)
 
-    # File Dialog
+    # Dialog
     build_load_image_dialog()
-
     build_load_metadata_dialog()
 
 

@@ -100,28 +100,31 @@ def append_to_filename(filename: str, s: str) -> str:
     split = os.path.splitext(filename)
     return split[0] + s + split[1]
 
-
 # height x width x channel
 def load_image(path: str) -> Image:
     name = Image.name_from_path(path)
-    ext = get_extension(path)
-    if ext == '.RAW':
+    fmt = ImageFormat.from_extension(get_extension(name))
+    data: np.ndarray
+    if fmt == ImageFormat.RAW:
         metadata = metadata_repo.get_metadata(name)
-        npimg = np.fromfile(path, dtype=np.uint8)
-        imageSize = (metadata.width, metadata.height)
-        npimg = npimg.reshape(imageSize)
-        return Image(name, ImageFormat.from_extension(ext), npimg) 
+        data = np.fromfile(path, dtype=np.uint8)
+        data = data.reshape((metadata.width, metadata.height))
+    else:
+        data = np.asarray(PImage.open(path), dtype=np.uint8)
 
-    return Image(name, ImageFormat.from_extension(ext), np.asarray(PImage.open(path)))
+    return Image(name, fmt, data)
 
-# TODO: Add raw type support
 def save_image(image: Image, dir_path: str) -> None:
     path = os.path.join(dir_path, strip_extension(image.name)) + image.format.to_extension()
-    if get_extension(path) == ".raw":
-        split_name = os.path.splitext(os.path.basename(path))
-        PImage.fromarray(image.data/1023.0).save(split_name[0] + ".tiff") #Polemico
-        return
-    PImage.fromarray(image.data).save(path)
+    if image.format == ImageFormat.RAW:
+        # Write bytes from data
+        with open(path, 'wb') as fp:
+            for b in image.data.flatten():
+                fp.write(b)
+        # Write metadata
+        metadata_repo.persist_image_metadata(image.name, image.width, image.height)
+    else:
+        PImage.fromarray(image.data).save(path)
 
 
 CREATED_IMAGE_LEN:  int = 200
