@@ -9,7 +9,8 @@ import metadata_repo as metadata_repo
 import numpy as np
 from PIL import Image as PImage
 
-raw_images_metadata_path: str = 'images/raw_metadata.csv'
+circle_image_path: str = '/home/fpannunzio/ATI/ati/images/circle.pgm'
+square_image_path: str = '/home/fpannunzio/ATI/ati/images/square.pgm'
 
 class ImageFormat(Enum):
     PGM     = 'pgm'
@@ -108,8 +109,52 @@ def load_image(path: str) -> Image:
 # TODO: Add raw type support
 def save_image(image: Image, dir_path: str) -> None:
     path = os.path.join(dir_path, strip_extension(image.name)) + image.format.to_extension()
+    if get_extension(path) == ".raw":
+        split_name = os.path.splitext(os.path.basename(path))
+        PImage.fromarray(image.data/1023.0).save(split_name[0] + ".tiff") #Polemico
+        return
     PImage.fromarray(image.data).save(path)
 
 
 def load_metadata(path: str) -> None:
     metadata_repo.load_metadata(path)
+
+def create_circular_image() -> None:
+    mask = create_circular_mask(200, 200, radius=100)
+    array = np.zeros((200, 200), dtype=np.uint8)
+    array[mask] = 255
+    PImage.fromarray(array).save(circle_image_path)
+
+def create_circular_mask(h, w, center=None, radius=None):
+
+    if center is None: # use the middle of the image
+        center = (int(w/2), int(h/2))
+    if radius is None: # use the smallest distance between the center and image walls
+        radius = min(center[0], center[1], w-center[0], h-center[1])
+
+    Y, X = np.ogrid[:h, :w]
+    dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
+
+    mask = dist_from_center <= radius
+    return mask
+
+def create_square_image() -> None:
+    array = np.zeros((200, 200), dtype=np.uint8)
+    for i in range(200):
+        for j in range(200):
+            if i >= 20 and i <= 180:
+                if j >= 20 and j<=180: 
+                    array[i][j] = 255
+
+    PImage.fromarray(array).save(square_image_path)
+
+def sum_images(first_img: Image, second_img: Image) -> np.ndarray:
+    array = np.add(first_img.data.astype(np.uint) , second_img.data.astype(np.uint))
+    new_array = normalize(array)
+    print(first_img.data[100,100], second_img.data[100,100], new_array[100,100])
+    return new_array
+
+def normalize(arr: np.ndarray) -> np.ndarray:
+    rng = arr.max()-arr.min()
+    amin = arr.min()
+    return (arr-amin)*255/rng

@@ -1,10 +1,11 @@
 import dearpygui.dearpygui as dpg
 
-from image_utils import image_to_rgba_array, load_image, load_metadata, valid_image_formats, Image, save_image, get_extension
+from image_utils import create_circular_image, create_square_image, image_to_rgba_array, load_image, load_metadata, valid_image_formats, Image, save_image, get_extension, circle_image_path, square_image_path
 import images_repo as img_repo
 from interface_utils import render_error
 from metadata_repo import load_metadata
 from transformations import TRANSFORMATIONS
+from operations import OPERATIONS
 
 # General Items
 PRIMARY_WINDOW: str = 'primary'
@@ -32,6 +33,9 @@ def render_image_window(image_name: str):
                 with dpg.menu(label="Apply Transformation"):
                     for name, tr in TRANSFORMATIONS.items():
                         dpg.add_button(label=name.capitalize(), user_data=image_name, callback=lambda s, ad, ud: tr(ud))
+                with dpg.menu(label="Apply Operations"):
+                    for name, op in OPERATIONS.items():
+                        dpg.add_button(label=name.capitalize(), user_data=image_name, callback=lambda s, ad, ud: op(ud))
 
 def register_image(image: Image) -> None:
     image_vector = image_to_rgba_array(image)
@@ -42,7 +46,6 @@ def register_image(image: Image) -> None:
 def load_image_handler(app_data):
     path = app_data['file_path_name']
     image_name = Image.name_from_path(path)
-
     if not img_repo.contains_image(image_name):
         image = load_image(path)
         img_repo.persist_image(image)
@@ -61,6 +64,17 @@ def load_metadata_handler(app_data):
     if get_extension(path) == '.csv':
         load_metadata(path)
 
+def create_circle_handler():
+    create_circular_image()
+    app_data = {}
+    app_data['file_path_name'] = circle_image_path
+    load_image_handler(app_data)
+
+def create_square_handler():
+    create_square_image()
+    app_data = {}
+    app_data['file_path_name'] = square_image_path
+    load_image_handler(app_data)
 
 # TODO: eliminar item tambien cuando se cancela
 def build_save_image_dialog(image_name: str) -> None:

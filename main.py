@@ -1,7 +1,6 @@
 import dearpygui.dearpygui as dpg
 
-from image_utils import raw_images_metadata_path
-from interface import build_load_image_dialog, build_load_metadata_dialog, LOAD_IMAGE_DIALOG, SAVE_METADATA_DIALOG, PRIMARY_WINDOW, TEXTURE_REGISTRY, IMAGES_MENU
+from interface import build_load_image_dialog, build_load_metadata_dialog, create_circle_handler, create_square_handler, LOAD_IMAGE_DIALOG, SAVE_METADATA_DIALOG, PRIMARY_WINDOW, TEXTURE_REGISTRY, IMAGES_MENU
 
 
 def main():
@@ -17,8 +16,12 @@ def main():
 
     build_load_metadata_dialog()
 
+
     with dpg.viewport_menu_bar():
-        dpg.add_menu_item(label="Load New Image", callback=lambda: dpg.show_item(LOAD_IMAGE_DIALOG))
+        with dpg.menu(label="Images functionalities"):
+            dpg.add_menu_item(label="Load New Image", callback=lambda: dpg.show_item(LOAD_IMAGE_DIALOG))
+            dpg.add_menu_item(label="Create Circle Image", callback=create_circle_handler)
+            dpg.add_menu_item(label="Create Square Image", callback=create_square_handler)
 
         dpg.add_menu(label="Images", tag=IMAGES_MENU)
 
