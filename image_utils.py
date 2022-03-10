@@ -4,13 +4,14 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Iterable, Tuple
 
-import metadata_repo as metadata_repo
+import metadata_repo
 
 import numpy as np
 from PIL import Image as PImage
 
-circle_image_path: str = 'images/circle.pgm'
-square_image_path: str = 'images/square.pgm'
+CIRCLE_IMAGE_NAME: str = 'circle.pgm'
+SQUARE_IMAGE_NAME: str = 'square.pgm'
+RESERVED_IMAGE_NAMES: Tuple[str, str] = (CIRCLE_IMAGE_NAME, SQUARE_IMAGE_NAME)
 
 class ImageFormat(Enum):
     PGM     = 'pgm'
@@ -41,6 +42,13 @@ class Image:
     name:   str
     format: ImageFormat
     data:   np.ndarray
+
+    def __init__(self, name: str, fmt: ImageFormat, data: np.ndarray, allow_reserved: bool = False):
+        if not allow_reserved and name in RESERVED_IMAGE_NAMES:
+            raise ValueError(f'name cannot be any of this names: {RESERVED_IMAGE_NAMES}')
+        self.name = name
+        self.format = fmt
+        self.data = data
 
     @property
     def shape(self) -> Tuple[int]:
@@ -116,37 +124,41 @@ def save_image(image: Image, dir_path: str) -> None:
     PImage.fromarray(image.data).save(path)
 
 
-def load_metadata(path: str) -> None:
-    metadata_repo.load_metadata(path)
+CREATED_IMAGE_LEN:  int = 200
+CIRCLE_RADIUS: int = 100
+def create_circle_image() -> Image:
+    mask = create_circular_mask(CREATED_IMAGE_LEN, CREATED_IMAGE_LEN, radius=CIRCLE_RADIUS)
+    data = np.zeros((CREATED_IMAGE_LEN, CREATED_IMAGE_LEN), dtype=np.uint8)
+    data[mask] = 255
+    return Image(CIRCLE_IMAGE_NAME, ImageFormat.PGM, data, allow_reserved=True)
 
-def create_circular_image() -> None:
-    mask = create_circular_mask(200, 200, radius=100)
-    array = np.zeros((200, 200), dtype=np.uint8)
-    array[mask] = 255
-    PImage.fromarray(array).save(circle_image_path)
-
+# https://stackoverflow.com/a/44874588
 def create_circular_mask(h, w, center=None, radius=None):
-
-    if center is None: # use the middle of the image
+    if center is None:  # use the middle of the image
         center = (int(w/2), int(h/2))
-    if radius is None: # use the smallest distance between the center and image walls
+    if radius is None:  # use the smallest distance between the center and image walls
         radius = min(center[0], center[1], w-center[0], h-center[1])
 
-    Y, X = np.ogrid[:h, :w]
-    dist_from_center = np.sqrt((X - center[0])**2 + (Y-center[1])**2)
+    y, x = np.ogrid[:h, :w]
+    dist_from_center = np.sqrt((x - center[0])**2 + (y-center[1])**2)
 
     mask = dist_from_center <= radius
     return mask
 
-def create_square_image() -> None:
-    array = np.zeros((200, 200), dtype=np.uint8)
-    for i in range(200):
-        for j in range(200):
-            if i >= 20 and i <= 180:
-                if j >= 20 and j<=180: 
-                    array[i][j] = 255
 
-    PImage.fromarray(array).save(square_image_path)
+SQUARE_LEN: int = 160
+def create_square_image() -> Image:
+    diff = (CREATED_IMAGE_LEN - SQUARE_LEN) // 2
+    min_square = diff
+    max_square = CREATED_IMAGE_LEN - diff
+    data = np.zeros((CREATED_IMAGE_LEN, CREATED_IMAGE_LEN), dtype=np.uint8)
+    for i in range(CREATED_IMAGE_LEN):
+        for j in range(CREATED_IMAGE_LEN):
+            if min_square <= i <= max_square:
+                if min_square <= j <= max_square:
+                    data[i][j] = 255
+
+    return Image(SQUARE_IMAGE_NAME, ImageFormat.PGM, data, allow_reserved=True)
 
 def sum_images(first_img: Image, second_img: Image) -> np.ndarray:
     array = np.add(first_img.data.astype(np.uint) , second_img.data.astype(np.uint))

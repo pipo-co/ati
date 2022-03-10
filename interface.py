@@ -1,7 +1,10 @@
+from typing import Callable
+
 import dearpygui.dearpygui as dpg
 import numpy as np
 
-from image_utils import create_circular_image, create_square_image, image_to_rgba_array, load_image, load_metadata, valid_image_formats, Image, save_image, get_extension, circle_image_path, square_image_path
+from image_utils import image_to_rgba_array, load_image, valid_image_formats, Image, save_image, get_extension, \
+    create_square_image, create_circle_image, CIRCLE_IMAGE_NAME, SQUARE_IMAGE_NAME
 import images_repo as img_repo
 from interface_utils import render_error
 from metadata_repo import load_metadata
@@ -121,6 +124,7 @@ def register_image(image: Image) -> None:
 def load_image_handler(app_data):
     path = app_data['file_path_name']
     image_name = Image.name_from_path(path)
+
     if not img_repo.contains_image(image_name):
         image = load_image(path)
         img_repo.persist_image(image)
@@ -139,17 +143,20 @@ def load_metadata_handler(app_data):
     if get_extension(path) == '.csv':
         load_metadata(path)
 
+# Generic function to create images
+def create_image(name: str, supplier: Callable[[], Image]) -> None:
+    if not img_repo.contains_image(name):
+        image = supplier()
+        img_repo.persist_image(image)
+        register_image(image)
+
+    render_image_window(name)
+
 def create_circle_handler():
-    create_circular_image()
-    app_data = {}
-    app_data['file_path_name'] = circle_image_path
-    load_image_handler(app_data)
+    create_image(CIRCLE_IMAGE_NAME, create_circle_image)
 
 def create_square_handler():
-    create_square_image()
-    app_data = {}
-    app_data['file_path_name'] = square_image_path
-    load_image_handler(app_data)
+    create_image(SQUARE_IMAGE_NAME, create_square_image)
 
 # TODO: eliminar item tambien cuando se cancela
 def build_save_image_dialog(image_name: str) -> None:
