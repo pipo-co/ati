@@ -1,4 +1,4 @@
-from typing import Callable
+from typing import Callable, Tuple
 
 import dearpygui.dearpygui as dpg
 import numpy as np
@@ -22,19 +22,21 @@ LOAD_IMAGE_DIALOG: str = 'load_image_dialog'
 SAVE_IMAGE_DIALOG: str = 'save_image_dialog'
 LOAD_METADATA_DIALOG: str = 'load_metadata_dialog'
 
+CENTER_POS: Tuple[int, int] = (750, 350)
+MIN_IMAGE_SIZE: Tuple[int, int] = (200, 200)
+
 # Creates window only if it doesn't exist
 @render_error
 def render_image_window(image_name: str):
     if dpg.does_item_exist(f'image_{image_name}'):
         dpg.focus_item(f'image_{image_name}')
     else:
-        with dpg.window(label=image_name, tag=f'window_{image_name}', pos=(100, 100), no_resize=True, on_close=lambda: dpg.delete_item(f'window_{image_name}')) as window:
-            
+        with dpg.window(label=image_name, pos=CENTER_POS, min_size=MIN_IMAGE_SIZE, no_resize=True, on_close=lambda: dpg.delete_item(window)) as window:
             with dpg.menu_bar():
                 dpg.add_menu_item(label='Save', user_data=image_name, callback=lambda s, ad, ud: trigger_save_image_dialog(ud))
                 with dpg.menu(label='Transform'):
                     for name, tr in TRANSFORMATIONS.items():
-                        dpg.add_button(label=name.capitalize(), user_data=image_name, callback=lambda s, ad, ud: tr(ud))
+                        dpg.add_menu_item(label=name.capitalize(), user_data=image_name, callback=lambda s, ad, ud: tr(ud))
             
             dpg.set_item_user_data(window, {})
 
@@ -42,19 +44,17 @@ def render_image_window(image_name: str):
 
             img_meta: Image = img_repo.get_image(image_name)
 
-            dpg.add_text(f'Height: {img_meta.height}. Width: {img_meta.width}. Format: {img_meta.format.name}.')
+            dpg.add_text(f'Height: {img_meta.height}  Width: {img_meta.width}')
             dpg.add_text('', tag=f'image_{image_name}_pointer')
             dpg.add_text('', tag=f'image_{image_name}_region')
 
-            def get_pixel_pos():
+            def get_pixel_pos() -> Tuple[int, int]:
                 mouse_pos  = dpg.get_mouse_pos(local=False)
                 window_pos = dpg.get_item_pos(window)
                 img_pos    = dpg.get_item_pos(image)
+                return int(mouse_pos[0] - window_pos[0] - img_pos[0]), int(mouse_pos[1] - window_pos[1] - img_pos[1])
 
-                return (mouse_pos[0] - window_pos[0] - img_pos[0], mouse_pos[1] - window_pos[1] - img_pos[1])
-
-            def mouse_move_handler(sender, app_data):
-
+            def mouse_move_handler():
                 if dpg.is_item_hovered(image) and dpg.is_item_focused(window):
                     pixel = get_pixel_pos()
 
@@ -67,23 +67,21 @@ def render_image_window(image_name: str):
                         dpg.draw_rectangle(usr_data['init_draw'], pixel, parent=window, tag=f'image_{image_name}_selection')
 
                     dpg.show_item(f'image_{image_name}_pointer')
-                    dpg.set_value(f'image_{image_name}_pointer', f"Pixel: {get_pixel_pos()}. Value {img_meta.data[int(pixel[1])][int(pixel[0])]}")
+                    dpg.set_value(f'image_{image_name}_pointer', f"Pixel: {get_pixel_pos()}  Value: {img_meta.data[int(pixel[1])][int(pixel[0])]}")
                 else:
                     if dpg.does_item_exist(f'image_{image_name}_selection'):
                         dpg.delete_item(f'image_{image_name}_selection')
                         
                     dpg.hide_item(f'image_{image_name}_pointer')
 
-            def mouse_down_handler(sender, app_data):
-
+            def mouse_down_handler():
                 usr_data = dpg.get_item_user_data(window)
 
                 usr_data['init_draw'] = usr_data.get('init_draw', get_pixel_pos())
 
                 dpg.set_item_user_data(window, usr_data)
 
-            def mouse_release_handler(sender, app_data):
-                
+            def mouse_release_handler():
                 usr_data = dpg.get_item_user_data(window)
                 
                 pixel_pos = get_pixel_pos()
@@ -98,7 +96,7 @@ def render_image_window(image_name: str):
                 else:
                     mean = np.mean(img_meta.data[y[0]:y[1], x[0]:x[1]])
 
-                dpg.set_value(f'image_{image_name}_region', f"#Pixel: {np.prod(np.abs(region_size))}. Avg: {mean}")
+                dpg.set_value(f'image_{image_name}_region', f"#Pixel: {np.prod(np.abs(region_size))}  Avg: {np.around(mean, 2)}")
                 
                 usr_data.pop('init_draw', None)
 
@@ -113,7 +111,7 @@ def render_image_window(image_name: str):
 def register_image(image: Image) -> None:
     image_vector = image_to_rgba_array(image)
     dpg.add_static_texture(image.width, image.height, image_vector, tag=image.name, parent=TEXTURE_REGISTRY)
-    dpg.add_button(label=image.name, parent=IMAGES_MENU, tag=f'button_{image.name}', user_data=image.name, callback=lambda s, ad, ud: render_image_window(ud))
+    dpg.add_menu_item(label=image.name, parent=IMAGES_MENU, user_data=image.name, callback=lambda s, ad, ud: render_image_window(ud))
 
 @render_error
 def load_image_handler(app_data):
