@@ -1,6 +1,5 @@
-from turtle import width
+from dataclasses import dataclass
 from typing import Dict
-from attr import dataclass
 import pandas as pd
 
 @dataclass

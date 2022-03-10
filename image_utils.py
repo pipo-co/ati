@@ -9,8 +9,8 @@ import metadata_repo as metadata_repo
 import numpy as np
 from PIL import Image as PImage
 
-circle_image_path: str = '/home/fpannunzio/ATI/ati/images/circle.pgm'
-square_image_path: str = '/home/fpannunzio/ATI/ati/images/square.pgm'
+circle_image_path: str = 'images/circle.pgm'
+square_image_path: str = 'images/square.pgm'
 
 class ImageFormat(Enum):
     PGM     = 'pgm'
