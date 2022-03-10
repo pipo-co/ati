@@ -1,4 +1,5 @@
 import dearpygui.dearpygui as dpg
+import numpy as np
 
 from image_utils import create_circular_image, create_square_image, image_to_rgba_array, load_image, load_metadata, valid_image_formats, Image, save_image, get_extension, circle_image_path, square_image_path
 import images_repo as img_repo
@@ -26,8 +27,8 @@ def render_image_window(image_name: str):
     if dpg.does_item_exist(f'image_{image_name}'):
         dpg.focus_item(f'image_{image_name}')
     else:
-        with dpg.window(label=image_name, tag=f'window_{image_name}', pos=(100, 100), no_resize=True, on_close=lambda: dpg.delete_item(f'window_{image_name}')):
-            dpg.add_image(image_name, tag=f'image_{image_name}')
+        with dpg.window(label=image_name, tag=f'window_{image_name}', pos=(100, 100), no_resize=True, on_close=lambda: dpg.delete_item(f'window_{image_name}')) as window:
+            
             with dpg.menu_bar():
                 dpg.add_menu_item(label="Save Image", user_data=image_name, callback=lambda s, ad, ud: build_save_image_dialog(ud))
                 with dpg.menu(label="Apply Transformation"):
@@ -36,7 +37,81 @@ def render_image_window(image_name: str):
                 with dpg.menu(label="Apply Operations"):
                     for name, op in OPERATIONS.items():
                         dpg.add_button(label=name.capitalize(), user_data=image_name, callback=lambda s, ad, ud: op(ud))
+            
+            dpg.set_item_user_data(window, {})
 
+            image = dpg.add_image(image_name, tag=f'image_{image_name}')
+
+            img_meta: Image = img_repo.get_image(image_name)
+
+            dpg.add_text(f'Height: {img_meta.height}. Width: {img_meta.width}. Format: {img_meta.format.name}.')
+            dpg.add_text('', tag=f'image_{image_name}_pointer')
+            dpg.add_text('', tag=f'image_{image_name}_region')
+
+            def get_pixel_pos():
+                mouse_pos  = dpg.get_mouse_pos(local=False)
+                window_pos = dpg.get_item_pos(window)
+                img_pos    = dpg.get_item_pos(image)
+
+                return (mouse_pos[0] - window_pos[0] - img_pos[0], mouse_pos[1] - window_pos[1] - img_pos[1])
+
+            def mouse_move_handler(sender, app_data):
+
+                if dpg.is_item_hovered(image) and dpg.is_item_focused(window):
+                    pixel = get_pixel_pos()
+
+                    usr_data = dpg.get_item_user_data(window)
+
+                    if 'init_draw' in usr_data:
+                        if dpg.does_item_exist(f'image_{image_name}_selection'):
+                            dpg.delete_item(f'image_{image_name}_selection')
+                    
+                        dpg.draw_rectangle(usr_data['init_draw'], pixel, parent=window, tag=f'image_{image_name}_selection')
+
+                    dpg.show_item(f'image_{image_name}_pointer')
+                    dpg.set_value(f'image_{image_name}_pointer', f"Pixel: {get_pixel_pos()}. Value {img_meta.data[int(pixel[1])][int(pixel[0])]}")
+                else:
+                    if dpg.does_item_exist(f'image_{image_name}_selection'):
+                        dpg.delete_item(f'image_{image_name}_selection')
+                        
+                    dpg.hide_item(f'image_{image_name}_pointer')
+
+            def mouse_down_handler(sender, app_data):
+
+                usr_data = dpg.get_item_user_data(window)
+
+                usr_data['init_draw'] = usr_data.get('init_draw', get_pixel_pos())
+
+                dpg.set_item_user_data(window, usr_data)
+
+            def mouse_release_handler(sender, app_data):
+                
+                usr_data = dpg.get_item_user_data(window)
+                
+                pixel_pos = get_pixel_pos()
+                init_draw = usr_data['init_draw']
+                region_size = (pixel_pos[0] - init_draw[0] + 1, pixel_pos[1] - init_draw[1] + 1)
+
+                x = (int(min(pixel_pos[0], init_draw[0])), int(max(pixel_pos[0], init_draw[0])))
+                y = (int(min(pixel_pos[1], init_draw[1])), int(max(pixel_pos[1], init_draw[1])))
+                
+                if img_meta.channels > 1:
+                    mean = np.mean(np.array(img_meta.data[y[0]:y[1], x[0]:x[1]]).reshape((-1, 3)), axis=0)
+                else:
+                    mean = np.mean(img_meta.data[y[0]:y[1], x[0]:x[1]])
+
+                dpg.set_value(f'image_{image_name}_region', f"#Pixel: {np.prod(np.abs(region_size))}. Avg: {mean}")
+                
+                usr_data.pop('init_draw', None)
+
+                dpg.set_item_user_data(window, usr_data)
+
+            with dpg.handler_registry():
+                dpg.add_mouse_move_handler(callback=mouse_move_handler)
+                dpg.add_mouse_down_handler(callback=mouse_down_handler)
+                dpg.add_mouse_release_handler(callback=mouse_release_handler)
+
+            
 def register_image(image: Image) -> None:
     image_vector = image_to_rgba_array(image)
     dpg.add_static_texture(image.width, image.height, image_vector, tag=image.name, parent=TEXTURE_REGISTRY)
