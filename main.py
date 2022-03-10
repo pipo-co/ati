@@ -1,7 +1,7 @@
 import dearpygui.dearpygui as dpg
 
-from interface import build_load_image_dialog, build_load_metadata_dialog, create_circle_handler, create_square_handler,\
-    LOAD_IMAGE_DIALOG, SAVE_METADATA_DIALOG, PRIMARY_WINDOW, TEXTURE_REGISTRY, IMAGES_MENU
+from interface import build_load_image_dialog, build_load_metadata_dialog, create_circle_handler, create_square_handler, \
+    LOAD_IMAGE_DIALOG, LOAD_METADATA_DIALOG, PRIMARY_WINDOW, TEXTURE_REGISTRY, IMAGES_MENU, build_save_image_dialog
 from metadata_repo import set_metadata_file
 DEFAULT_METADATA_PATH: str = 'images/raw_metadata.tsv'
 
@@ -17,6 +17,7 @@ def main():
 
     # Dialog
     build_load_image_dialog()
+    build_save_image_dialog()
     build_load_metadata_dialog()
 
     with dpg.viewport_menu_bar():
@@ -30,7 +31,7 @@ def main():
 
         with dpg.menu(label='Configuration'):
             dpg.add_text('Metadata file for raw images: ')
-            dpg.add_menu_item(label='Load Configuration file', callback=lambda: dpg.show_item(SAVE_METADATA_DIALOG))
+            dpg.add_menu_item(label='Load Configuration file', callback=lambda: dpg.show_item(LOAD_METADATA_DIALOG))
 
     dpg.add_window(tag=PRIMARY_WINDOW)
 

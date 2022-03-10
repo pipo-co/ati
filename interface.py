@@ -20,8 +20,7 @@ TEXTURE_REGISTRY: str = 'texture_registry'
 # Dialog Tags
 LOAD_IMAGE_DIALOG: str = 'load_image_dialog'
 SAVE_IMAGE_DIALOG: str = 'save_image_dialog'
-
-SAVE_METADATA_DIALOG: str = 'save_metadata_dialog'
+LOAD_METADATA_DIALOG: str = 'load_metadata_dialog'
 
 # Creates window only if it doesn't exist
 @render_error
@@ -32,7 +31,7 @@ def render_image_window(image_name: str):
         with dpg.window(label=image_name, tag=f'window_{image_name}', pos=(100, 100), no_resize=True, on_close=lambda: dpg.delete_item(f'window_{image_name}')) as window:
             
             with dpg.menu_bar():
-                dpg.add_menu_item(label='Save', user_data=image_name, callback=lambda s, ad, ud: build_save_image_dialog(ud))
+                dpg.add_menu_item(label='Save', user_data=image_name, callback=lambda s, ad, ud: trigger_save_image_dialog(ud))
                 with dpg.menu(label='Transform'):
                     for name, tr in TRANSFORMATIONS.items():
                         dpg.add_button(label=name.capitalize(), user_data=image_name, callback=lambda s, ad, ud: tr(ud))
@@ -132,7 +131,6 @@ def save_image_handler(app_data, image_name: str) -> None:
     image = img_repo.get_image(image_name)
     dir_path = app_data['file_path_name']
     save_image(image, dir_path)
-    dpg.delete_item(f'{SAVE_IMAGE_DIALOG}_{image_name}')
 
 def load_metadata_handler(app_data):
     path = app_data['file_path_name']
@@ -155,14 +153,19 @@ def create_circle_handler():
 def create_square_handler():
     create_image(SQUARE_IMAGE_NAME, create_square_image)
 
-# TODO: eliminar item tambien cuando se cancela
-def build_save_image_dialog(image_name: str) -> None:
-    dpg.add_file_dialog(label=f'Choose where to save {image_name}...', tag=f'{SAVE_IMAGE_DIALOG}_{image_name}', default_path='images', directory_selector=True, modal=True, width=1024, height=512, user_data=image_name, callback=lambda s, ad, ud: save_image_handler(ad, ud))
+@render_error
+def trigger_save_image_dialog(image_name: str) -> None:
+    dpg.set_item_label(SAVE_IMAGE_DIALOG, f'Choose where to save {image_name}...')
+    dpg.set_item_user_data(SAVE_IMAGE_DIALOG, image_name)
+    dpg.show_item(SAVE_IMAGE_DIALOG)
+
+def build_save_image_dialog() -> None:
+    dpg.add_file_dialog(tag=SAVE_IMAGE_DIALOG, default_path='images', directory_selector=True, show=False, modal=True, width=1024, height=512, callback=lambda s, ad, ud: save_image_handler(ad, ud))
 
 def build_load_image_dialog() -> None:
     with dpg.file_dialog(label='Choose file to load...', tag=LOAD_IMAGE_DIALOG, default_path='images', directory_selector=False, show=False, modal=True, width=1024, height=512, callback=lambda s, ad: load_image_handler(ad)):
         dpg.add_file_extension(f'Image{{{",".join(valid_image_formats())}}}')
 
 def build_load_metadata_dialog() -> None:
-    with dpg.file_dialog(label='Choose file to load...', tag=SAVE_METADATA_DIALOG, default_path='images', directory_selector=False, show=False, modal=True, width=1024, height=512, callback=lambda s, ad: load_metadata_handler(ad)):
+    with dpg.file_dialog(label='Choose metadata file to load...', tag=LOAD_METADATA_DIALOG, default_path='images', directory_selector=False, show=False, modal=True, width=1024, height=512, callback=lambda s, ad: load_metadata_handler(ad)):
         dpg.add_file_extension('.tsv')
