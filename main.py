@@ -19,18 +19,18 @@ def main():
     build_load_image_dialog()
     build_load_metadata_dialog()
 
-
     with dpg.viewport_menu_bar():
-        with dpg.menu(label="Images functionalities"):
-            dpg.add_menu_item(label="Load New Image", callback=lambda: dpg.show_item(LOAD_IMAGE_DIALOG))
-            dpg.add_menu_item(label="Create Circle Image", callback=create_circle_handler)
-            dpg.add_menu_item(label="Create Square Image", callback=create_square_handler)
+        dpg.add_menu_item(label='Load', callback=lambda: dpg.show_item(LOAD_IMAGE_DIALOG))
 
-        dpg.add_menu(label="Images", tag=IMAGES_MENU)
+        with dpg.menu(label='Create'):
+            dpg.add_menu_item(label='Circle', callback=create_circle_handler)
+            dpg.add_menu_item(label='Square', callback=create_square_handler)
 
-        with dpg.menu(label="Configuration"):
+        dpg.add_menu(label='Catalog', tag=IMAGES_MENU)
+
+        with dpg.menu(label='Configuration'):
             dpg.add_text('Metadata file for raw images: ')
-            dpg.add_menu_item(label="Load Configuration file", callback=lambda: dpg.show_item(SAVE_METADATA_DIALOG))
+            dpg.add_menu_item(label='Load Configuration file', callback=lambda: dpg.show_item(SAVE_METADATA_DIALOG))
 
     dpg.add_window(tag=PRIMARY_WINDOW)
 
