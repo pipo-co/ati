@@ -164,12 +164,11 @@ def create_square_image() -> Image:
     return Image(SQUARE_IMAGE_NAME, ImageFormat.PGM, data, allow_reserved=True)
 
 def sum_images(first_img: Image, second_img: Image) -> np.ndarray:
-    array = np.add(first_img.data.astype(np.uint) , second_img.data.astype(np.uint))
+    array = np.add(first_img.data.astype(np.uint), second_img.data.astype(np.uint))
     new_array = normalize(array)
-    print(first_img.data[100,100], second_img.data[100,100], new_array[100,100])
     return new_array
 
 def normalize(arr: np.ndarray) -> np.ndarray:
-    rng = arr.max()-arr.min()
+    rng = arr.max() - arr.min()
     amin = arr.min()
-    return (arr-amin)*255/rng
+    return (arr - amin)*255//rng

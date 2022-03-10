@@ -36,7 +36,7 @@ def render_image_window(image_name: str):
                 dpg.add_menu_item(label='Save', user_data=image_name, callback=lambda s, ad, ud: trigger_save_image_dialog(ud))
                 with dpg.menu(label='Transform'):
                     for name, tr in TRANSFORMATIONS.items():
-                        dpg.add_menu_item(label=name.capitalize(), user_data=image_name, callback=lambda s, ad, ud: tr(ud))
+                        dpg.add_menu_item(label=name.capitalize(), user_data=(tr, image_name), callback=lambda s, ad, ud: ud[0](ud[1]))
             
             dpg.set_item_user_data(window, {})
 
@@ -125,6 +125,7 @@ def load_image_handler(app_data):
 
     render_image_window(image_name)
 
+@render_error
 def save_image_handler(app_data, image_name: str) -> None:
     image = img_repo.get_image(image_name)
     dir_path = app_data['file_path_name']

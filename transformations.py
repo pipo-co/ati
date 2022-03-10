@@ -22,6 +22,7 @@ def finalize_transformation(new_image: Image) -> None:
 def build_tr_dialog(tr_id: str) -> int:
     return dpg.window(label=f'Apply {tr_id.capitalize()} Transformation', tag=TR_DIALOG, modal=True, no_close=True, pos=interface.CENTER_POS)
 
+@render_error
 def delete_dialog() -> None:
     dpg.delete_item(TR_DIALOG)
 
@@ -43,21 +44,22 @@ def get_req_tr_img_value() -> Image:
         raise ValueError('Selecting a valid image is required for transformation')
     return img_repo.get_image(img_name)
 
-def build_tr_dialog_end_buttons(image_name: str, handle: Callable[[str], None]) -> None:
+def build_tr_dialog_end_buttons(tr_id: str, image_name: str, handle: Callable[[str], None]) -> None:
     with dpg.group(horizontal=True):
-        dpg.add_button(label='Transform', user_data=image_name, callback=lambda s, ap, ud: handle(ud[0]))
-        dpg.add_button(label='Cancel', callback=lambda: delete_dialog())
+        dpg.add_button(label='Transform', user_data=(handle, image_name), callback=lambda s, ap, ud: ud[0](ud[1]))
+        dpg.add_button(label='Cancel', user_data=tr_id, callback=lambda: delete_dialog())
 
 
-NOP_TRANSFORMATION: str = 'nop'
+TR_NOP: str = 'nop'
 @render_error
 def build_nop_dialog(image_name: str) -> None:
-    with build_tr_dialog(NOP_TRANSFORMATION):
-        build_tr_name_input(NOP_TRANSFORMATION, image_name)
+    with build_tr_dialog(TR_NOP):
+        build_tr_name_input(TR_NOP, image_name)
         # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
-        build_tr_dialog_end_buttons(image_name, nop_handle)
+        build_tr_dialog_end_buttons(TR_NOP, image_name, nop_handle)
 
-def nop_handle(image_name: str, dialog) -> None:
+@render_error
+def nop_handle(image_name: str) -> None:
     # 1. Obtenemos inputs
     image = img_repo.get_image(image_name)
     new_name: str = get_tr_name_value(image)
@@ -70,14 +72,15 @@ def nop_handle(image_name: str, dialog) -> None:
     finalize_transformation(new_image)
 
 
-ADD_OPERATION: str = 'add'
+TR_ADD: str = 'add'
 @render_error
 def build_add_dialog(image_name: str) -> None:
-    with build_tr_dialog(ADD_OPERATION):
-        build_tr_name_input(ADD_OPERATION, image_name)
+    with build_tr_dialog(TR_ADD):
+        build_tr_name_input(TR_ADD, image_name)
         build_op_img_selector(image_name)
-        build_tr_dialog_end_buttons(image_name, sum_handle)
+        build_tr_dialog_end_buttons(TR_ADD, image_name, sum_handle)
 
+@render_error
 def sum_handle(image_name: str) -> None:
     # 1. Obtenemos inputs
     image = img_repo.get_image(image_name)
@@ -96,6 +99,6 @@ def sum_handle(image_name: str) -> None:
 
 
 TRANSFORMATIONS: Dict[str, Callable[[str], None]] = {
-    NOP_TRANSFORMATION: build_nop_dialog,
-    ADD_OPERATION: build_add_dialog,
+    TR_NOP: build_nop_dialog,
+    TR_ADD: build_add_dialog,
 }
