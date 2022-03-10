@@ -9,7 +9,6 @@ import images_repo as img_repo
 from interface_utils import render_error
 from metadata_repo import set_metadata_file
 from transformations import TRANSFORMATIONS
-from operations import OPERATIONS
 
 # General Items
 PRIMARY_WINDOW: str = 'primary'
@@ -33,13 +32,10 @@ def render_image_window(image_name: str):
         with dpg.window(label=image_name, tag=f'window_{image_name}', pos=(100, 100), no_resize=True, on_close=lambda: dpg.delete_item(f'window_{image_name}')) as window:
             
             with dpg.menu_bar():
-                dpg.add_menu_item(label="Save Image", user_data=image_name, callback=lambda s, ad, ud: build_save_image_dialog(ud))
-                with dpg.menu(label="Apply Transformation"):
+                dpg.add_menu_item(label='Save', user_data=image_name, callback=lambda s, ad, ud: build_save_image_dialog(ud))
+                with dpg.menu(label='Transform'):
                     for name, tr in TRANSFORMATIONS.items():
                         dpg.add_button(label=name.capitalize(), user_data=image_name, callback=lambda s, ad, ud: tr(ud))
-                with dpg.menu(label="Apply Operations"):
-                    for name, op in OPERATIONS.items():
-                        dpg.add_button(label=name.capitalize(), user_data=image_name, callback=lambda s, ad, ud: op(ud))
             
             dpg.set_item_user_data(window, {})
 

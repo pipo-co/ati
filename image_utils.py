@@ -11,7 +11,7 @@ from PIL import Image as PImage
 
 CIRCLE_IMAGE_NAME: str = 'circle.pgm'
 SQUARE_IMAGE_NAME: str = 'square.pgm'
-RESERVED_IMAGE_NAMES: Tuple[str, str] = (CIRCLE_IMAGE_NAME, SQUARE_IMAGE_NAME)
+RESERVED_IMAGE_NAMES: Tuple[str, ...] = (CIRCLE_IMAGE_NAME, SQUARE_IMAGE_NAME)
 
 class ImageFormat(Enum):
     PGM     = 'pgm'
