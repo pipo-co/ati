@@ -38,7 +38,10 @@ def get_req_tr_name_value(image: Image) -> str:
     base_name = dpg.get_value(TR_NAME_INPUT)
     if not base_name:
         raise ValueError('A name for the new image must be provided')
-    return dpg.get_value(TR_NAME_INPUT) + image.format.to_extension()
+    ret = dpg.get_value(TR_NAME_INPUT) + image.format.to_extension()
+    if img_repo.contains_image(ret):
+        raise ValueError(f'Another image with name "{ret}" already exists')
+    return ret
 
 def build_op_img_selector(image_name: str) -> None:
     image_list = list(map(lambda img: img.name, img_repo.get_same_shape_images(image_name)))
@@ -50,6 +53,10 @@ def get_req_tr_img_value() -> Image:
     if not img_repo.contains_image(img_name):
         raise ValueError('Selecting a valid image is required for transformation')
     return img_repo.get_image(img_name)
+
+def require_same_shape(img1: Image, img2: Image, msg: str) -> None:
+    if img1.shape != img2.shape:
+        raise ValueError(msg)
 
 def build_tr_dialog_end_buttons(tr_id: str, image_name: str, handle: TrHandler) -> None:
     with dpg.group(horizontal=True):
@@ -88,8 +95,7 @@ def tr_add(image_name: str) -> Image:
     image = img_repo.get_image(image_name)
     new_name: str = get_req_tr_name_value(image)
     sec_image = get_req_tr_img_value()
-    if image.shape != sec_image.shape:
-        raise ValueError('You can only sum images with the same shape')
+    require_same_shape(image, sec_image, 'You can only sum images with the same shape')
 
     # 2. Procesamos
     new_data = add_images(image, sec_image)
@@ -110,8 +116,7 @@ def tr_sub(image_name: str) -> Image:
     image = img_repo.get_image(image_name)
     new_name: str = get_req_tr_name_value(image)
     sec_image = get_req_tr_img_value()
-    if image.shape != sec_image.shape:
-        raise ValueError('You can only sub images with the same shape')
+    require_same_shape(image, sec_image, 'You can only sub images with the same shape')
 
     # 2. Procesamos
     new_data = sub_images(image, sec_image)
@@ -132,8 +137,7 @@ def tr_mult(image_name: str) -> Image:
     image = img_repo.get_image(image_name)
     new_name: str = get_req_tr_name_value(image)
     sec_image = get_req_tr_img_value()
-    if image.shape != sec_image.shape:
-        raise ValueError('You can only multiply images with the same shape')
+    require_same_shape(image, sec_image, 'You can only multiply images with the same shape')
 
     # 2. Procesamos
     new_data = multiply_images(image, sec_image)
