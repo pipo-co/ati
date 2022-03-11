@@ -52,6 +52,10 @@ class Image:
         self.format = fmt
         self.data = data
 
+    def valid_pixel(self, pixel: Tuple[int, int]) -> bool:
+        x, y = pixel
+        return 0 <= x < self.width and 0 <= y < self.height
+
     @property
     def shape(self) -> Tuple[int]:
         return self.data.shape

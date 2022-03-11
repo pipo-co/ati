@@ -1,7 +1,8 @@
 import dearpygui.dearpygui as dpg
 
 from interface import build_load_image_dialog, build_load_metadata_dialog, create_circle_handler, create_square_handler, \
-    LOAD_IMAGE_DIALOG, LOAD_METADATA_DIALOG, PRIMARY_WINDOW, TEXTURE_REGISTRY, IMAGES_MENU, build_save_image_dialog
+    LOAD_IMAGE_DIALOG, LOAD_METADATA_DIALOG, PRIMARY_WINDOW, TEXTURE_REGISTRY, IMAGES_MENU, build_save_image_dialog, \
+    build_image_handler_registry
 from metadata_repo import set_metadata_file
 DEFAULT_METADATA_PATH: str = 'images/raw_metadata.tsv'
 
@@ -14,6 +15,7 @@ def main():
 
     # Registries
     dpg.add_texture_registry(tag=TEXTURE_REGISTRY)
+    build_image_handler_registry()
 
     # Dialog
     build_load_image_dialog()
