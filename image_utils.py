@@ -3,6 +3,7 @@ import os
 from dataclasses import dataclass
 from enum import Enum
 from typing import Iterable, Tuple
+from noise import gaussian, exponential, rayleigh
 
 import metadata_repo
 
@@ -140,6 +141,7 @@ def create_circle_image() -> Image:
     mask = create_circular_mask(CREATED_IMAGE_LEN, CREATED_IMAGE_LEN, radius=CIRCLE_RADIUS)
     data = np.zeros((CREATED_IMAGE_LEN, CREATED_IMAGE_LEN), dtype=np.uint8)
     data[mask] = 255
+    print()
     return Image(CIRCLE_IMAGE_NAME, ImageFormat.PGM, data, allow_reserved=True)
 
 # https://stackoverflow.com/a/44874588
@@ -204,7 +206,6 @@ def get_negative(img: Image) -> np.ndarray:
     return np.array([-xi + COLOR_DEPTH for xi in img.data], dtype=np.uint8)
 
 def transform_from_threshold(img: Image, umb:int) -> np.ndarray:
-    # return img.data[img.data > umb].astype(np.uint8)
     shape = img.shape
     new_arr = np.array([get_grey_value(xi, umb) for xi in img.data.flatten()], dtype=np.uint8)
 
@@ -215,3 +216,8 @@ def get_grey_value(pix, umb):
         return COLOR_DEPTH
     else:
         return 0 
+
+def pollute_gaussian(img: Image, percentage:int, median: float, sigma:float, mode:str ='add') -> np.ndarray:
+    shape = img.shape
+    if mode == 'add':
+        new_arr = np.array([get_grey_value(xi, umb) for xi in img.data.flatten()], dtype=np.uint8)

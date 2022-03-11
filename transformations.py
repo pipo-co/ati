@@ -4,7 +4,7 @@ import dearpygui.dearpygui as dpg
 
 import images_repo as img_repo
 import interface
-from image_utils import Image, strip_extension, add_images, sub_images, multiply_images, power_function, get_negative, transform_from_threshold
+from image_utils import Image, strip_extension, add_images, sub_images, multiply_images, power_function, get_negative, transform_from_threshold, pollute_gaussian
 from interface_utils import render_error
 
 # General Items
@@ -37,13 +37,13 @@ def build_tr_name_input(tr_id: str, image_name: str) -> None:
     dpg.add_text('Select New Image Name (no extension)')
     dpg.add_input_text(default_value=strip_extension(image_name) + f'_{tr_id}', tag=TR_NAME_INPUT)
 
-def build_tr_value_int_selector(value: str, min: int, max:int) -> None:
+def build_tr_value_int_selector(value: str, min: int, max:int, mtag:str = TR_INT_VALUE_SELECTOR) -> None:
     dpg.add_text(f'Select {value} value')
-    dpg.add_input_int( min_value=min, max_value=max, label=f'pick a value for {value} between {min} and {max}', tag=TR_INT_VALUE_SELECTOR)
+    dpg.add_input_int( min_value=min, max_value=max, label=f'pick a value for {value} between {min} and {max}', tag=mtag)
 
-def build_tr_value_float_selector(value: str, min: float, max:float) -> None:
+def build_tr_value_float_selector(value: str, min: float, max:float, mtag:str = TR_FLOAT_VALUE_SELECTOR) -> None:
     dpg.add_text(f'Select {value} value')
-    dpg.add_input_float( min_value=min, max_value=max, label=f'pick a value for {value} between {min} and {max}', tag=TR_FLOAT_VALUE_SELECTOR)
+    dpg.add_input_float( min_value=min, max_value=max, label=f'pick a value for {value} between {min} and {max}', tag=mtag)
 
 def get_req_tr_name_value(image: Image) -> str:
     base_name = dpg.get_value(TR_NAME_INPUT)
@@ -163,6 +163,29 @@ def tr_umb(image_name: str) -> Image:
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 
+TR_GAUSS: str = 'gauss'
+@render_error
+def build_gauss_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_UMB):
+        build_tr_name_input(TR_UMB, image_name)
+        # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
+        build_tr_value_int_selector('median', 0, 255, mtag='median_value_input')
+        build_tr_value_float_selector('sigma', 0, 1, mtag='sigma_value_input')
+        build_tr_value_float_selector('percentage', 0, 100, mtag='percentage_value_input')
+        build_tr_dialog_end_buttons(TR_GAUSS, image_name, tr_gauss)
+
+def tr_gauss(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image = img_repo.get_image(image_name)
+    new_name: str = get_req_tr_name_value(image)
+    median:int = dpg.get_value('median_value_input')
+    sigma:float = dpg.get_value('sigma_value_input')
+    percentage:float = dpg.get_value('percentage_value_input')
+    # 2. Procesamos - Puede ser async
+    new_data = pollute_gaussian(image, percentage, median, sigma, mode='add')
+    # 3. Creamos Imagen
+    return Image(new_name, image.format, new_data)
+
 
 TR_ADD: str = 'add'
 @render_error
@@ -235,4 +258,5 @@ TRANSFORMATIONS: Dict[str, Callable[[str], None]] = {
     TR_ADD: build_add_dialog,
     TR_SUB: build_sub_dialog,
     TR_MULT: build_mult_dialog,
+    TR_GAUSS: build_gauss_dialog
 }
