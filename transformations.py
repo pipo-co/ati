@@ -20,9 +20,8 @@ TrHandler = Callable[[str], Image]
 def execute_transformation(image_name: str, handler: TrHandler) -> None:
     try:
         new_image = handler(image_name)
-    except Exception as e:
+    finally:
         dpg.delete_item(TR_DIALOG)
-        raise e
 
     img_repo.persist_image(new_image)
     interface.register_image(new_image)
