@@ -163,12 +163,8 @@ def create_square_image() -> Image:
     diff = (CREATED_IMAGE_LEN - SQUARE_LEN) // 2
     min_square = diff
     max_square = CREATED_IMAGE_LEN - diff
-    data = np.zeros((CREATED_IMAGE_LEN, CREATED_IMAGE_LEN), dtype=np.uint8)
-    for i in range(CREATED_IMAGE_LEN):
-        for j in range(CREATED_IMAGE_LEN):
-            if min_square <= i <= max_square:
-                if min_square <= j <= max_square:
-                    data[i][j] = 255
+    data = np.zeros((CREATED_IMAGE_LEN, CREATED_IMAGE_LEN), dtype=np.uint8) 
+    data[min_square:max_square, min_square:max_square] = 255
 
     return Image(SQUARE_IMAGE_NAME, ImageFormat.PGM, data, allow_reserved=True)
 
