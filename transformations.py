@@ -4,7 +4,7 @@ import dearpygui.dearpygui as dpg
 
 import images_repo as img_repo
 import interface
-from image_utils import Image, multiply_images, strip_extension, sum_images, sub_images, multiply_images
+from image_utils import Image, strip_extension, add_images, sub_images, multiply_images
 from interface_utils import render_error
 
 # General Items
@@ -92,9 +92,10 @@ def tr_add(image_name: str) -> Image:
         raise ValueError('You can only sum images with the same shape')
 
     # 2. Procesamos
-    new_data = sum_images(image, sec_image)
+    new_data = add_images(image, sec_image)
     # 3. Creamos Imagen y finalizamos
     return Image(new_name, image.format, new_data)
+
 
 TR_SUB: str = 'sub'
 @render_error
@@ -116,6 +117,7 @@ def tr_sub(image_name: str) -> Image:
     new_data = sub_images(image, sec_image)
     # 3. Creamos Imagen y finalizamos
     return Image(new_name, image.format, new_data)
+
 
 TR_MULT: str = 'mult'
 @render_error

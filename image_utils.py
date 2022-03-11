@@ -46,6 +46,8 @@ class Image:
     def __init__(self, name: str, fmt: ImageFormat, data: np.ndarray, allow_reserved: bool = False):
         if not allow_reserved and name in RESERVED_IMAGE_NAMES:
             raise ValueError(f'name cannot be any of this names: {RESERVED_IMAGE_NAMES}')
+        if data.dtype != np.uint8:
+            raise ValueError('data must be of type uint8')
         self.name = name
         self.format = fmt
         self.data = data
@@ -163,13 +165,14 @@ def create_square_image() -> Image:
 
     return Image(SQUARE_IMAGE_NAME, ImageFormat.PGM, data, allow_reserved=True)
 
-def sum_images(first_img: Image, second_img: Image) -> np.ndarray:
-    array = np.add(first_img.data.astype(np.uint), second_img.data.astype(np.uint))
+def add_images(first_img: Image, second_img: Image) -> np.ndarray:
+    # TODO(tobi): Alcanza con uint16, pero con la normalización que tenemos necesitamos 32
+    array = np.add(first_img.data, second_img.data, dtype=np.uint32)
     new_array = normalize(array)
     return new_array
 
 def sub_images(first_img: Image, second_img: Image) -> np.ndarray:
-    array = np.subtract(first_img.data.astype(np.uint), second_img.data.astype(np.uint))
+    array = np.subtract(first_img.data, second_img.data, dtype=np.int32)
     new_array = normalize(array)
     return new_array
 
@@ -184,8 +187,15 @@ def multiply_images(first_img: Image, second_img: Image) -> np.ndarray:
 
     return ImageChops.multiply(im1, im2)
 
-        
-def normalize(arr: np.ndarray) -> np.ndarray:
-    rng = arr.max() - arr.min()
-    amin = arr.min()
-    return (arr - amin)*255//rng
+# Normalizes to uint8 ndarray
+# TODO(tobi): Consultar si se puede mejorar
+def normalize(data: np.ndarray) -> np.ndarray:
+    if data.dtype == np.uint8:
+        return data
+    elif np.can_cast(data.dtype, np.uint8, casting='safe'):
+        return data.astype(np.uint8, casting='safe', copy=False)
+    else:
+        rng = data.max() - data.min()
+        amin = data.min()
+        ret = (data - amin) * 255 // rng
+        return ret.astype(np.uint8, copy=False)
