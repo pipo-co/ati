@@ -7,7 +7,7 @@ from typing import Iterable, Tuple
 import metadata_repo
 
 import numpy as np
-from PIL import Image as PImage
+from PIL import ImageChops, Image as PImage
 
 CIRCLE_IMAGE_NAME: str = 'circle.pgm'
 SQUARE_IMAGE_NAME: str = 'square.pgm'
@@ -168,6 +168,23 @@ def sum_images(first_img: Image, second_img: Image) -> np.ndarray:
     new_array = normalize(array)
     return new_array
 
+def sub_images(first_img: Image, second_img: Image) -> np.ndarray:
+    array = np.subtract(first_img.data.astype(np.uint), second_img.data.astype(np.uint))
+    new_array = normalize(array)
+    return new_array
+
+def multiply_images(first_img: Image, second_img: Image) -> np.ndarray:
+    # creating a image1 object
+    print(first_img.name, second_img.name)
+    im1 = PImage.open("images/" + first_img.name)
+
+    # creating a image2 object
+    im2 = PImage.open("images/" + second_img.name)
+    print(im1, im2)
+
+    return ImageChops.multiply(im1, im2)
+
+        
 def normalize(arr: np.ndarray) -> np.ndarray:
     rng = arr.max() - arr.min()
     amin = arr.min()

@@ -4,7 +4,7 @@ import dearpygui.dearpygui as dpg
 
 import images_repo as img_repo
 import interface
-from image_utils import Image, strip_extension, sum_images
+from image_utils import Image, multiply_images, strip_extension, sum_images, sub_images, multiply_images
 from interface_utils import render_error
 
 # General Items
@@ -97,8 +97,52 @@ def tr_add(image_name: str) -> Image:
     # 3. Creamos Imagen y finalizamos
     return Image(new_name, image.format, new_data)
 
+TR_SUB: str = 'sub'
+@render_error
+def build_sub_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_SUB):
+        build_tr_name_input(TR_SUB, image_name)
+        build_op_img_selector(image_name)
+        build_tr_dialog_end_buttons(TR_SUB, image_name, tr_sub)
+
+def tr_sub(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image = img_repo.get_image(image_name)
+    new_name: str = get_req_tr_name_value(image)
+    sec_image = get_req_tr_img_value()
+    if image.shape != sec_image.shape:
+        raise ValueError('You can only sub images with the same shape')
+
+    # 2. Procesamos
+    new_data = sub_images(image, sec_image)
+    # 3. Creamos Imagen y finalizamos
+    return Image(new_name, image.format, new_data)
+
+TR_MULT: str = 'mult'
+@render_error
+def build_mult_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_MULT):
+        build_tr_name_input(TR_MULT, image_name)
+        build_op_img_selector(image_name)
+        build_tr_dialog_end_buttons(TR_MULT, image_name, tr_mult)
+
+def tr_mult(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image = img_repo.get_image(image_name)
+    new_name: str = get_req_tr_name_value(image)
+    sec_image = get_req_tr_img_value()
+    if image.shape != sec_image.shape:
+        raise ValueError('You can only multiply images with the same shape')
+
+    # 2. Procesamos
+    new_data = multiply_images(image, sec_image)
+    # 3. Creamos Imagen y finalizamos
+    return Image(new_name, image.format, new_data)
+
 
 TRANSFORMATIONS: Dict[str, Callable[[str], None]] = {
     TR_NOP: build_nop_dialog,
     TR_ADD: build_add_dialog,
+    TR_SUB: build_sub_dialog,
+    TR_MULT: build_mult_dialog,
 }
