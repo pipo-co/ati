@@ -7,7 +7,7 @@ from typing import Iterable, Tuple
 import metadata_repo
 
 import numpy as np
-from PIL import ImageChops, Image as PImage
+from PIL import Image as PImage
 
 CIRCLE_IMAGE_NAME: str = 'circle.pgm'
 SQUARE_IMAGE_NAME: str = 'square.pgm'
@@ -168,24 +168,15 @@ def create_square_image() -> Image:
 def add_images(first_img: Image, second_img: Image) -> np.ndarray:
     # TODO(tobi): Alcanza con uint16, pero con la normalización que tenemos necesitamos 32
     array = np.add(first_img.data, second_img.data, dtype=np.uint32)
-    new_array = normalize(array)
-    return new_array
+    return normalize(array)
 
 def sub_images(first_img: Image, second_img: Image) -> np.ndarray:
     array = np.subtract(first_img.data, second_img.data, dtype=np.int32)
-    new_array = normalize(array)
-    return new_array
+    return normalize(array)
 
 def multiply_images(first_img: Image, second_img: Image) -> np.ndarray:
-    # creating a image1 object
-    print(first_img.name, second_img.name)
-    im1 = PImage.open("images/" + first_img.name)
-
-    # creating a image2 object
-    im2 = PImage.open("images/" + second_img.name)
-    print(im1, im2)
-
-    return ImageChops.multiply(im1, im2)
+    array = np.multiply(first_img.data, second_img.data, dtype=np.uint32)
+    return normalize(array)
 
 # Normalizes to uint8 ndarray
 # TODO(tobi): Consultar si se puede mejorar
