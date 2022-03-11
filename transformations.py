@@ -4,7 +4,7 @@ import dearpygui.dearpygui as dpg
 
 import images_repo as img_repo
 import interface
-from image_utils import Image, strip_extension, add_images, sub_images, multiply_images
+from image_utils import Image, strip_extension, add_images, sub_images, multiply_images, power_function
 from interface_utils import render_error
 
 # General Items
@@ -13,6 +13,8 @@ TR_DIALOG: str = 'tr_dialog'
 # Custom Inputs
 TR_NAME_INPUT: str = 'tr_name_input'
 TR_IMG_INPUT: str = 'tr_img_input'
+
+TR_NUMERIC_VALUE_SELECTOR: str = 'tr_numeric_value_input'
 
 TrHandler = Callable[[str], Image]
 
@@ -34,11 +36,30 @@ def build_tr_name_input(tr_id: str, image_name: str) -> None:
     dpg.add_text('Select New Image Name (no extension)')
     dpg.add_input_text(default_value=strip_extension(image_name) + f'_{tr_id}', tag=TR_NAME_INPUT)
 
+def build_tr_value_selector(value: str, input_label:str) -> None:
+    dpg.add_text(f'Select {value} value')
+    dpg.add_input_float( min_value=0.0, max_value=2.0, label=input_label, tag=TR_NUMERIC_VALUE_SELECTOR)
+
 def get_req_tr_name_value(image: Image) -> str:
     base_name = dpg.get_value(TR_NAME_INPUT)
     if not base_name:
         raise ValueError('A name for the new image must be provided')
-    ret = dpg.get_value(TR_NAME_INPUT) + image.format.to_extension()
+    ret = base_name + image.format.to_extension()
+    if img_repo.contains_image(ret):
+        raise ValueError(f'Another image with name "{ret}" already exists')
+    return ret
+
+def get_gamma_tr_value() -> float:
+    gamma = dpg.get_value(TR_NUMERIC_VALUE_SELECTOR)
+    if gamma == 1.0:
+        raise ValueError('Value cannot be 1')
+    return gamma
+
+def get_req_tr_name_value(image: Image) -> str:
+    base_name = dpg.get_value(TR_NAME_INPUT)
+    if not base_name:
+        raise ValueError('A name for the new image must be provided')
+    ret = base_name + image.format.to_extension()
     if img_repo.contains_image(ret):
         raise ValueError(f'Another image with name "{ret}" already exists')
     return ret
@@ -80,6 +101,25 @@ def tr_nop(image_name: str) -> Image:
     # Do Nothing
     # 3. Creamos Imagen
     return Image(new_name, image.format, image.data)
+
+TR_POW: str = 'pow'
+@render_error
+def build_pow_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_POW):
+        build_tr_name_input(TR_POW, image_name)
+        # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
+        build_tr_value_selector('gamma', 'select a gamma value between 0 and 2. 1 is not a valid option.')
+        build_tr_dialog_end_buttons(TR_POW, image_name, tr_pow)
+
+def tr_pow(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image = img_repo.get_image(image_name)
+    new_name: str = get_req_tr_name_value(image)
+    gamma:float = get_gamma_tr_value()
+    # 2. Procesamos - Puede ser async
+    new_data = power_function(image, gamma)
+    # 3. Creamos Imagen
+    return Image(new_name, image.format, new_data)
 
 
 TR_ADD: str = 'add'
@@ -147,6 +187,7 @@ def tr_mult(image_name: str) -> Image:
 
 TRANSFORMATIONS: Dict[str, Callable[[str], None]] = {
     TR_NOP: build_nop_dialog,
+    TR_POW: build_pow_dialog,
     TR_ADD: build_add_dialog,
     TR_SUB: build_sub_dialog,
     TR_MULT: build_mult_dialog,

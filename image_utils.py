@@ -12,6 +12,7 @@ from PIL import Image as PImage
 CIRCLE_IMAGE_NAME: str = 'circle.pgm'
 SQUARE_IMAGE_NAME: str = 'square.pgm'
 RESERVED_IMAGE_NAMES: Tuple[str, ...] = (CIRCLE_IMAGE_NAME, SQUARE_IMAGE_NAME)
+COLOR_DEPTH: int = 255
 
 class ImageFormat(Enum):
     PGM     = 'pgm'
@@ -194,3 +195,8 @@ def normalize(data: np.ndarray) -> np.ndarray:
         amin = data.min()
         ret = (data - amin) * 255 // rng
         return ret.astype(np.uint8, copy=False)
+
+def power_function(img: Image, gamma: float) -> np.ndarray:
+    c: float = COLOR_DEPTH/(COLOR_DEPTH**gamma)
+    return np.array([c*xi**gamma for xi in img.data], dtype=np.uint8)
+
