@@ -4,7 +4,7 @@ import dearpygui.dearpygui as dpg
 
 import images_repo as img_repo
 import interface
-from image_utils import Image, strip_extension, add_images, sub_images, multiply_images, power_function
+from image_utils import Image, strip_extension, add_images, sub_images, multiply_images, power_function, get_negative, transform_from_threshold
 from interface_utils import render_error
 
 # General Items
@@ -14,7 +14,8 @@ TR_DIALOG: str = 'tr_dialog'
 TR_NAME_INPUT: str = 'tr_name_input'
 TR_IMG_INPUT: str = 'tr_img_input'
 
-TR_NUMERIC_VALUE_SELECTOR: str = 'tr_numeric_value_input'
+TR_INT_VALUE_SELECTOR: str = 'tr_int_value_input'
+TR_FLOAT_VALUE_SELECTOR: str = 'tr_float_value_input'
 
 TrHandler = Callable[[str], Image]
 
@@ -36,9 +37,13 @@ def build_tr_name_input(tr_id: str, image_name: str) -> None:
     dpg.add_text('Select New Image Name (no extension)')
     dpg.add_input_text(default_value=strip_extension(image_name) + f'_{tr_id}', tag=TR_NAME_INPUT)
 
-def build_tr_value_selector(value: str, input_label:str) -> None:
+def build_tr_value_int_selector(value: str, min: int, max:int) -> None:
     dpg.add_text(f'Select {value} value')
-    dpg.add_input_float( min_value=0.0, max_value=2.0, label=input_label, tag=TR_NUMERIC_VALUE_SELECTOR)
+    dpg.add_input_int( min_value=min, max_value=max, label=f'pick a value for {value} between {min} and {max}', tag=TR_INT_VALUE_SELECTOR)
+
+def build_tr_value_float_selector(value: str, min: float, max:float) -> None:
+    dpg.add_text(f'Select {value} value')
+    dpg.add_input_float( min_value=min, max_value=max, label=f'pick a value for {value} between {min} and {max}', tag=TR_FLOAT_VALUE_SELECTOR)
 
 def get_req_tr_name_value(image: Image) -> str:
     base_name = dpg.get_value(TR_NAME_INPUT)
@@ -50,7 +55,7 @@ def get_req_tr_name_value(image: Image) -> str:
     return ret
 
 def get_gamma_tr_value() -> float:
-    gamma = dpg.get_value(TR_NUMERIC_VALUE_SELECTOR)
+    gamma = dpg.get_value(TR_FLOAT_VALUE_SELECTOR)
     if gamma == 1.0:
         raise ValueError('Value cannot be 1')
     return gamma
@@ -100,7 +105,25 @@ def tr_nop(image_name: str) -> Image:
     # 2. Procesamos - Puede ser async
     # Do Nothing
     # 3. Creamos Imagen
-    return Image(new_name, image.format, image.data)
+    return Image(new_name, image.format, image.data)\
+
+TR_NEG: str = 'neg'
+@render_error
+def build_neg_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_NEG):
+        build_tr_name_input(TR_NEG, image_name)
+        # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
+        build_tr_dialog_end_buttons(TR_NEG, image_name, tr_neg)
+
+def tr_neg(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image = img_repo.get_image(image_name)
+    new_name: str = get_req_tr_name_value(image)
+    # 2. Procesamos - Puede ser async
+    new_data = get_negative(image)
+    # Do Nothing
+    # 3. Creamos Imagen
+    return Image(new_name, image.format, new_data)
 
 TR_POW: str = 'pow'
 @render_error
@@ -108,7 +131,7 @@ def build_pow_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_POW):
         build_tr_name_input(TR_POW, image_name)
         # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
-        build_tr_value_selector('gamma', 'select a gamma value between 0 and 2. 1 is not a valid option.')
+        build_tr_value_float_selector('gamma', 0.0, 2.0)
         build_tr_dialog_end_buttons(TR_POW, image_name, tr_pow)
 
 def tr_pow(image_name: str) -> Image:
@@ -118,6 +141,25 @@ def tr_pow(image_name: str) -> Image:
     gamma:float = get_gamma_tr_value()
     # 2. Procesamos - Puede ser async
     new_data = power_function(image, gamma)
+    # 3. Creamos Imagen
+    return Image(new_name, image.format, new_data)
+
+TR_UMB: str = 'umb'
+@render_error
+def build_umb_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_UMB):
+        build_tr_name_input(TR_UMB, image_name)
+        # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
+        build_tr_value_int_selector('threshold', 0, 255)
+        build_tr_dialog_end_buttons(TR_UMB, image_name, tr_umb)
+
+def tr_umb(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image = img_repo.get_image(image_name)
+    new_name: str = get_req_tr_name_value(image)
+    umb:int = dpg.get_value(TR_INT_VALUE_SELECTOR)
+    # 2. Procesamos - Puede ser async
+    new_data = transform_from_threshold(image, umb)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 
@@ -187,7 +229,9 @@ def tr_mult(image_name: str) -> Image:
 
 TRANSFORMATIONS: Dict[str, Callable[[str], None]] = {
     TR_NOP: build_nop_dialog,
+    TR_NEG: build_neg_dialog,
     TR_POW: build_pow_dialog,
+    TR_UMB: build_umb_dialog,
     TR_ADD: build_add_dialog,
     TR_SUB: build_sub_dialog,
     TR_MULT: build_mult_dialog,

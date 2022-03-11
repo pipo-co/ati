@@ -200,3 +200,18 @@ def power_function(img: Image, gamma: float) -> np.ndarray:
     c: float = COLOR_DEPTH/(COLOR_DEPTH**gamma)
     return np.array([c*xi**gamma for xi in img.data], dtype=np.uint8)
 
+def get_negative(img: Image) -> np.ndarray:
+    return np.array([-xi + COLOR_DEPTH for xi in img.data], dtype=np.uint8)
+
+def transform_from_threshold(img: Image, umb:int) -> np.ndarray:
+    # return img.data[img.data > umb].astype(np.uint8)
+    shape = img.shape
+    new_arr = np.array([get_grey_value(xi, umb) for xi in img.data.flatten()], dtype=np.uint8)
+
+    return np.reshape(new_arr, shape)
+
+def get_grey_value(pix, umb):
+    if pix >= umb:
+        return COLOR_DEPTH
+    else:
+        return 0 
