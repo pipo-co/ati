@@ -21,6 +21,9 @@ def main():
     build_load_image_dialog()
     build_save_image_dialog()
     build_load_metadata_dialog()
+    
+    # Image window
+    build_hist_themes()
 
     with dpg.viewport_menu_bar():
         dpg.add_menu_item(label='Load', callback=lambda: dpg.show_item(LOAD_IMAGE_DIALOG))
