@@ -13,7 +13,8 @@ from PIL import Image as PImage
 CIRCLE_IMAGE_NAME: str = 'circle.pgm'
 SQUARE_IMAGE_NAME: str = 'square.pgm'
 RESERVED_IMAGE_NAMES: Tuple[str, ...] = (CIRCLE_IMAGE_NAME, SQUARE_IMAGE_NAME)
-COLOR_DEPTH: int = 255
+COLOR_DEPTH: int = 256
+MAX_COLOR: int = COLOR_DEPTH - 1
 
 class ImageFormat(Enum):
     PGM     = 'pgm'
@@ -195,11 +196,11 @@ def normalize(data: np.ndarray) -> np.ndarray:
         return ret.astype(np.uint8, copy=False)
 
 def power_function(img: Image, gamma: float) -> np.ndarray:
-    c: float = COLOR_DEPTH/(COLOR_DEPTH**gamma)
+    c: float = MAX_COLOR/(MAX_COLOR**gamma)
     return np.array([c*xi**gamma for xi in img.data], dtype=np.uint8)
 
 def get_negative(img: Image) -> np.ndarray:
-    return np.array([-xi + COLOR_DEPTH for xi in img.data], dtype=np.uint8)
+    return np.array([-xi + MAX_COLOR for xi in img.data], dtype=np.uint8)
 
 def transform_from_threshold(img: Image, umb:int) -> np.ndarray:
     shape = img.shape
@@ -209,7 +210,7 @@ def transform_from_threshold(img: Image, umb:int) -> np.ndarray:
 
 def get_grey_value(pix, umb):
     if pix >= umb:
-        return COLOR_DEPTH
+        return MAX_COLOR
     else:
         return 0 
 
@@ -217,3 +218,16 @@ def pollute_gaussian(img: Image, percentage:int, median: float, sigma:float, mod
     shape = img.shape
     if mode == 'add':
         new_arr = np.array([get_grey_value(xi, umb) for xi in img.data.flatten()], dtype=np.uint8)
+
+def channel_histogram(channel: np.ndarray) -> np.ndarray:
+    return np.histogram(channel.flatten(), bins=COLOR_DEPTH, range=(0, COLOR_DEPTH)) / channel.size
+
+def hist_equalization(channel: np.ndarray)  -> np.ndarray:
+
+    normed_hist = channel_histogram(channel)
+    s = normed_hist.cumsum()
+    masked_s = np.ma.masked_equal(s, 0)
+    masked_s = (masked_s - masked_s.min())*(MAX_COLOR)/(masked_s.max()-masked_s.min())
+    s = np.ma.filled(masked_s, 0).astype('uint8')
+
+    return s[channel]
