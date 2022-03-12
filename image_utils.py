@@ -59,6 +59,9 @@ class Image:
         x, y = pixel
         return 0 <= x < self.width and 0 <= y < self.height
 
+    def get_channel(self, channel: int) -> np.ndarray:
+        return self.data[:, :, channel] if self.channels > 1 else self.data
+
     @property
     def shape(self) -> Tuple[int]:
         return self.data.shape
