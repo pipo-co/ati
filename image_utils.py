@@ -239,6 +239,6 @@ def equalize(image: Image) -> np.ndarray:
         return channel_equalization(image.data)
     else:
         ret = np.empty(image.shape, dtype=np.uint8)
-        for channel in range(0, image.channels):
+        for channel in range(image.channels):
             ret[:, :, channel] = channel_equalization(image.get_channel(channel))
         return ret
