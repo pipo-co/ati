@@ -1,4 +1,4 @@
-from typing import Dict, Callable
+from typing import Callable
 
 import dearpygui.dearpygui as dpg
 
@@ -19,6 +19,24 @@ TR_INT_VALUE_SELECTOR: str = 'tr_int_value_input'
 TR_FLOAT_VALUE_SELECTOR: str = 'tr_float_value_input'
 
 TrHandler = Callable[[str], Image]
+
+def build_transformations_menu(image_name: str) -> None:
+    with dpg.menu(label='Transform'):
+        with dpg.menu(label='Basic'):
+            build_tr_menu_item(TR_COPY, build_copy_dialog, image_name)
+            build_tr_menu_item(TR_NEG, build_neg_dialog, image_name)
+            build_tr_menu_item(TR_POW, build_pow_dialog, image_name)
+            build_tr_menu_item(TR_UMBRAL, build_umbral_dialog, image_name)
+            build_tr_menu_item(TR_EQUALIZE, build_equalize_dialog, image_name)
+        with dpg.menu(label='Combine'):
+            build_tr_menu_item(TR_ADD, build_add_dialog, image_name)
+            build_tr_menu_item(TR_SUB, build_sub_dialog, image_name)
+            build_tr_menu_item(TR_MULT, build_mult_dialog, image_name)
+        with dpg.menu(label='Noise'):
+            build_tr_menu_item(TR_GAUSS, build_gauss_dialog, image_name)
+
+def build_tr_menu_item(tr_id: str, tr_dialog_builder: Callable[[str], None], image_name: str) -> None:
+    dpg.add_menu_item(label=tr_id.capitalize(), user_data=(tr_dialog_builder, image_name), callback=lambda s, ad, ud: ud[0](ud[1]))
 
 @render_error
 def execute_transformation(image_name: str, handler: TrHandler) -> None:
@@ -139,14 +157,14 @@ def tr_pow(image_name: str) -> Image:
     return Image(new_name, image.format, new_data)
 
 
-TR_UMB: str = 'umb'
+TR_UMBRAL: str = 'umbral'
 @render_error
-def build_umb_dialog(image_name: str) -> None:
-    with build_tr_dialog(TR_UMB):
-        build_tr_name_input(TR_UMB, image_name)
+def build_umbral_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_UMBRAL):
+        build_tr_name_input(TR_UMBRAL, image_name)
         # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
         build_tr_value_int_selector('threshold', 0, 255)
-        build_tr_dialog_end_buttons(TR_UMB, image_name, tr_umb)
+        build_tr_dialog_end_buttons(TR_UMBRAL, image_name, tr_umb)
 
 def tr_umb(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -162,8 +180,8 @@ def tr_umb(image_name: str) -> Image:
 TR_GAUSS: str = 'gauss'
 @render_error
 def build_gauss_dialog(image_name: str) -> None:
-    with build_tr_dialog(TR_UMB):
-        build_tr_name_input(TR_UMB, image_name)
+    with build_tr_dialog(TR_UMBRAL):
+        build_tr_name_input(TR_UMBRAL, image_name)
         # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
         build_tr_value_int_selector('median', 0, 255, mtag='median_value_input')
         build_tr_value_float_selector('sigma', 0, 1, mtag='sigma_value_input')
@@ -259,15 +277,3 @@ def tr_equalize(image_name: str) -> Image:
     # 3. Creamos Imagen y finalizamos
     return Image(new_name, image.format, new_data)
 
-
-TRANSFORMATIONS: Dict[str, Callable[[str], None]] = {
-    TR_COPY: build_copy_dialog,
-    TR_NEG: build_neg_dialog,
-    TR_POW: build_pow_dialog,
-    TR_UMB: build_umb_dialog,
-    TR_ADD: build_add_dialog,
-    TR_SUB: build_sub_dialog,
-    TR_MULT: build_mult_dialog,
-    TR_EQUALIZE: build_equalize_dialog,
-    TR_GAUSS: build_gauss_dialog,
-}

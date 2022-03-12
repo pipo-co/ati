@@ -8,7 +8,7 @@ from image_utils import channel_histogram, image_to_rgba_array, load_image, vali
 import images_repo as img_repo
 from interface_utils import render_error
 from metadata_repo import set_metadata_file
-from transformations import TRANSFORMATIONS
+from transformations import build_transformations_menu
 
 # General Items
 PRIMARY_WINDOW: str = 'primary'
@@ -39,9 +39,7 @@ def render_image_window(image_name: str):
         with dpg.window(label=image_name, tag=f'image_window_{image_name}', no_scrollbar=True, user_data={'image_name': image_name}, on_close=lambda: dpg.delete_item(window)) as window:
             with dpg.menu_bar():
                 dpg.add_menu_item(label='Save', user_data=image_name, callback=lambda s, ad, ud: trigger_save_image_dialog(ud))
-                with dpg.menu(label='Transform'):
-                    for name, tr in TRANSFORMATIONS.items():
-                        dpg.add_menu_item(label=name.capitalize(), user_data=(tr, image_name), callback=lambda s, ad, ud: ud[0](ud[1]))
+                build_transformations_menu(image_name)
 
             with dpg.group(horizontal=True) as main_group:
                 
