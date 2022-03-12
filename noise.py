@@ -1,19 +1,29 @@
 
 from enum import Enum
+import functools
 import random
-from typing import Callable
 import numpy as np
 
-class NoiseTypes(Enum):
-    GAUSS   = 'gaus'
-    EXP     = 'exp'
-    RAYL    = 'rayl'
+class NoiseType(Enum):
+    GAUSS   = functools.partial(lambda sigma: gaussian(0, sigma))
+    EXP     = functools.partial(lambda lambd: exponential(lambd))
+    RAYL    = functools.partial(lambda param: rayleigh(param))
 
-def gaussian(mu, sigma):
-    return random.gauss(mu, sigma)
+    def __call__(self, *args):
+        return self.value(*args)
 
-def exponential(lambd):
-    return random.expovariate(lambd)
 
-def rayleigh(param):
+def uniform() -> float:
+    return random.uniform(0, 1)
+
+def gaussian(mu, sigma) -> float:
+    
+    value = random.gauss(mu, sigma)
+    # print(value)
+    return value
+
+def exponential(lambd) -> float:
+    return random.expovariate(lambd) 
+
+def rayleigh(param) -> float:
     return np.random.rayleigh(param)

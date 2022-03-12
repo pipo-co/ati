@@ -3,7 +3,7 @@ import os
 from dataclasses import dataclass
 from enum import Enum
 from typing import Iterable, Tuple
-from noise import gaussian, exponential, rayleigh
+from noise import NoiseType, gaussian, exponential, rayleigh, uniform
 
 import metadata_repo
 
@@ -145,7 +145,6 @@ def create_circle_image() -> Image:
     mask = create_circular_mask(CREATED_IMAGE_LEN, CREATED_IMAGE_LEN, radius=CIRCLE_RADIUS)
     data = np.zeros((CREATED_IMAGE_LEN, CREATED_IMAGE_LEN), dtype=np.uint8)
     data[mask] = 255
-    print()
     return Image(CIRCLE_IMAGE_NAME, ImageFormat.PGM, data, allow_reserved=True)
 
 # https://stackoverflow.com/a/44874588
@@ -206,21 +205,52 @@ def get_negative(img: Image) -> np.ndarray:
     return np.array([-xi + MAX_COLOR for xi in img.data], dtype=np.uint8)
 
 def transform_from_threshold(img: Image, umb:int) -> np.ndarray:
-    shape = img.shape
-    new_arr = np.array([get_grey_value(xi, umb) for xi in img.data.flatten()], dtype=np.uint8)
+    if img.channels == 1:
+        return transform_array_from_threshold(img.data, umb)
+    else:
+        ret = np.empty(img.shape, dtype=np.uint8)
+        for channel in range(0, img.channels):
+            ret[:, :, channel] = transform_array_from_threshold(img.get_channel(channel), umb)
+        return ret
+
+def transform_array_from_threshold(channel: np.ndarray, umb:int) -> np.ndarray:
+    shape = np.shape(channel)
+    new_arr = np.array([MAX_COLOR if xi >= umb else 0 for xi in channel.flatten()], dtype=np.uint8)
 
     return np.reshape(new_arr, shape)
 
-def get_grey_value(pix, umb):
-    if pix >= umb:
-        return MAX_COLOR
+def pollute_img(img: Image, noise: NoiseType, percentage:float, sigma:float, mode:str ='add') -> np.ndarray:
+    if img.channels == 1:
+        return polute_array(img.data, noise, percentage, sigma, mode)
     else:
-        return 0 
+        ret = np.empty(img.shape, dtype=np.uint8)
+        for channel in range(0, img.channels):
+            ret[:, :, channel] = polute_array(img.get_channel(channel), noise, percentage, sigma, mode)
+        return ret
 
-def pollute_gaussian(img: Image, percentage:int, median: float, sigma:float, mode:str ='add') -> np.ndarray:
-    shape = img.shape
+def polute_array(channel: np.ndarray, noise: NoiseType, percentage:float, param:float, mode:str ='add') -> np.ndarray:
+    shape = np.shape(channel)
     if mode == 'add':
-        new_arr = np.array([get_grey_value(xi, umb) for xi in img.data.flatten()], dtype=np.uint8)
+        new_arr = normalize(np.array([(xi + noise(param) * MAX_COLOR) if uniform() < (percentage / 100) else xi for xi in channel.flatten()]))
+    else:
+        new_arr = normalize(np.array([(xi * noise(param) * MAX_COLOR) if uniform() < (percentage / 100) else xi for xi in channel.flatten()]))
+
+    return np.reshape(new_arr, shape)
+
+def salt_img(img: Image, percentage: float) -> np.ndarray:
+    if img.channels == 1:
+        return salt_array(img.data, percentage)
+    else:
+        ret = np.empty(img.shape, dtype=np.uint8)
+        for channel in range(0, img.channels):
+            ret[:, :, channel] = salt_array(img.get_channel(channel), percentage)
+        return ret
+
+def salt_array(channel: np.ndarray, percentage:float) -> np.ndarray:
+    shape = np.shape(channel)
+    new_arr = np.array([MAX_COLOR if uniform() < (percentage / 100) else xi for xi in channel.flatten()], dtype=np.uint8)
+
+    return np.reshape(new_arr, shape)
 
 def channel_histogram(channel: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     hist, bins = np.histogram(channel.flatten(), bins=COLOR_DEPTH, range=(0, COLOR_DEPTH))

@@ -4,9 +4,10 @@ import dearpygui.dearpygui as dpg
 
 import images_repo as img_repo
 import interface
-from image_utils import Image, strip_extension, add_images, sub_images, multiply_images, power_function, get_negative, \
-    transform_from_threshold, pollute_gaussian, equalize
+from image_utils import Image, pollute_img, salt_img, strip_extension, add_images, sub_images, multiply_images, power_function, get_negative, \
+    transform_from_threshold, equalize
 from interface_utils import render_error
+from noise import NoiseType
 
 # General Items
 TR_DIALOG: str = 'tr_dialog'
@@ -17,6 +18,8 @@ TR_IMG_INPUT: str = 'tr_img_input'
 
 TR_INT_VALUE_SELECTOR: str = 'tr_int_value_input'
 TR_FLOAT_VALUE_SELECTOR: str = 'tr_float_value_input'
+
+TR_RADIO_BUTTONS: str = 'tr_radio_buttons'
 
 TrHandler = Callable[[str], Image]
 
@@ -63,6 +66,10 @@ def build_tr_value_int_selector(value: str, min: int, max:int, mtag:str = TR_INT
 def build_tr_value_float_selector(value: str, min: float, max:float, mtag:str = TR_FLOAT_VALUE_SELECTOR) -> None:
     dpg.add_text(f'Select {value} value')
     dpg.add_input_float( min_value=min, max_value=max, label=f'pick a value for {value} between {min} and {max}', tag=mtag)
+
+def build_tr_radiobuttons(names: List, default_value: str) -> None:
+    dpg.add_radio_button(items=names, label='sum', default_value=default_value, tag=TR_RADIO_BUTTONS)
+
 
 def get_req_tr_name_value(image: Image) -> str:
     base_name = dpg.get_value(TR_NAME_INPUT)
@@ -180,10 +187,10 @@ def tr_umb(image_name: str) -> Image:
 TR_GAUSS: str = 'gauss'
 @render_error
 def build_gauss_dialog(image_name: str) -> None:
-    with build_tr_dialog(TR_UMBRAL):
-        build_tr_name_input(TR_UMBRAL, image_name)
+    with build_tr_dialog(TR_GAUSS):
+        build_tr_name_input(TR_GAUSS, image_name)
         # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
-        build_tr_value_int_selector('median', 0, 255, mtag='median_value_input')
+        build_tr_radiobuttons(['add', 'mult'], 'add')
         build_tr_value_float_selector('sigma', 0, 1, mtag='sigma_value_input')
         build_tr_value_float_selector('percentage', 0, 100, mtag='percentage_value_input')
         build_tr_dialog_end_buttons(TR_GAUSS, image_name, tr_gauss)
@@ -192,11 +199,99 @@ def tr_gauss(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image = img_repo.get_image(image_name)
     new_name: str = get_req_tr_name_value(image)
-    median:int = dpg.get_value('median_value_input')
     sigma:float = dpg.get_value('sigma_value_input')
     percentage:float = dpg.get_value('percentage_value_input')
+    mode:str = dpg.get_value('tr_radio_buttons')
     # 2. Procesamos - Puede ser async
-    new_data = pollute_gaussian(image, percentage, median, sigma, mode='add')
+    new_data = pollute_img(image, NoiseType.GAUSS, percentage, sigma, mode)
+    # 3. Creamos Imagen
+    return Image(new_name, image.format, new_data)
+
+TR_EXP: str = 'exp'
+@render_error
+def build_exp_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_EXP):
+        build_tr_name_input(TR_EXP, image_name)
+        # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
+        build_tr_radiobuttons(['add', 'mult'], 'add')
+        build_tr_value_float_selector('lambda', 0, 1, mtag='parameter_value_input')
+        build_tr_value_float_selector('percentage', 0, 100, mtag='percentage_value_input')
+        build_tr_dialog_end_buttons(TR_EXP, image_name, tr_exp)
+
+def tr_exp(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image = img_repo.get_image(image_name)
+    new_name: str = get_req_tr_name_value(image)
+    param:float = dpg.get_value('parameter_value_input')
+    percentage:float = dpg.get_value('percentage_value_input')
+    mode:str = dpg.get_value('tr_radio_buttons')
+    # 2. Procesamos - Puede ser async
+    new_data = pollute_img(image, NoiseType.EXP, percentage, param, mode)
+    # 3. Creamos Imagen
+    return Image(new_name, image.format, new_data)
+
+TR_RAYL: str = 'rayl'
+@render_error
+def build_rayl_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_RAYL):
+        build_tr_name_input(TR_RAYL, image_name)
+        # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
+        build_tr_radiobuttons(['add', 'mult'], 'add')
+        build_tr_value_float_selector('rayleigh parameter', 0, 1, mtag='rayleigh_value_input')
+        build_tr_value_float_selector('percentage', 0, 100, mtag='percentage_value_input')
+        build_tr_dialog_end_buttons(TR_RAYL, image_name, tr_rayl)
+
+def tr_rayl(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image = img_repo.get_image(image_name)
+    new_name: str = get_req_tr_name_value(image)
+    param:float = dpg.get_value('rayleigh_value_input')
+    percentage:float = dpg.get_value('percentage_value_input')
+    mode:str = dpg.get_value('tr_radio_buttons')
+    # 2. Procesamos - Puede ser async
+    new_data = pollute_img(image, NoiseType.RAYL, percentage, param, mode)
+    # 3. Creamos Imagen
+    return Image(new_name, image.format, new_data)
+
+TR_RAYL: str = 'rayl'
+@render_error
+def build_rayl_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_RAYL):
+        build_tr_name_input(TR_RAYL, image_name)
+        # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
+        build_tr_radiobuttons(['add', 'mult'], 'add')
+        build_tr_value_float_selector('rayleigh parameter', 0, 1, mtag='rayleigh_value_input')
+        build_tr_value_float_selector('percentage', 0, 100, mtag='percentage_value_input')
+        build_tr_dialog_end_buttons(TR_RAYL, image_name, tr_rayl)
+
+def tr_rayl(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image = img_repo.get_image(image_name)
+    new_name: str = get_req_tr_name_value(image)
+    param:float = dpg.get_value('rayleigh_value_input')
+    percentage:float = dpg.get_value('percentage_value_input')
+    mode:str = dpg.get_value('tr_radio_buttons')
+    # 2. Procesamos - Puede ser async
+    new_data = pollute_img(image, NoiseType.RAYL, percentage, param, mode)
+    # 3. Creamos Imagen
+    return Image(new_name, image.format, new_data)
+
+TR_SALT: str = 'salt'
+@render_error
+def build_salt_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_SALT):
+        build_tr_name_input(TR_SALT, image_name)
+        # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
+        build_tr_value_float_selector('percentage', 0, 100, mtag='percentage_value_input')
+        build_tr_dialog_end_buttons(TR_SALT, image_name, tr_salt)
+
+def tr_salt(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image = img_repo.get_image(image_name)
+    new_name: str = get_req_tr_name_value(image)
+    percentage:float = dpg.get_value('percentage_value_input')
+    # 2. Procesamos - Puede ser async
+    new_data = salt_img(image, percentage)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 
