@@ -61,15 +61,6 @@ def get_gamma_tr_value() -> float:
         raise ValueError('Value cannot be 1')
     return gamma
 
-def get_req_tr_name_value(image: Image) -> str:
-    base_name = dpg.get_value(TR_NAME_INPUT)
-    if not base_name:
-        raise ValueError('A name for the new image must be provided')
-    ret = base_name + image.format.to_extension()
-    if img_repo.contains_image(ret):
-        raise ValueError(f'Another image with name "{ret}" already exists')
-    return ret
-
 def build_op_img_selector(image_name: str) -> None:
     image_list = list(map(lambda img: img.name, img_repo.get_same_shape_images(image_name)))
     dpg.add_text('Select Another Image to combine')
@@ -91,13 +82,13 @@ def build_tr_dialog_end_buttons(tr_id: str, image_name: str, handle: TrHandler) 
         dpg.add_button(label='Cancel', user_data=tr_id, callback=lambda: dpg.delete_item(TR_DIALOG))
 
 
-TR_NOP: str = 'nop'
+TR_COPY: str = 'copy'
 @render_error
-def build_nop_dialog(image_name: str) -> None:
-    with build_tr_dialog(TR_NOP):
-        build_tr_name_input(TR_NOP, image_name)
+def build_copy_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_COPY):
+        build_tr_name_input(TR_COPY, image_name)
         # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
-        build_tr_dialog_end_buttons(TR_NOP, image_name, tr_nop)
+        build_tr_dialog_end_buttons(TR_COPY, image_name, tr_nop)
 
 def tr_nop(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -106,7 +97,8 @@ def tr_nop(image_name: str) -> Image:
     # 2. Procesamos - Puede ser async
     # Do Nothing
     # 3. Creamos Imagen
-    return Image(new_name, image.format, image.data)\
+    return Image(new_name, image.format, image.data)
+
 
 TR_NEG: str = 'neg'
 @render_error
@@ -125,6 +117,7 @@ def tr_neg(image_name: str) -> Image:
     # Do Nothing
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
+
 
 TR_POW: str = 'pow'
 @render_error
@@ -145,6 +138,7 @@ def tr_pow(image_name: str) -> Image:
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 
+
 TR_UMB: str = 'umb'
 @render_error
 def build_umb_dialog(image_name: str) -> None:
@@ -163,6 +157,7 @@ def tr_umb(image_name: str) -> Image:
     new_data = transform_from_threshold(image, umb)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
+
 
 TR_GAUSS: str = 'gauss'
 @render_error
@@ -266,7 +261,7 @@ def tr_equalize(image_name: str) -> Image:
 
 
 TRANSFORMATIONS: Dict[str, Callable[[str], None]] = {
-    TR_NOP: build_nop_dialog,
+    TR_COPY: build_copy_dialog,
     TR_NEG: build_neg_dialog,
     TR_POW: build_pow_dialog,
     TR_UMB: build_umb_dialog,
