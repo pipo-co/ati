@@ -222,17 +222,23 @@ def pollute_gaussian(img: Image, percentage:int, median: float, sigma:float, mod
     if mode == 'add':
         new_arr = np.array([get_grey_value(xi, umb) for xi in img.data.flatten()], dtype=np.uint8)
 
-def channel_histogram(channel: np.ndarray) -> np.ndarray:
-    
+def channel_histogram(channel: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
     hist, bins = np.histogram(channel.flatten(), bins=COLOR_DEPTH, range=(0, COLOR_DEPTH))
     return hist / channel.size, bins
 
-def hist_equalization(channel: np.ndarray)  -> np.ndarray:
-
+def channel_equalization(channel: np.ndarray)  -> np.ndarray:
     normed_hist, bins = channel_histogram(channel)
     s = normed_hist.cumsum()
     masked_s = np.ma.masked_equal(s, 0)
-    masked_s = (masked_s - masked_s.min())*(MAX_COLOR)/(masked_s.max()-masked_s.min())
-    s = np.ma.filled(masked_s, 0).astype('uint8')
-
+    masked_s = (masked_s - masked_s.min()) * MAX_COLOR / (masked_s.max() - masked_s.min())
+    s = np.ma.filled(masked_s, 0).astype(np.uint8)
     return s[channel]
+
+def equalize(image: Image) -> np.ndarray:
+    if image.channels == 1:
+        return channel_equalization(image.data)
+    else:
+        ret = np.empty(image.shape, dtype=np.uint8)
+        for channel in range(0, image.channels):
+            ret[:, :, channel] = channel_equalization(image.get_channel(channel))
+        return ret

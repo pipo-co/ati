@@ -4,7 +4,8 @@ import dearpygui.dearpygui as dpg
 
 import images_repo as img_repo
 import interface
-from image_utils import Image, strip_extension, add_images, sub_images, multiply_images, power_function, get_negative, transform_from_threshold, pollute_gaussian
+from image_utils import Image, strip_extension, add_images, sub_images, multiply_images, power_function, get_negative, \
+    transform_from_threshold, pollute_gaussian, equalize
 from interface_utils import render_error
 
 # General Items
@@ -201,7 +202,6 @@ def tr_add(image_name: str) -> Image:
     new_name: str = get_req_tr_name_value(image)
     sec_image = get_req_tr_img_value()
     require_same_shape(image, sec_image, 'You can only sum images with the same shape')
-
     # 2. Procesamos
     new_data = add_images(image, sec_image)
     # 3. Creamos Imagen y finalizamos
@@ -222,7 +222,6 @@ def tr_sub(image_name: str) -> Image:
     new_name: str = get_req_tr_name_value(image)
     sec_image = get_req_tr_img_value()
     require_same_shape(image, sec_image, 'You can only sub images with the same shape')
-
     # 2. Procesamos
     new_data = sub_images(image, sec_image)
     # 3. Creamos Imagen y finalizamos
@@ -243,9 +242,25 @@ def tr_mult(image_name: str) -> Image:
     new_name: str = get_req_tr_name_value(image)
     sec_image = get_req_tr_img_value()
     require_same_shape(image, sec_image, 'You can only multiply images with the same shape')
-
     # 2. Procesamos
     new_data = multiply_images(image, sec_image)
+    # 3. Creamos Imagen y finalizamos
+    return Image(new_name, image.format, new_data)
+
+
+TR_EQUALIZE: str = 'equalize'
+@render_error
+def build_equalize_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_EQUALIZE):
+        build_tr_name_input(TR_EQUALIZE, image_name)
+        build_tr_dialog_end_buttons(TR_EQUALIZE, image_name, tr_equalize)
+
+def tr_equalize(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image = img_repo.get_image(image_name)
+    new_name: str = get_req_tr_name_value(image)
+    # 2. Procesamos
+    new_data = equalize(image)
     # 3. Creamos Imagen y finalizamos
     return Image(new_name, image.format, new_data)
 
@@ -258,5 +273,6 @@ TRANSFORMATIONS: Dict[str, Callable[[str], None]] = {
     TR_ADD: build_add_dialog,
     TR_SUB: build_sub_dialog,
     TR_MULT: build_mult_dialog,
-    TR_GAUSS: build_gauss_dialog
+    TR_EQUALIZE: build_equalize_dialog,
+    TR_GAUSS: build_gauss_dialog,
 }
