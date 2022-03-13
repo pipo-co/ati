@@ -1,4 +1,4 @@
-from typing import Callable, Literal, Tuple, Union
+from typing import Callable, Tuple, Union
 
 import dearpygui.dearpygui as dpg
 import numpy as np
@@ -23,9 +23,10 @@ SAVE_IMAGE_DIALOG: str = 'save_image_dialog'
 LOAD_METADATA_DIALOG: str = 'load_metadata_dialog'
 
 CENTER_POS: Tuple[int, int] = (750, 350)
-MIN_IMAGE_SIZE: Tuple[int, int] = (200, 200)
-HIST_OFFSET: Literal = 20
-HIST_WIDTH: Literal = 200
+MIN_IMAGE_WIDTH: int = 235
+MIN_IMAGE_HEIGHT: int = 200
+HIST_OFFSET: int = 20
+HIST_WIDTH: int = 200
 
 # Creates window only if it doesn't exist
 @render_error
@@ -33,16 +34,15 @@ def render_image_window(image_name: str):
     if dpg.does_item_exist(f'image_{image_name}'):
         dpg.focus_item(f'image_{image_name}')
     else:
-
         image: Image = img_repo.get_image(image_name)
-
-        with dpg.window(label=image_name, tag=f'image_window_{image_name}', no_scrollbar=True, user_data={'image_name': image_name}, on_close=lambda: dpg.delete_item(window)) as window:
+        width, height = calculate_image_window_size(image)
+        with dpg.window(label=image_name, tag=f'image_window_{image_name}', width=width, height=height, no_scrollbar=True, user_data={'image_name': image_name, 'hists_toggled': False}, on_close=lambda: dpg.delete_item(window)) as window:
             with dpg.menu_bar():
                 dpg.add_menu_item(label='Save', user_data=image_name, callback=lambda s, ad, ud: trigger_save_image_dialog(ud))
                 build_transformations_menu(image_name)
+                dpg.add_menu_item(label='Show Histograms', tag=f'hists_toggle_{image_name}', user_data=image_name, callback=lambda s, ad, ud: toggle_hists(ud))
 
             with dpg.group(horizontal=True) as main_group:
-                
                 with dpg.group(parent=main_group, width=image.width):
                     dpg.add_image(image_name, tag=f'image_{image_name}', width=image.width, height=image.height)
                     dpg.add_text(f'Height: {image.height}  Width: {image.width}')
@@ -50,6 +50,28 @@ def render_image_window(image_name: str):
                     dpg.add_text('', tag=f'image_{image_name}_pointer')
 
                 build_hist_group(main_group, image)
+
+def calculate_image_window_size(image: Image) -> Tuple[int, int]:
+    # 15 = padding, 120 = menu_bar + info_size
+    return max(image.width, MIN_IMAGE_WIDTH) + 15, max(image.height, MIN_IMAGE_HEIGHT) + 120
+
+@render_error
+def toggle_hists(image_name: str) -> None:
+    window = f'image_window_{image_name}'
+    toggle = f'hists_toggle_{image_name}'
+    hists = f'hist_group_{image_name}'
+    user_data = dpg.get_item_user_data(window)
+    plots_toggled: bool = user_data['hists_toggled']
+    diff: int = HIST_WIDTH + 10
+    if plots_toggled:
+        diff = -diff
+        dpg.set_item_label(toggle, 'Show Histograms')
+        dpg.hide_item(hists)
+    else:
+        dpg.set_item_label(toggle, 'Hide Histograms')
+        dpg.show_item(hists)
+    dpg.set_item_width(window, dpg.get_item_width(window) + diff)
+    user_data['hists_toggled'] = not plots_toggled
 
 def build_hist_themes():
     with dpg.theme(tag=f'red_hist_theme'):
@@ -65,39 +87,27 @@ def build_hist_themes():
         with dpg.theme_component(dpg.mvBarSeries):
             dpg.add_theme_color(value=(127, 127, 127), category=dpg.mvThemeCat_Plots)
 
+def histogram_plot(hist: np.ndarray, bins: np.ndarray, theme: str) -> None:
+    with dpg.plot(height=HIST_WIDTH * 9 // 16, no_mouse_pos=True):
+        dpg.add_plot_axis(dpg.mvXAxis, no_tick_marks=True, no_tick_labels=True)
+        y_axis = dpg.add_plot_axis(dpg.mvYAxis, no_tick_marks=True, no_tick_labels=True)
+        grey_hist = dpg.add_bar_series(bins, hist, parent=y_axis)
+        dpg.bind_item_theme(grey_hist, theme)
+
 def build_hist_group(parent, image: Image):
-
-    with dpg.group(parent=parent, width=HIST_WIDTH):
-
+    with dpg.group(parent=parent, tag=f'hist_group_{image.name}', width=HIST_WIDTH, show=False):
         if image.channels == 1:
-            x, y = channel_histogram(image.data.flatten())
-            with dpg.plot(height=HIST_WIDTH*9//16, no_mouse_pos=True):
-                dpg.add_plot_axis(dpg.mvXAxis, lock_min=True, no_tick_marks=True, no_tick_labels=True)
-                y_axis = dpg.add_plot_axis(dpg.mvYAxis, lock_min=True, no_tick_marks=True, no_tick_labels=True)
-                grey_hist = dpg.add_bar_series(y, x, parent=y_axis)
-                dpg.bind_item_theme(grey_hist, f'grey_hist_theme')
-
+            hist, bins = channel_histogram(image.data)
+            histogram_plot(hist, bins, 'grey_hist_theme')
         else:
-            red_x, red_y = channel_histogram(image.data[:,:,0].flatten())
-            with dpg.plot(height=HIST_WIDTH*9//16, no_mouse_pos=True):
-                dpg.add_plot_axis(dpg.mvXAxis, lock_min=True, no_tick_marks=True, no_tick_labels=True)
-                y_axis = dpg.add_plot_axis(dpg.mvYAxis, lock_min=True, no_tick_marks=True, no_tick_labels=True)
-                red_hist = dpg.add_bar_series(red_y, red_x, parent=y_axis)
-                dpg.bind_item_theme(red_hist, f'red_hist_theme')
+            hist, bins = channel_histogram(image.get_channel(Image.RED_CHANNEL))
+            histogram_plot(hist, bins, 'red_hist_theme')
 
-            green_x, green_y = channel_histogram(image.data[:,:,1].flatten())
-            with dpg.plot(height=HIST_WIDTH*9//16, no_mouse_pos=True):
-                dpg.add_plot_axis(dpg.mvXAxis, lock_min=True, no_tick_marks=True, no_tick_labels=True)
-                y_axis = dpg.add_plot_axis(dpg.mvYAxis, lock_min=True, no_tick_marks=True, no_tick_labels=True)
-                green_hist = dpg.add_bar_series(green_y, green_x, parent=y_axis)
-                dpg.bind_item_theme(green_hist, f'green_hist_theme')
+            hist, bins = channel_histogram(image.get_channel(Image.GREEN_CHANNEL))
+            histogram_plot(hist, bins, 'green_hist_theme')
 
-            blue_x, blue_y = channel_histogram(image.data[:,:,2].flatten())
-            with dpg.plot(height=HIST_WIDTH*9//16, no_mouse_pos=True):
-                dpg.add_plot_axis(dpg.mvXAxis, lock_min=True, no_tick_marks=True, no_tick_labels=True)
-                y_axis = dpg.add_plot_axis(dpg.mvYAxis, lock_min=True, no_tick_marks=True, no_tick_labels=True)
-                blue_hist = dpg.add_bar_series(blue_y, blue_x, parent=y_axis)
-                dpg.bind_item_theme(blue_hist, f'blue_hist_theme')
+            hist, bins = channel_histogram(image.get_channel(Image.BLUE_CHANNEL))
+            histogram_plot(hist, bins, 'blue_hist_theme')
 
 def register_image(image: Image) -> None:
     image_vector = image_to_rgba_array(image)

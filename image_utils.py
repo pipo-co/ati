@@ -46,6 +46,10 @@ class Image:
     format: ImageFormat
     data:   np.ndarray
 
+    RED_CHANNEL:    int = 0
+    GREEN_CHANNEL:  int = 1
+    BLUE_CHANNEL:   int = 2
+
     def __init__(self, name: str, fmt: ImageFormat, data: np.ndarray, allow_reserved: bool = False):
         if not allow_reserved and name in RESERVED_IMAGE_NAMES:
             raise ValueError(f'name cannot be any of this names: {RESERVED_IMAGE_NAMES}')
