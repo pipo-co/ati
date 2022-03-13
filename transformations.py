@@ -25,7 +25,6 @@ TR_RADIO_BUTTONS: str = 'tr_radio_buttons'
 
 TrHandler = Callable[[str], Image]
 
-
 def build_transformations_menu(image_name: str) -> None:
     with dpg.menu(label='Transform'):
         with dpg.menu(label='Basic'):
@@ -80,7 +79,6 @@ def build_tr_value_float_selector(value: str, min: float, max: float, mtag: str 
     dpg.add_text(f'Select {value} value')
     dpg.add_input_float(min_value=min, max_value=max, label=f'pick a value for {value} between {min} and {max}',
                         tag=mtag)
-
 
 def build_tr_radiobuttons(names: List[str], default_value: Optional[str] = None) -> None:
     names = list(map(str.capitalize, names))
@@ -141,7 +139,6 @@ def build_copy_dialog(image_name: str) -> None:
         # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
         build_tr_dialog_end_buttons(TR_COPY, image_name, tr_nop)
 
-
 def tr_nop(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image = img_repo.get_image(image_name)
@@ -159,7 +156,6 @@ def build_neg_dialog(image_name: str) -> None:
         build_tr_name_input(TR_NEG, image_name)
         # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
         build_tr_dialog_end_buttons(TR_NEG, image_name, tr_neg)
-
 
 def tr_neg(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -181,7 +177,6 @@ def build_pow_dialog(image_name: str) -> None:
         build_tr_value_float_selector('gamma', 0.0, 2.0)
         build_tr_dialog_end_buttons(TR_POW, image_name, tr_pow)
 
-
 def tr_pow(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image = img_repo.get_image(image_name)
@@ -201,7 +196,6 @@ def build_umbral_dialog(image_name: str) -> None:
         # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
         build_tr_value_int_selector('threshold', 0, 255)
         build_tr_dialog_end_buttons(TR_UMBRAL, image_name, tr_umb)
-
 
 def tr_umb(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -225,7 +219,6 @@ def build_gauss_dialog(image_name: str) -> None:
         build_tr_value_float_selector('percentage', 0, 100, mtag='percentage_value_input')
         build_tr_dialog_end_buttons(TR_GAUSS, image_name, tr_gauss)
 
-
 def tr_gauss(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image = img_repo.get_image(image_name)
@@ -240,8 +233,6 @@ def tr_gauss(image_name: str) -> Image:
 
 
 TR_EXP: str = 'exp'
-
-
 @render_error
 def build_exp_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_EXP):
@@ -251,7 +242,6 @@ def build_exp_dialog(image_name: str) -> None:
         build_tr_value_float_selector('lambda', 0, 1, mtag='parameter_value_input')
         build_tr_value_float_selector('percentage', 0, 100, mtag='percentage_value_input')
         build_tr_dialog_end_buttons(TR_EXP, image_name, tr_exp)
-
 
 def tr_exp(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -277,7 +267,6 @@ def build_rayl_dialog(image_name: str) -> None:
         build_tr_value_float_selector('percentage', 0, 100, mtag='percentage_value_input')
         build_tr_dialog_end_buttons(TR_RAYL, image_name, tr_rayl)
 
-
 def tr_rayl(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image = img_repo.get_image(image_name)
@@ -302,7 +291,6 @@ def build_rayl_dialog(image_name: str) -> None:
         build_tr_value_float_selector('percentage', 0, 100, mtag='percentage_value_input')
         build_tr_dialog_end_buttons(TR_RAYL, image_name, tr_rayl)
 
-
 def tr_rayl(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image = img_repo.get_image(image_name)
@@ -325,7 +313,6 @@ def build_salt_dialog(image_name: str) -> None:
         build_tr_value_float_selector('percentage', 0, 100, mtag='percentage_value_input')
         build_tr_dialog_end_buttons(TR_SALT, image_name, tr_salt)
 
-
 def tr_salt(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image = img_repo.get_image(image_name)
@@ -344,7 +331,6 @@ def build_add_dialog(image_name: str) -> None:
         build_tr_name_input(TR_ADD, image_name)
         build_op_img_selector(image_name)
         build_tr_dialog_end_buttons(TR_ADD, image_name, tr_add)
-
 
 def tr_add(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -366,7 +352,6 @@ def build_sub_dialog(image_name: str) -> None:
         build_op_img_selector(image_name)
         build_tr_dialog_end_buttons(TR_SUB, image_name, tr_sub)
 
-
 def tr_sub(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image = img_repo.get_image(image_name)
@@ -387,7 +372,6 @@ def build_mult_dialog(image_name: str) -> None:
         build_op_img_selector(image_name)
         build_tr_dialog_end_buttons(TR_MULT, image_name, tr_mult)
 
-
 def tr_mult(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image = img_repo.get_image(image_name)
@@ -406,7 +390,6 @@ def build_equalize_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_EQUALIZE):
         build_tr_name_input(TR_EQUALIZE, image_name)
         build_tr_dialog_end_buttons(TR_EQUALIZE, image_name, tr_equalize)
-
 
 def tr_equalize(image_name: str) -> Image:
     # 1. Obtenemos inputs
