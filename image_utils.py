@@ -3,7 +3,7 @@ import os
 from dataclasses import dataclass
 from enum import Enum
 from typing import Iterable, Tuple, Callable
-from noise import NoiseType, gaussian, exponential, rayleigh, uniform
+from noise import NoiseType, uniform
 
 import metadata_repo
 

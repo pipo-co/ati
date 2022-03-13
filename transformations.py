@@ -7,7 +7,7 @@ import interface
 from denoising import mean, PaddingStrategy
 from image_utils import Image, pollute_img, salt_img, strip_extension, add_images, sub_images, multiply_images, \
     power_function, get_negative, \
-    transform_from_threshold, equalize
+    transform_from_threshold, equalize, ImageFormat
 from interface_utils import render_error
 from noise import NoiseType
 
@@ -29,6 +29,7 @@ def build_transformations_menu(image_name: str) -> None:
     with dpg.menu(label='Transform'):
         with dpg.menu(label='Basic'):
             build_tr_menu_item(TR_COPY, build_copy_dialog, image_name)
+            build_tr_menu_item(TR_REFORMAT, build_reformat_dialog, image_name)
             build_tr_menu_item(TR_NEG, build_neg_dialog, image_name)
             build_tr_menu_item(TR_POW, build_pow_dialog, image_name)
             build_tr_menu_item(TR_UMBRAL, build_umbral_dialog, image_name)
@@ -58,7 +59,6 @@ def execute_transformation(image_name: str, handler: TrHandler) -> None:
     img_repo.persist_image(new_image)
     interface.register_image(new_image)
     interface.render_image_window(new_image.name)
-
 
 def build_tr_dialog(tr_id: str) -> int:
     return dpg.window(label=f'Apply {tr_id.capitalize()} Transformation', tag=TR_DIALOG, modal=True, no_close=True,
@@ -98,19 +98,16 @@ def get_req_tr_name_value(image: Image) -> str:
         raise ValueError(f'Another image with name "{ret}" already exists')
     return ret
 
-
 def get_gamma_tr_value() -> float:
     gamma = dpg.get_value(TR_FLOAT_VALUE_SELECTOR)
     if gamma == 1.0:
         raise ValueError('Value cannot be 1')
     return gamma
 
-
 def build_op_img_selector(image_name: str) -> None:
     image_list = list(map(lambda img: img.name, img_repo.get_same_shape_images(image_name)))
     dpg.add_text('Select Another Image to combine')
     dpg.add_listbox(image_list, tag=TR_IMG_INPUT)
-
 
 def get_req_tr_img_value() -> Image:
     img_name = dpg.get_value(TR_IMG_INPUT)
@@ -118,17 +115,33 @@ def get_req_tr_img_value() -> Image:
         raise ValueError('Selecting a valid image is required for transformation')
     return img_repo.get_image(img_name)
 
-
 def require_same_shape(img1: Image, img2: Image, msg: str) -> None:
     if img1.shape != img2.shape:
         raise ValueError(msg)
-
 
 def build_tr_dialog_end_buttons(tr_id: str, image_name: str, handle: TrHandler) -> None:
     with dpg.group(horizontal=True):
         dpg.add_button(label='Transform', user_data=(image_name, handle),
                        callback=lambda s, ap, ud: execute_transformation(*ud))
         dpg.add_button(label='Cancel', user_data=tr_id, callback=lambda: dpg.delete_item(TR_DIALOG))
+
+
+TR_REFORMAT: str = 'reformat'
+@render_error
+def build_reformat_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_COPY):
+        build_tr_radiobuttons(ImageFormat.values())
+        build_tr_dialog_end_buttons(TR_COPY, image_name, tr_reformat)
+
+def tr_reformat(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image = img_repo.get_image(image_name)
+    new_fmt = ImageFormat.from_str(dpg.get_value(TR_RADIO_BUTTONS).lower())
+    new_name = strip_extension(image_name) + new_fmt.to_extension()
+    # 2. Procesamos - Puede ser async
+    # Do Nothing
+    # 3. Creamos Imagen
+    return Image(new_name, new_fmt, image.data)
 
 
 TR_COPY: str = 'copy'
@@ -154,7 +167,6 @@ TR_NEG: str = 'neg'
 def build_neg_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_NEG):
         build_tr_name_input(TR_NEG, image_name)
-        # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
         build_tr_dialog_end_buttons(TR_NEG, image_name, tr_neg)
 
 def tr_neg(image_name: str) -> Image:
@@ -173,7 +185,6 @@ TR_POW: str = 'pow'
 def build_pow_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_POW):
         build_tr_name_input(TR_POW, image_name)
-        # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
         build_tr_value_float_selector('gamma', 0.0, 2.0)
         build_tr_dialog_end_buttons(TR_POW, image_name, tr_pow)
 
@@ -193,7 +204,6 @@ TR_UMBRAL: str = 'umbral'
 def build_umbral_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_UMBRAL):
         build_tr_name_input(TR_UMBRAL, image_name)
-        # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
         build_tr_value_int_selector('threshold', 0, 255)
         build_tr_dialog_end_buttons(TR_UMBRAL, image_name, tr_umb)
 
@@ -213,7 +223,6 @@ TR_GAUSS: str = 'gauss'
 def build_gauss_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_GAUSS):
         build_tr_name_input(TR_GAUSS, image_name)
-        # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
         build_tr_radiobuttons(['add', 'mult'], 'add')
         build_tr_value_float_selector('sigma', 0, 1, mtag='sigma_value_input')
         build_tr_value_float_selector('percentage', 0, 100, mtag='percentage_value_input')
@@ -237,7 +246,6 @@ TR_EXP: str = 'exp'
 def build_exp_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_EXP):
         build_tr_name_input(TR_EXP, image_name)
-        # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
         build_tr_radiobuttons(['add', 'mult'], 'add')
         build_tr_value_float_selector('lambda', 0, 1, mtag='parameter_value_input')
         build_tr_value_float_selector('percentage', 0, 100, mtag='percentage_value_input')
@@ -261,7 +269,6 @@ TR_RAYL: str = 'rayl'
 def build_rayl_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_RAYL):
         build_tr_name_input(TR_RAYL, image_name)
-        # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
         build_tr_radiobuttons(['add', 'mult'], 'add')
         build_tr_value_float_selector('rayleigh parameter', 0, 1, mtag='rayleigh_value_input')
         build_tr_value_float_selector('percentage', 0, 100, mtag='percentage_value_input')
@@ -285,7 +292,6 @@ TR_RAYL: str = 'rayl'
 def build_rayl_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_RAYL):
         build_tr_name_input(TR_RAYL, image_name)
-        # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
         build_tr_radiobuttons(['add', 'mult'], 'add')
         build_tr_value_float_selector('rayleigh parameter', 0, 1, mtag='rayleigh_value_input')
         build_tr_value_float_selector('percentage', 0, 100, mtag='percentage_value_input')
@@ -309,7 +315,6 @@ TR_SALT: str = 'salt'
 def build_salt_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_SALT):
         build_tr_name_input(TR_SALT, image_name)
-        # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
         build_tr_value_float_selector('percentage', 0, 100, mtag='percentage_value_input')
         build_tr_dialog_end_buttons(TR_SALT, image_name, tr_salt)
 
