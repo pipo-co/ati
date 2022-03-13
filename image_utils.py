@@ -2,7 +2,7 @@ import itertools
 import os
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterable, Tuple
+from typing import Iterable, Tuple, Callable
 from noise import NoiseType, gaussian, exponential, rayleigh, uniform
 
 import metadata_repo
@@ -54,7 +54,7 @@ class Image:
         if not allow_reserved and name in RESERVED_IMAGE_NAMES:
             raise ValueError(f'name cannot be any of this names: {RESERVED_IMAGE_NAMES}')
         if data.dtype != np.uint8:
-            raise ValueError('data must be of type uint8')
+            raise ValueError(f'data must be of type uint8, not {data.dtype}')
         self.name = name
         self.format = fmt
         self.data = data
@@ -63,8 +63,20 @@ class Image:
         x, y = pixel
         return 0 <= x < self.width and 0 <= y < self.height
 
+    def get_pixel(self, pixel: Tuple[int, int]) -> bool:
+        x, y = pixel
+        return self.data[x, y]
+
     def get_channel(self, channel: int) -> np.ndarray:
         return self.data[:, :, channel] if self.channels > 1 else self.data
+
+    def apply_over_channels(self, fn: Callable[[np.ndarray], np.ndarray], *args, **kwargs) -> np.ndarray:
+        if self.channels == 1:
+            return fn(self.data, *args, **kwargs)
+        else:
+            data = np.empty(self.shape,  dtype=np.uint8)
+            for channel in range(self.channels):
+                data[:, :, channel] = fn(self.get_channel(channel), *args, **kwargs)
 
     @property
     def shape(self) -> Tuple[int]:

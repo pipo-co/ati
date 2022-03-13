@@ -45,11 +45,11 @@ def weighted_mean(channel: np.ndarray, kernel: np.ndarray, padding_strategy: str
         raise ValueError(f'Invalid kernel: {kernel}')
 
     sw = sliding_window(channel, kernel.shape, padding_strategy)
-    return np.mean(sw[:, :] * kernel, axis=(2, 3))
+    return np.mean(sw[:, :] * kernel, axis=(2, 3)).astype(np.uint8)
 
 
 def mean(channel: np.ndarray, n: int, padding_strategy: str) -> np.ndarray:
-    return mean(channel, np.full((n, n), 1), padding_strategy)
+    return weighted_mean(channel, np.full((n, n), 1), padding_strategy)
 
 
 def weighted_median(channel: np.ndarray, kernel: np.ndarray, padding_strategy: str) -> np.ndarray:
@@ -57,7 +57,7 @@ def weighted_median(channel: np.ndarray, kernel: np.ndarray, padding_strategy: s
         raise ValueError(f'Invalid kernel: {kernel}')
 
     sw = sliding_window(channel, kernel.shape, padding_strategy)
-    return np.median(sw[:, :] * kernel, axis=(2, 3))
+    return np.median(sw[:, :] * kernel, axis=(2, 3)).astype(np.uint8)
 
 
 def median(channel: np.ndarray, n: int, padding_strategy: str) -> np.ndarray:

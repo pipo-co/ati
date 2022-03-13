@@ -227,7 +227,7 @@ def build_image_handler_registry() -> None:
                     dpg.draw_rectangle(usr_data['init_draw'], pixel, parent=window, tag=selection, color=(0xCC, 0x00, 0x66, 200))
 
                 dpg.show_item(pointer)
-                dpg.set_value(pointer, f"Pixel: {get_pixel_pos_in_image(window, image_name)}  Value: {image.data[int(pixel[1])][int(pixel[0])]}")
+                dpg.set_value(pointer, f"Pixel: {get_pixel_pos_in_image(window, image_name)}  Value: {image.get_pixel(pixel)}")
                 return  # Terminamos de dibujar
 
         # No estamos en la imagen -> Borramos lo dibujado
