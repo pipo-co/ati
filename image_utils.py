@@ -71,12 +71,17 @@ class Image:
         return self.data[:, :, channel] if self.channels > 1 else self.data
 
     def apply_over_channels(self, fn: Callable[[np.ndarray], np.ndarray], *args, **kwargs) -> np.ndarray:
+        
+        new_data: np.ndarray
+
         if self.channels == 1:
-            return fn(self.data, *args, **kwargs)
+            new_data = fn(self.data, *args, **kwargs)
         else:
-            data = np.empty(self.shape,  dtype=np.uint8)
+            new_data = np.empty(self.shape,  dtype=np.uint8)
             for channel in range(self.channels):
-                data[:, :, channel] = fn(self.get_channel(channel), *args, **kwargs)
+                new_data[:, :, channel] = fn(self.get_channel(channel), *args, **kwargs)
+
+        return new_data
 
     @property
     def shape(self) -> Tuple[int]:
