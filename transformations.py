@@ -4,7 +4,7 @@ import dearpygui.dearpygui as dpg
 
 import images_repo as img_repo
 import interface
-from denoising import mean, PaddingStrategy
+from denoising import mean, PaddingStrategy, median
 from image_utils import Image, pollute_img, salt_img, strip_extension, add_images, sub_images, multiply_images, \
     power_function, get_negative, \
     transform_from_threshold, equalize, ImageFormat
@@ -42,6 +42,7 @@ def build_transformations_menu(image_name: str) -> None:
             build_tr_menu_item(TR_GAUSS, build_gauss_dialog, image_name)
         with dpg.menu(label='Denoise'):
             build_tr_menu_item(TR_MEAN, build_denoise_mean_dialog, image_name)
+            build_tr_menu_item(TR_MEDIAN, build_denoise_median_dialog, image_name)
 
 
 def build_tr_menu_item(tr_id: str, tr_dialog_builder: Callable[[str], None], image_name: str) -> None:
@@ -411,8 +412,6 @@ def tr_equalize(image_name: str) -> Image:
 ########################################################
 
 TR_MEAN: str = 'mean'
-
-
 @render_error
 def build_denoise_mean_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_MEAN):
@@ -431,7 +430,27 @@ def tr_mean(image_name: str) -> Image:
     padding: str = dpg.get_value(TR_RADIO_BUTTONS)
     # 2. Procesamos - Puede ser async
     new_data = image.apply_over_channels(mean, n, padding)
-    print(image.data)
-    print(new_data)
+    # 3. Creamos Imagen
+    return Image(new_name, image.format, new_data)
+
+
+TR_MEDIAN: str = 'median'
+@render_error
+def build_denoise_median_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_MEDIAN):
+        build_tr_name_input(TR_MEDIAN, image_name)
+        # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
+        build_tr_value_int_selector('n', 3, 255)
+        build_tr_radiobuttons(PaddingStrategy.values())
+        build_tr_dialog_end_buttons(TR_MEDIAN, image_name, tr_median)
+
+def tr_median(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image = img_repo.get_image(image_name)
+    new_name: str = get_req_tr_name_value(image)
+    n: int = int(dpg.get_value(TR_INT_VALUE_SELECTOR))
+    padding: str = dpg.get_value(TR_RADIO_BUTTONS)
+    # 2. Procesamos - Puede ser async
+    new_data = image.apply_over_channels(median, n, padding)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
