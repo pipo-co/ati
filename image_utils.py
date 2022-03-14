@@ -65,7 +65,7 @@ class Image:
 
     def get_pixel(self, pixel: Tuple[int, int]) -> bool:
         x, y = pixel
-        return self.data[x, y]
+        return self.data[y, x]
 
     def get_channel(self, channel: int) -> np.ndarray:
         return self.data[:, :, channel] if self.channels > 1 else self.data
@@ -88,11 +88,11 @@ class Image:
         return self.data.shape
 
     @property
-    def width(self) -> int:
+    def height(self) -> int:
         return self.data.shape[0]
 
     @property
-    def height(self) -> int:
+    def width(self) -> int:
         return self.data.shape[1]
 
     @property
@@ -141,7 +141,7 @@ def load_image(path: str) -> Image:
     if fmt == ImageFormat.RAW:
         metadata = metadata_repo.get_metadata(name)
         data = np.fromfile(path, dtype=np.uint8)
-        data = data.reshape((metadata.width, metadata.height))
+        data = data.reshape((metadata.height, metadata.width))
     else:
         data = np.asarray(PImage.open(path), dtype=np.uint8)
 
