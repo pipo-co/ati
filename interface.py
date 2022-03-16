@@ -3,7 +3,7 @@ from typing import Callable, Tuple, Union
 import dearpygui.dearpygui as dpg
 import numpy as np
 
-from image_utils import channel_histogram, image_to_rgba_array, load_image, valid_image_formats, Image, save_image, get_extension, \
+from image_utils import image_to_rgba_array, load_image, valid_image_formats, Image, save_image, get_extension, \
     create_square_image, create_circle_image, CIRCLE_IMAGE_NAME, SQUARE_IMAGE_NAME
 import images_repo as img_repo
 from interface_utils import render_error
@@ -34,22 +34,32 @@ def render_image_window(image_name: str):
     if dpg.does_item_exist(f'image_{image_name}'):
         dpg.focus_item(f'image_{image_name}')
     else:
+        # Precalculamos las operaciones costosas.
+        # Si lo hacemos durante el rendereado, se generan condiciones de carrera.
         image: Image = img_repo.get_image(image_name)
         width, height = calculate_image_window_size(image)
-        with dpg.window(label=image_name, tag=f'image_window_{image_name}', width=width, height=height, no_scrollbar=True, user_data={'image_name': image_name, 'hists_toggled': False}, on_close=lambda: dpg.delete_item(window)) as window:
+        hists = image.get_histograms()
+
+        with dpg.window(label=image_name, tag=f'image_window_{image_name}', width=width, height=height, no_scrollbar=True, no_resize=True, user_data={'image_name': image_name, 'hists_toggled': False}, on_close=lambda: dpg.delete_item(window)) as window:
             with dpg.menu_bar():
                 dpg.add_menu_item(label='Save', user_data=image_name, callback=lambda s, ad, ud: trigger_save_image_dialog(ud))
                 build_transformations_menu(image_name)
                 dpg.add_menu_item(label='Show Histograms', tag=f'hists_toggle_{image_name}', user_data=image_name, callback=lambda s, ad, ud: toggle_hists(ud))
 
-            with dpg.group(horizontal=True) as main_group:
-                with dpg.group(parent=main_group, width=image.width):
+            with dpg.group(horizontal=True):
+                with dpg.group(width=image.width):
                     dpg.add_image(image_name, tag=f'image_{image_name}', width=image.width, height=image.height)
                     dpg.add_text(f'Height: {image.height}  Width: {image.width}')
                     dpg.add_text('', tag=f'image_{image_name}_region')
                     dpg.add_text('', tag=f'image_{image_name}_pointer')
 
-                build_hist_group(main_group, image)
+                with dpg.group(tag=f'hist_group_{image.name}', width=HIST_WIDTH, show=False):
+                    if len(hists) == 1:
+                        build_reduced_histogram_plot(image_name, 'grey_hist_theme',  *hists[0])
+                    else:
+                        build_reduced_histogram_plot(image_name, 'red_hist_theme',   *hists[Image.RED_CHANNEL])
+                        build_reduced_histogram_plot(image_name, 'green_hist_theme', *hists[Image.GREEN_CHANNEL])
+                        build_reduced_histogram_plot(image_name, 'blue_hist_theme',  *hists[Image.BLUE_CHANNEL])
 
 def calculate_image_window_size(image: Image) -> Tuple[int, int]:
     # 15 = padding, 120 = menu_bar + info_size
@@ -87,31 +97,27 @@ def build_hist_themes():
         with dpg.theme_component(dpg.mvBarSeries):
             dpg.add_theme_color(value=(127, 127, 127), category=dpg.mvThemeCat_Plots)
 
-def histogram_plot(hist: np.ndarray, bins: np.ndarray, theme: str) -> None:
-    with dpg.plot(height=HIST_WIDTH * 9 // 16, no_mouse_pos=True):
-        dpg.add_plot_axis(dpg.mvXAxis, no_tick_marks=True, no_tick_labels=True)
-        y_axis = dpg.add_plot_axis(dpg.mvYAxis, no_tick_marks=True, no_tick_labels=True)
-        grey_hist = dpg.add_bar_series(bins, hist, parent=y_axis)
+def build_histogram_plot(theme: str, hist: np.ndarray, bins: np.ndarray, height: int = 0, no_ticks: bool = False, no_mouse_pos: bool = False) -> None:
+    with dpg.plot(height=height, no_mouse_pos=no_mouse_pos):
+        dpg.add_plot_axis(dpg.mvXAxis, no_tick_marks=no_ticks, no_tick_labels=no_ticks)
+        y_axis = dpg.add_plot_axis(dpg.mvYAxis, no_tick_marks=no_ticks, no_tick_labels=no_ticks)
+        grey_hist = dpg.add_bar_series(bins, hist, parent=y_axis) # noqa
         dpg.bind_item_theme(grey_hist, theme)
 
-def build_hist_group(parent, image: Image):
-    with dpg.group(parent=parent, tag=f'hist_group_{image.name}', width=HIST_WIDTH, show=False):
-        if image.channels == 1:
-            hist, bins = channel_histogram(image.data)
-            histogram_plot(hist, bins, 'grey_hist_theme')
-        else:
-            hist, bins = channel_histogram(image.get_channel(Image.RED_CHANNEL))
-            histogram_plot(hist, bins, 'red_hist_theme')
+def build_reduced_histogram_plot(image_name: str, theme: str, hist: np.ndarray, bins: np.ndarray):
+    build_histogram_plot(theme, hist, bins, height=HIST_WIDTH * 9 // 16, no_ticks=True, no_mouse_pos=True)
+    dpg.add_button(label='Expand', user_data=(image_name, theme, hist, bins), callback=lambda s, ad, ud: build_expanded_histogram_plot(*ud))
+    dpg.add_separator()
 
-            hist, bins = channel_histogram(image.get_channel(Image.GREEN_CHANNEL))
-            histogram_plot(hist, bins, 'green_hist_theme')
-
-            hist, bins = channel_histogram(image.get_channel(Image.BLUE_CHANNEL))
-            histogram_plot(hist, bins, 'blue_hist_theme')
+# TODO(tobi): Capaz agregar un boton para mostrar la acumulada encima? Esta piola para la funcion equalize
+@render_error
+def build_expanded_histogram_plot(image_name: str, theme: str, hist: np.ndarray, bins: np.ndarray) -> None:
+    with dpg.window(label=f'Histogram - {image_name} - {theme.split("_")[0].capitalize()} Channel'):
+        build_histogram_plot(theme, hist, bins)
 
 def register_image(image: Image) -> None:
     image_vector = image_to_rgba_array(image)
-    dpg.add_static_texture(image.width, image.height, image_vector, tag=image.name, parent=TEXTURE_REGISTRY)
+    dpg.add_static_texture(image.width, image.height, image_vector, tag=image.name, parent=TEXTURE_REGISTRY) # noqa
     dpg.add_menu_item(label=image.name, parent=IMAGES_MENU, user_data=image.name, callback=lambda s, ad, ud: render_image_window(ud))
 
 @render_error

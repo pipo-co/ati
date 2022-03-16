@@ -2,7 +2,7 @@ import itertools
 import os
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterable, Tuple, Callable
+from typing import Iterable, Tuple, Callable, Union
 from noise import NoiseType, uniform
 
 import metadata_repo
@@ -15,6 +15,9 @@ SQUARE_IMAGE_NAME: str = 'square.pgm'
 RESERVED_IMAGE_NAMES: Tuple[str, ...] = (CIRCLE_IMAGE_NAME, SQUARE_IMAGE_NAME)
 COLOR_DEPTH: int = 256
 MAX_COLOR: int = COLOR_DEPTH - 1
+
+# (hist, bins)
+Hist = Tuple[np.ndarray, np.ndarray]
 
 class ImageFormat(Enum):
     PGM     = 'pgm'
@@ -83,6 +86,16 @@ class Image:
 
         return new_data
 
+    def get_histograms(self) -> Union[Tuple[Hist], Tuple[Hist, Hist, Hist]]:
+        if self.channels == 1:
+            return channel_histogram(self.data),
+        else:
+            return (
+                channel_histogram(self.get_channel(Image.RED_CHANNEL)),
+                channel_histogram(self.get_channel(Image.GREEN_CHANNEL)),
+                channel_histogram(self.get_channel(Image.BLUE_CHANNEL))
+            )
+
     @property
     def shape(self) -> Tuple[int]:
         return self.data.shape
@@ -143,7 +156,7 @@ def load_image(path: str) -> Image:
         data = np.fromfile(path, dtype=np.uint8)
         data = data.reshape((metadata.height, metadata.width))
     else:
-        data = np.asarray(PImage.open(path), dtype=np.uint8)
+        data = np.asarray(PImage.open(path), dtype=np.uint8) # noqa
 
     return Image(name, fmt, data)
 
@@ -193,7 +206,6 @@ def create_square_image() -> Image:
     return Image(SQUARE_IMAGE_NAME, ImageFormat.PGM, data, allow_reserved=True)
 
 def add_images(first_img: Image, second_img: Image) -> np.ndarray:
-    # TODO(tobi): Alcanza con uint16, pero con la normalización que tenemos necesitamos 32
     array = np.add(first_img.data, second_img.data, dtype=np.uint32)
     return normalize(array)
 
@@ -206,7 +218,6 @@ def multiply_images(first_img: Image, second_img: Image) -> np.ndarray:
     return normalize(array)
 
 # Normalizes to uint8 ndarray
-# TODO(tobi): Consultar si se puede mejorar
 def normalize(data: np.ndarray) -> np.ndarray:
     if data.dtype == np.uint8:
         return data
@@ -273,7 +284,7 @@ def salt_array(channel: np.ndarray, percentage:float) -> np.ndarray:
 
     return np.reshape(new_arr, shape)
 
-def channel_histogram(channel: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+def channel_histogram(channel: np.ndarray) -> Hist:
     hist, bins = np.histogram(channel.flatten(), bins=COLOR_DEPTH, range=(0, COLOR_DEPTH))
     return hist / channel.size, bins
 
