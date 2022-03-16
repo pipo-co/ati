@@ -113,7 +113,7 @@ def build_reduced_histogram_plot(image_name: str, theme: str, hist: np.ndarray, 
 @render_error
 def build_expanded_histogram_plot(image_name: str, theme: str, hist: np.ndarray, bins: np.ndarray) -> None:
     with dpg.window(label=f'Histogram - {image_name} - {theme.split("_")[0].capitalize()} Channel'):
-        build_histogram_plot(theme, hist, bins)
+        build_histogram_plot(theme, hist.tolist(), bins.tolist()) # noqa - Hackazo para evitar el bug de que se renderea mal
 
 def register_image(image: Image) -> None:
     image_vector = image_to_rgba_array(image)
