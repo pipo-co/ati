@@ -2,8 +2,7 @@ import itertools
 import os
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterable, Tuple, Callable, Union
-from noise import NoiseType, uniform
+from typing import Iterable, Tuple, Callable, Union, Any
 
 import metadata_repo
 
@@ -73,10 +72,8 @@ class Image:
     def get_channel(self, channel: int) -> np.ndarray:
         return self.data[:, :, channel] if self.channels > 1 else self.data
 
-    def apply_over_channels(self, fn: Callable[[np.ndarray], np.ndarray], *args, **kwargs) -> np.ndarray:
-        
+    def apply_over_channels(self, fn: Callable[[np.ndarray, Any], np.ndarray], *args, **kwargs) -> np.ndarray:
         new_data: np.ndarray
-
         if self.channels == 1:
             new_data = fn(self.data, *args, **kwargs)
         else:
@@ -233,8 +230,8 @@ def power_function(img: Image, gamma: float) -> np.ndarray:
     c: float = MAX_COLOR/(MAX_COLOR**gamma)
     return np.array([c*xi**gamma for xi in img.data], dtype=np.uint8)
 
-def get_negative(img: Image) -> np.ndarray:
-    return np.array([-xi + MAX_COLOR for xi in img.data], dtype=np.uint8)
+def negate(img: Image) -> np.ndarray:
+    return np.array([MAX_COLOR - xi for xi in img.data], dtype=np.uint8)
 
 def transform_from_threshold(img: Image, umb:int) -> np.ndarray:
     if img.channels == 1:
