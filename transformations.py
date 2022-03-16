@@ -148,8 +148,13 @@ TR_REFORMAT: str = 'reformat'
 @render_error
 def build_reformat_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_COPY):
-        build_tr_radio_buttons(ImageFormat.values())
-        build_tr_dialog_end_buttons(TR_COPY, image_name, tr_reformat)
+        image = img_repo.get_image(image_name)
+        fmts = ImageFormat.values()
+        if image.channels > 1:
+            # Raw solo funciona para imagenes de un solo canal
+            fmts.remove(ImageFormat.RAW.value)
+        build_tr_radio_buttons(fmts)
+        build_tr_dialog_end_buttons(TR_REFORMAT, image_name, tr_reformat)
 
 def tr_reformat(image_name: str) -> Image:
     # 1. Obtenemos inputs
