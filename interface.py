@@ -84,16 +84,16 @@ def toggle_hists(image_name: str) -> None:
     user_data['hists_toggled'] = not plots_toggled
 
 def build_hist_themes():
-    with dpg.theme(tag=f'red_hist_theme'):
+    with dpg.theme(tag='red_hist_theme'):
         with dpg.theme_component(dpg.mvBarSeries):
             dpg.add_theme_color(value=(255, 0, 0), category=dpg.mvThemeCat_Plots)
-    with dpg.theme(tag=f'green_hist_theme'):
+    with dpg.theme(tag='green_hist_theme'):
         with dpg.theme_component(dpg.mvBarSeries):
             dpg.add_theme_color(value=(0, 255, 0), category=dpg.mvThemeCat_Plots)
-    with dpg.theme(tag=f'blue_hist_theme'):
+    with dpg.theme(tag='blue_hist_theme'):
         with dpg.theme_component(dpg.mvBarSeries):
             dpg.add_theme_color(value=(0, 0, 255), category=dpg.mvThemeCat_Plots) 
-    with dpg.theme(tag=f'grey_hist_theme'):
+    with dpg.theme(tag='grey_hist_theme'):
         with dpg.theme_component(dpg.mvBarSeries):
             dpg.add_theme_color(value=(127, 127, 127), category=dpg.mvThemeCat_Plots)
 
