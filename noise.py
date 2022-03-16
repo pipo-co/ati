@@ -1,29 +1,58 @@
-
-from enum import Enum
 import functools
-import random
+from enum import Enum
+from typing import Callable, List
+
 import numpy as np
 
+import rng
+from image_utils import Image, normalize, MAX_COLOR
+
+NoiseSupplier = Callable[[], float]
+
 class NoiseType(Enum):
-    GAUSS   = functools.partial(lambda sigma: gaussian(0, sigma))
-    EXP     = functools.partial(lambda lambd: exponential(lambd))
-    RAYL    = functools.partial(lambda param: rayleigh(param))
+    ADDITIVE        = functools.partial(lambda val, noise: val + noise)
+    MULTIPLICATIVE  = functools.partial(lambda val, noise: val * noise)
 
-    def __call__(self, *args):
-        return self.value(*args)
+    @classmethod
+    def names(cls) -> List[str]:
+        return list(map(lambda c: c.name, cls))
 
+    @classmethod
+    def from_name(cls, name: str) -> 'NoiseType':
+        name = name.upper()
+        if name not in cls.__members__:
+            raise ValueError(f'"{name.capitalize()}" is not a supported noise type')
+        return cls[name]
 
-def uniform() -> float:
-    return random.uniform(0, 1)
+    def __call__(self, val: int, noise: float) -> float:
+        return self.value(val, noise)
 
-def gaussian(mu, sigma) -> float:
-    
-    value = random.gauss(mu, sigma)
-    # print(value)
-    return value
+def pollute(img: Image, noise_supplier: NoiseSupplier, noise_type: NoiseType, percentage: int) -> np.ndarray:
+    return img.apply_over_channels(pollute_channel, noise_supplier, noise_type, percentage)
 
-def exponential(lambd) -> float:
-    return random.expovariate(lambd) 
+# TODO(tobi, nacho): Vectorizar
+# TODO(tobi): Para mi esta mal multiplicar por MAX_COLOR de manera naive
+def pollute_channel(channel: np.ndarray, noise_supplier: NoiseSupplier, noise_type: NoiseType, percentage: int) -> np.ndarray:
+    p = percentage / 100
+    shape = np.shape(channel)
+    ret = normalize(np.array([(noise_type(xi, noise_supplier() * MAX_COLOR)) if rng.random() < p else xi for xi in channel.flatten()]))
+    return np.reshape(ret, shape)
 
-def rayleigh(param) -> float:
-    return np.random.rayleigh(param)
+def salt(img: Image, percentage: int) -> np.ndarray:
+    return img.apply_over_channels(pollute_channel, percentage)
+
+def salted_pixel(xi: int, p: float) -> int:
+    obs = rng.random()
+    if obs > 1 - p:
+        return MAX_COLOR
+    elif obs < p:
+        return 0
+    else:
+        return xi
+
+# TODO(tobi, nacho): Vectorizar
+def salt_channel(channel: np.ndarray, percentage: int) -> np.ndarray:
+    p = percentage / 100
+    shape = np.shape(channel)
+    new_arr = np.array([salted_pixel(xi, p) for xi in channel.flatten()], dtype=np.uint8)
+    return np.reshape(new_arr, shape)
