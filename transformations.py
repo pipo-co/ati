@@ -4,24 +4,26 @@ import dearpygui.dearpygui as dpg
 
 import images_repo as img_repo
 import interface
-from denoising import mean, PaddingStrategy, median
-from image_utils import Image, pollute_img, salt_img, strip_extension, add_images, sub_images, multiply_images, \
-    power_function, get_negative, \
-    transform_from_threshold, equalize, ImageFormat
+import rng
+
+from denoising import PaddingStrategy
+import denoising
+from image_utils import Image, strip_extension, add_images, sub_images, multiply_images, \
+    power_function, negate, \
+    transform_from_threshold, equalize, ImageFormat, MAX_COLOR
 from interface_utils import render_error
 from noise import NoiseType
+import noise
 
 # General Items
 TR_DIALOG: str = 'tr_dialog'
 
 # Custom Inputs
-TR_NAME_INPUT: str = 'tr_name_input'
-TR_IMG_INPUT: str = 'tr_img_input'
-
-TR_INT_VALUE_SELECTOR: str = 'tr_int_value_input'
-TR_FLOAT_VALUE_SELECTOR: str = 'tr_float_value_input'
-
-TR_RADIO_BUTTONS: str = 'tr_radio_buttons'
+TR_NAME_INPUT: str              = 'tr_name_input'
+TR_IMG_INPUT: str               = 'tr_img_input'
+TR_INT_VALUE_SELECTOR: str      = 'tr_int_value_input'
+TR_FLOAT_VALUE_SELECTOR: str    = 'tr_float_value_input'
+TR_RADIO_BUTTONS: str           = 'tr_radio_buttons'
 
 TrHandler = Callable[[str], Image]
 
@@ -40,10 +42,10 @@ def build_transformations_menu(image_name: str) -> None:
             build_tr_menu_item(TR_SUB,      build_sub_dialog, image_name)
             build_tr_menu_item(TR_MULT,     build_mult_dialog, image_name)
         with dpg.menu(label='Noise'):
-            build_tr_menu_item(TR_GAUSS,    build_gauss_dialog, image_name)
-            build_tr_menu_item(TR_EXP,      build_exp_dialog, image_name)
-            build_tr_menu_item(TR_RAYLEIGH, build_rayleigh_dialog, image_name)
-            build_tr_menu_item(TR_SALT,     build_salt_dialog, image_name)
+            build_tr_menu_item(TR_NOISE_GAUSS,    build_noise_gauss_dialog, image_name)
+            build_tr_menu_item(TR_NOISE_EXP,      build_noise_exp_dialog, image_name)
+            build_tr_menu_item(TR_NOISE_RAYLEIGH, build_noise_rayleigh_dialog, image_name)
+            build_tr_menu_item(TR_NOISE_SALT,     build_noise_salt_dialog, image_name)
         with dpg.menu(label='Denoise'):
             build_tr_menu_item(TR_MEAN,     build_denoise_mean_dialog, image_name)
             build_tr_menu_item(TR_MEDIAN,   build_denoise_median_dialog, image_name)
@@ -65,27 +67,45 @@ def execute_transformation(image_name: str, handler: TrHandler) -> None:
 def build_tr_dialog(tr_id: str) -> int:
     return dpg.window(label=f'Apply {tr_id.capitalize()} Transformation', tag=TR_DIALOG, modal=True, no_close=True, pos=interface.CENTER_POS)
 
+def build_tr_dialog_end_buttons(tr_id: str, image_name: str, handle: TrHandler) -> None:
+    with dpg.group(horizontal=True):
+        dpg.add_button(label='Transform', user_data=(image_name, handle), callback=lambda s, ap, ud: execute_transformation(*ud))
+        dpg.add_button(label='Cancel', user_data=tr_id, callback=lambda: dpg.delete_item(TR_DIALOG))
+
+# ******************** Input Builders ********************* #
+
+# Solo puede haber un name input, que (casi) siempre debe estar
 def build_tr_name_input(tr_id: str, image_name: str) -> None:
     dpg.add_text('Select New Image Name (no extension)')
     dpg.add_input_text(default_value=strip_extension(image_name) + f'_{tr_id}', tag=TR_NAME_INPUT)
 
-def build_tr_value_int_selector(value: str, min_val: int, max_val: int, m_tag: str = TR_INT_VALUE_SELECTOR) -> None:
-    dpg.add_text(f'Select {value} value')
-    dpg.add_input_int(min_value=min_val, max_value=max_val, label=f'pick a value for {value} between {min_val} and {max_val}', tag=m_tag)
+def build_tr_value_int_selector(name: str, min_val: int, max_val: int, suffix: str = None, step: int = 1, tag: str = TR_INT_VALUE_SELECTOR) -> None:
+    dpg.add_text(f'Select \'{name}\' between {min_val} and {max_val}')
+    dpg.add_input_int(min_value=min_val, max_value=max_val, default_value=min_val, step=step, label=suffix, tag=tag)
 
-def build_tr_value_float_selector(value: str, min_val: float, max_val: float, m_tag: str = TR_FLOAT_VALUE_SELECTOR) -> None:
-    dpg.add_text(f'Select {value} value')
-    dpg.add_input_float(min_value=min_val, max_value=max_val, label=f'pick a value for {value} between {min_val} and {max_val}', tag=m_tag)
+def build_tr_value_float_selector(name: str, min_val: float, max_val: float, suffix: str = None, tag: str = TR_FLOAT_VALUE_SELECTOR) -> None:
+    dpg.add_text(f'Select \'{name}\' between {min_val} and {max_val}')
+    dpg.add_input_float(min_value=min_val, max_value=max_val, default_value=min_val, label=suffix, tag=tag)
+    
+def build_tr_percentage_selector(name: str, tag: str = TR_INT_VALUE_SELECTOR) -> None:
+    build_tr_value_int_selector(name, 0, 100, suffix='%', tag=tag)
 
-def build_tr_radio_buttons(names: List[str], default_value: Optional[str] = None) -> None:
+def build_tr_radio_buttons(names: List[str], default_value: Optional[str] = None, tag: str = TR_RADIO_BUTTONS) -> None:
     names = list(map(str.capitalize, names))
     if default_value:
         default_value = default_value.capitalize()
     else:
         default_value = names[0]
-    dpg.add_radio_button(items=names, label='sum', default_value=default_value, tag=TR_RADIO_BUTTONS)
+    dpg.add_radio_button(items=names, default_value=default_value, tag=tag)
+    
+def build_tr_img_selector(image_name: str) -> None:
+    image_list = list(map(lambda img: img.name, img_repo.get_same_shape_images(image_name)))
+    dpg.add_text('Select Another Image to combine')
+    dpg.add_listbox(image_list, tag=TR_IMG_INPUT)
 
-def get_req_tr_name_value(image: Image) -> str:
+# ******************** Input Getters and Requirements ********************* #
+
+def get_tr_name_value(image: Image) -> str:
     base_name = dpg.get_value(TR_NAME_INPUT)
     if not base_name:
         raise ValueError('A name for the new image must be provided')
@@ -94,32 +114,41 @@ def get_req_tr_name_value(image: Image) -> str:
         raise ValueError(f'Another image with name "{ret}" already exists')
     return ret
 
-def get_gamma_tr_value() -> float:
-    gamma = dpg.get_value(TR_FLOAT_VALUE_SELECTOR)
-    if gamma == 1.0:
-        raise ValueError('Value cannot be 1')
-    return gamma
-
-def build_op_img_selector(image_name: str) -> None:
-    image_list = list(map(lambda img: img.name, img_repo.get_same_shape_images(image_name)))
-    dpg.add_text('Select Another Image to combine')
-    dpg.add_listbox(image_list, tag=TR_IMG_INPUT)
-
-def get_req_tr_img_value() -> Image:
-    img_name = dpg.get_value(TR_IMG_INPUT)
+def get_tr_img_value(img_input: str = TR_IMG_INPUT) -> Image:
+    img_name = dpg.get_value(img_input)
     if not img_repo.contains_image(img_name):
         raise ValueError('Selecting a valid image is required for transformation')
     return img_repo.get_image(img_name)
 
+def get_tr_radio_buttons_value(radio_buttons: str = TR_RADIO_BUTTONS) -> str:
+    return dpg.get_value(radio_buttons)
+
+def get_tr_int_value(int_input: str = TR_INT_VALUE_SELECTOR) -> int:
+    return dpg.get_value(int_input)
+
+def get_tr_float_value(float_input: str = TR_FLOAT_VALUE_SELECTOR) -> float:
+    return dpg.get_value(float_input)
+
+def get_tr_gamma_value(gamma_input: str = TR_FLOAT_VALUE_SELECTOR) -> float:
+    gamma = get_tr_float_value(gamma_input)
+    if gamma == 1.0:
+        raise ValueError('Gamma cannot be 1')
+    return gamma
+
+def get_tr_percentage_value(percentage_input: str = TR_FLOAT_VALUE_SELECTOR) -> int:
+    percentage = get_tr_int_value(percentage_input)
+    if not 0 <= percentage <= 100:
+        raise ValueError('Percentage must be between 0 and 100')
+    return percentage
+
+def require_odd(n: int, msg: str) -> int:
+    if n % 2 == 0:
+        raise ValueError(msg)
+    return n
+
 def require_same_shape(img1: Image, img2: Image, msg: str) -> None:
     if img1.shape != img2.shape:
         raise ValueError(msg)
-
-def build_tr_dialog_end_buttons(tr_id: str, image_name: str, handle: TrHandler) -> None:
-    with dpg.group(horizontal=True):
-        dpg.add_button(label='Transform', user_data=(image_name, handle),
-                       callback=lambda s, ap, ud: execute_transformation(*ud))
-        dpg.add_button(label='Cancel', user_data=tr_id, callback=lambda: dpg.delete_item(TR_DIALOG))
 
 ########################################################
 # ******************** Utilities ********************* #
@@ -132,12 +161,12 @@ def build_copy_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_COPY):
         build_tr_name_input(TR_COPY, image_name)
         # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
-        build_tr_dialog_end_buttons(TR_COPY, image_name, tr_nop)
+        build_tr_dialog_end_buttons(TR_COPY, image_name, tr_copy)
 
-def tr_nop(image_name: str) -> Image:
+def tr_copy(image_name: str) -> Image:
     # 1. Obtenemos inputs
-    image = img_repo.get_image(image_name)
-    new_name: str = get_req_tr_name_value(image)
+    image    = img_repo.get_image(image_name)
+    new_name = get_tr_name_value(image)
     # 2. Procesamos
     # Do Nothing
     # 3. Creamos Imagen
@@ -158,8 +187,8 @@ def build_reformat_dialog(image_name: str) -> None:
 
 def tr_reformat(image_name: str) -> Image:
     # 1. Obtenemos inputs
-    image = img_repo.get_image(image_name)
-    new_fmt = ImageFormat.from_str(dpg.get_value(TR_RADIO_BUTTONS).lower())
+    image    = img_repo.get_image(image_name)
+    new_fmt  = ImageFormat.from_str(get_tr_radio_buttons_value().lower())
     new_name = strip_extension(image_name) + new_fmt.to_extension()
     # 2. Procesamos
     # Do Nothing
@@ -180,11 +209,10 @@ def build_neg_dialog(image_name: str) -> None:
 
 def tr_neg(image_name: str) -> Image:
     # 1. Obtenemos inputs
-    image = img_repo.get_image(image_name)
-    new_name: str = get_req_tr_name_value(image)
+    image    = img_repo.get_image(image_name)
+    new_name = get_tr_name_value(image)
     # 2. Procesamos
-    new_data = get_negative(image)
-    # Do Nothing
+    new_data = negate(image)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 
@@ -194,14 +222,14 @@ TR_POW: str = 'pow'
 def build_pow_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_POW):
         build_tr_name_input(TR_POW, image_name)
-        build_tr_value_float_selector('gamma', 0.0, 2.0)
+        build_tr_value_float_selector('gamma', 0, 2)
         build_tr_dialog_end_buttons(TR_POW, image_name, tr_pow)
 
 def tr_pow(image_name: str) -> Image:
     # 1. Obtenemos inputs
-    image = img_repo.get_image(image_name)
-    new_name: str = get_req_tr_name_value(image)
-    gamma: float = get_gamma_tr_value()
+    image    = img_repo.get_image(image_name)
+    new_name = get_tr_name_value(image)
+    gamma    = get_tr_gamma_value()
     # 2. Procesamos
     new_data = power_function(image, gamma)
     # 3. Creamos Imagen
@@ -213,14 +241,14 @@ TR_UMBRAL: str = 'umbral'
 def build_umbral_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_UMBRAL):
         build_tr_name_input(TR_UMBRAL, image_name)
-        build_tr_value_int_selector('threshold', 0, 255)
+        build_tr_value_int_selector('threshold', 0, MAX_COLOR)
         build_tr_dialog_end_buttons(TR_UMBRAL, image_name, tr_umb)
 
 def tr_umb(image_name: str) -> Image:
     # 1. Obtenemos inputs
-    image = img_repo.get_image(image_name)
-    new_name: str = get_req_tr_name_value(image)
-    umb: int = dpg.get_value(TR_INT_VALUE_SELECTOR)
+    image    = img_repo.get_image(image_name)
+    new_name = get_tr_name_value(image)
+    umb      = get_tr_int_value()
     # 2. Procesamos
     new_data = transform_from_threshold(image, umb)
     # 3. Creamos Imagen
@@ -236,8 +264,8 @@ def build_equalize_dialog(image_name: str) -> None:
 
 def tr_equalize(image_name: str) -> Image:
     # 1. Obtenemos inputs
-    image = img_repo.get_image(image_name)
-    new_name: str = get_req_tr_name_value(image)
+    image    = img_repo.get_image(image_name)
+    new_name = get_tr_name_value(image)
     # 2. Procesamos
     new_data = equalize(image)
     # 3. Creamos Imagen y finalizamos
@@ -248,90 +276,90 @@ def tr_equalize(image_name: str) -> Image:
 ########################################################
 
 
-TR_GAUSS: str = 'gauss'
+TR_NOISE_GAUSS: str = 'gauss'
 @render_error
-def build_gauss_dialog(image_name: str) -> None:
-    with build_tr_dialog(TR_GAUSS):
-        build_tr_name_input(TR_GAUSS, image_name)
-        build_tr_radio_buttons(['add', 'mult'], 'add')
-        build_tr_value_float_selector('sigma', 0, 1, m_tag='sigma_value_input')
-        build_tr_value_float_selector('percentage', 0, 100, m_tag='percentage_value_input')
-        build_tr_dialog_end_buttons(TR_GAUSS, image_name, tr_gauss)
+def build_noise_gauss_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_NOISE_GAUSS):
+        build_tr_name_input(TR_NOISE_GAUSS, image_name)
+        build_tr_radio_buttons(NoiseType.names())
+        build_tr_value_float_selector('sigma', 0, 1, tag='sigma')
+        build_tr_percentage_selector('noise percentage', tag='percentage')
+        build_tr_dialog_end_buttons(TR_NOISE_GAUSS, image_name, tr_noise_gauss)
 
-def tr_gauss(image_name: str) -> Image:
+def tr_noise_gauss(image_name: str) -> Image:
     # 1. Obtenemos inputs
-    image = img_repo.get_image(image_name)
-    new_name: str = get_req_tr_name_value(image)
-    sigma: float = dpg.get_value('sigma_value_input')
-    percentage: float = dpg.get_value('percentage_value_input')
-    mode: str = dpg.get_value('tr_radio_buttons')
+    image       = img_repo.get_image(image_name)
+    new_name    = get_tr_name_value(image)
+    sigma       = get_tr_float_value('sigma')
+    percentage  = get_tr_percentage_value('percentage')
+    noise_type  = NoiseType.from_name(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data = pollute_img(image, NoiseType.GAUSS, percentage, sigma, mode)
+    new_data = noise.pollute(image, lambda: rng.gaussian(0, sigma), noise_type, percentage)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 
 
-TR_EXP: str = 'exp'
+TR_NOISE_EXP: str = 'exp'
 @render_error
-def build_exp_dialog(image_name: str) -> None:
-    with build_tr_dialog(TR_EXP):
-        build_tr_name_input(TR_EXP, image_name)
-        build_tr_radio_buttons(['add', 'mult'], 'add')
-        build_tr_value_float_selector('lambda', 0, 1, m_tag='parameter_value_input')
-        build_tr_value_float_selector('percentage', 0, 100, m_tag='percentage_value_input')
-        build_tr_dialog_end_buttons(TR_EXP, image_name, tr_exp)
+def build_noise_exp_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_NOISE_EXP):
+        build_tr_name_input(TR_NOISE_EXP, image_name)
+        build_tr_radio_buttons(NoiseType.names())
+        build_tr_value_float_selector('lambda', 0, 1, tag='lambda')
+        build_tr_percentage_selector('noise percentage', tag='percentage')
+        build_tr_dialog_end_buttons(TR_NOISE_EXP, image_name, tr_noise_exp)
 
-def tr_exp(image_name: str) -> Image:
+def tr_noise_exp(image_name: str) -> Image:
     # 1. Obtenemos inputs
-    image = img_repo.get_image(image_name)
-    new_name: str = get_req_tr_name_value(image)
-    param: float = dpg.get_value('parameter_value_input')
-    percentage: float = dpg.get_value('percentage_value_input')
-    mode: str = dpg.get_value('tr_radio_buttons')
+    image       = img_repo.get_image(image_name)
+    new_name    = get_tr_name_value(image)
+    lam         = get_tr_float_value('lambda')
+    percentage  = get_tr_percentage_value('percentage')
+    noise_type  = NoiseType.from_name(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data = pollute_img(image, NoiseType.EXP, percentage, param, mode)
+    new_data = noise.pollute(image, lambda: rng.exponential(lam), noise_type, percentage)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 
 
-TR_RAYLEIGH: str = 'rayleigh'
+TR_NOISE_RAYLEIGH: str = 'rayleigh'
 @render_error
-def build_rayleigh_dialog(image_name: str) -> None:
-    with build_tr_dialog(TR_RAYLEIGH):
-        build_tr_name_input(TR_RAYLEIGH, image_name)
-        build_tr_radio_buttons(['add', 'mult'], 'add')
-        build_tr_value_float_selector('rayleigh parameter', 0, 1, m_tag='rayleigh_value_input')
-        build_tr_value_float_selector('percentage', 0, 100, m_tag='percentage_value_input')
-        build_tr_dialog_end_buttons(TR_RAYLEIGH, image_name, tr_rayleigh)
+def build_noise_rayleigh_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_NOISE_RAYLEIGH):
+        build_tr_name_input(TR_NOISE_RAYLEIGH, image_name)
+        build_tr_radio_buttons(NoiseType.names())
+        build_tr_value_float_selector('epsilon', 0, 1, tag='epsilon')
+        build_tr_percentage_selector('noise percentage', tag='percentage')
+        build_tr_dialog_end_buttons(TR_NOISE_RAYLEIGH, image_name, tr_noise_rayleigh)
 
-def tr_rayleigh(image_name: str) -> Image:
+def tr_noise_rayleigh(image_name: str) -> Image:
     # 1. Obtenemos inputs
-    image = img_repo.get_image(image_name)
-    new_name: str = get_req_tr_name_value(image)
-    param: float = dpg.get_value('rayleigh_value_input')
-    percentage: float = dpg.get_value('percentage_value_input')
-    mode: str = dpg.get_value('tr_radio_buttons')
+    image       = img_repo.get_image(image_name)
+    new_name    = get_tr_name_value(image)
+    epsilon     = dpg.get_value('epsilon')
+    percentage  = dpg.get_value('percentage')
+    noise_type  = NoiseType.from_name(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data = pollute_img(image, NoiseType.RAYL, percentage, param, mode)
+    new_data = noise.pollute(image, lambda: rng.rayleigh(epsilon), noise_type, percentage)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 
 
-TR_SALT: str = 'salt'
+TR_NOISE_SALT: str = 'salt'
 @render_error
-def build_salt_dialog(image_name: str) -> None:
-    with build_tr_dialog(TR_SALT):
-        build_tr_name_input(TR_SALT, image_name)
-        build_tr_value_float_selector('percentage', 0, 100, m_tag='percentage_value_input')
-        build_tr_dialog_end_buttons(TR_SALT, image_name, tr_salt)
+def build_noise_salt_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_NOISE_SALT):
+        build_tr_name_input(TR_NOISE_SALT, image_name)
+        build_tr_percentage_selector('salt percentage', tag='percentage')
+        build_tr_dialog_end_buttons(TR_NOISE_SALT, image_name, tr_noise_salt)
 
-def tr_salt(image_name: str) -> Image:
+def tr_noise_salt(image_name: str) -> Image:
     # 1. Obtenemos inputs
-    image = img_repo.get_image(image_name)
-    new_name: str = get_req_tr_name_value(image)
-    percentage: float = dpg.get_value('percentage_value_input')
+    image       = img_repo.get_image(image_name)
+    new_name    = get_tr_name_value(image)
+    percentage  = get_tr_percentage_value('percentage')
     # 2. Procesamos
-    new_data = salt_img(image, percentage)
+    new_data = noise.salt(image, percentage)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 
@@ -345,14 +373,14 @@ TR_ADD: str = 'add'
 def build_add_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_ADD):
         build_tr_name_input(TR_ADD, image_name)
-        build_op_img_selector(image_name)
+        build_tr_img_selector(image_name)
         build_tr_dialog_end_buttons(TR_ADD, image_name, tr_add)
 
 def tr_add(image_name: str) -> Image:
     # 1. Obtenemos inputs
-    image = img_repo.get_image(image_name)
-    new_name: str = get_req_tr_name_value(image)
-    sec_image = get_req_tr_img_value()
+    image       = img_repo.get_image(image_name)
+    new_name    = get_tr_name_value(image)
+    sec_image   = get_tr_img_value()
     require_same_shape(image, sec_image, 'You can only sum images with the same shape')
     # 2. Procesamos
     new_data = add_images(image, sec_image)
@@ -365,14 +393,14 @@ TR_SUB: str = 'sub'
 def build_sub_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_SUB):
         build_tr_name_input(TR_SUB, image_name)
-        build_op_img_selector(image_name)
+        build_tr_img_selector(image_name)
         build_tr_dialog_end_buttons(TR_SUB, image_name, tr_sub)
 
 def tr_sub(image_name: str) -> Image:
     # 1. Obtenemos inputs
-    image = img_repo.get_image(image_name)
-    new_name: str = get_req_tr_name_value(image)
-    sec_image = get_req_tr_img_value()
+    image       = img_repo.get_image(image_name)
+    new_name    = get_tr_name_value(image)
+    sec_image   = get_tr_img_value()
     require_same_shape(image, sec_image, 'You can only sub images with the same shape')
     # 2. Procesamos
     new_data = sub_images(image, sec_image)
@@ -385,14 +413,14 @@ TR_MULT: str = 'mult'
 def build_mult_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_MULT):
         build_tr_name_input(TR_MULT, image_name)
-        build_op_img_selector(image_name)
+        build_tr_img_selector(image_name)
         build_tr_dialog_end_buttons(TR_MULT, image_name, tr_mult)
 
 def tr_mult(image_name: str) -> Image:
     # 1. Obtenemos inputs
-    image = img_repo.get_image(image_name)
-    new_name: str = get_req_tr_name_value(image)
-    sec_image = get_req_tr_img_value()
+    image       = img_repo.get_image(image_name)
+    new_name    = get_tr_name_value(image)
+    sec_image   = get_tr_img_value()
     require_same_shape(image, sec_image, 'You can only multiply images with the same shape')
     # 2. Procesamos
     new_data = multiply_images(image, sec_image)
@@ -409,19 +437,18 @@ TR_MEAN: str = 'mean'
 def build_denoise_mean_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_MEAN):
         build_tr_name_input(TR_MEAN, image_name)
-        build_tr_value_int_selector('n', 3, 255)
-        build_tr_radio_buttons(PaddingStrategy.values())
+        build_tr_value_int_selector('kernel size', 3, 23, step=2)
+        build_tr_radio_buttons(PaddingStrategy.names())
         build_tr_dialog_end_buttons(TR_MEAN, image_name, tr_mean)
-
 
 def tr_mean(image_name: str) -> Image:
     # 1. Obtenemos inputs
-    image = img_repo.get_image(image_name)
-    new_name: str = get_req_tr_name_value(image)
-    n: int = int(dpg.get_value(TR_INT_VALUE_SELECTOR))
-    padding: str = dpg.get_value(TR_RADIO_BUTTONS)
+    image       = img_repo.get_image(image_name)
+    new_name    = get_tr_name_value(image)
+    kernel_size = require_odd(get_tr_int_value(), 'Kernel size must be odd')
+    padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data = image.apply_over_channels(mean, n, padding)
+    new_data = denoising.mean(image, kernel_size, padding_str)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 
@@ -431,17 +458,17 @@ TR_MEDIAN: str = 'median'
 def build_denoise_median_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_MEDIAN):
         build_tr_name_input(TR_MEDIAN, image_name)
-        build_tr_value_int_selector('n', 3, 255)
-        build_tr_radio_buttons(PaddingStrategy.values())
+        build_tr_value_int_selector('kernel size', 3, 23, step=2)
+        build_tr_radio_buttons(denoising.PaddingStrategy.names())
         build_tr_dialog_end_buttons(TR_MEDIAN, image_name, tr_median)
 
 def tr_median(image_name: str) -> Image:
     # 1. Obtenemos inputs
-    image = img_repo.get_image(image_name)
-    new_name: str = get_req_tr_name_value(image)
-    n: int = int(dpg.get_value(TR_INT_VALUE_SELECTOR))
-    padding: str = dpg.get_value(TR_RADIO_BUTTONS)
+    image       = img_repo.get_image(image_name)
+    new_name    = get_tr_name_value(image)
+    kernel_size = require_odd(get_tr_int_value(), 'Kernel size must be odd')
+    padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data = image.apply_over_channels(median, n, padding)
+    new_data = denoising.median(image, kernel_size, padding_str)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
