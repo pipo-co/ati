@@ -1,19 +1,19 @@
+import itertools
 from typing import Callable, List, Optional
 
 import dearpygui.dearpygui as dpg
 
+import denoising
 import images_repo as img_repo
 import interface
+import noise
 import rng
-
 from denoising import PaddingStrategy
-import denoising
 from image_utils import Image, strip_extension, add_images, sub_images, multiply_images, \
     power_function, negate, \
-    transform_from_threshold, equalize, ImageFormat, MAX_COLOR
+    transform_from_threshold, equalize, ImageFormat, MAX_COLOR, get_extension
 from interface_utils import render_error
 from noise import NoiseType
-import noise
 
 # General Items
 TR_DIALOG: str = 'tr_dialog'
@@ -74,10 +74,20 @@ def build_tr_dialog_end_buttons(tr_id: str, image_name: str, handle: TrHandler) 
 
 # ******************** Input Builders ********************* #
 
+def unique_image_name(base_name: str, ext: str) -> str:
+    if not img_repo.contains_image(base_name + ext):
+        print('base', base_name)
+        return base_name
+    for i in itertools.count(start=2):
+        name = f'{base_name}_{i}'
+        if not img_repo.contains_image(name + ext):
+            print('name', base_name)
+            return name
+
 # Solo puede haber un name input, que (casi) siempre debe estar
 def build_tr_name_input(tr_id: str, image_name: str) -> None:
     dpg.add_text('Select New Image Name (no extension)')
-    dpg.add_input_text(default_value=strip_extension(image_name) + f'_{tr_id}', tag=TR_NAME_INPUT)
+    dpg.add_input_text(default_value=unique_image_name(strip_extension(image_name) + f'_{tr_id}', get_extension(image_name)), tag=TR_NAME_INPUT)
 
 def build_tr_value_int_selector(name: str, min_val: int, max_val: int, suffix: str = None, step: int = 1, tag: str = TR_INT_VALUE_SELECTOR) -> None:
     dpg.add_text(f'Select \'{name}\' between {min_val} and {max_val}')
