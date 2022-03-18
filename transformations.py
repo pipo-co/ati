@@ -11,7 +11,7 @@ import rng
 from denoising import PaddingStrategy
 from image_utils import Image, strip_extension, add_images, sub_images, multiply_images, \
     power_function, negate, \
-    transform_from_threshold, equalize, ImageFormat, MAX_COLOR, get_extension
+    to_binary, equalize, ImageFormat, MAX_COLOR, get_extension
 from interface_utils import render_error
 from noise import NoiseType
 
@@ -76,12 +76,10 @@ def build_tr_dialog_end_buttons(tr_id: str, image_name: str, handle: TrHandler) 
 
 def unique_image_name(base_name: str, ext: str) -> str:
     if not img_repo.contains_image(base_name + ext):
-        print('base', base_name)
         return base_name
     for i in itertools.count(start=2):
         name = f'{base_name}_{i}'
         if not img_repo.contains_image(name + ext):
-            print('name', base_name)
             return name
 
 # Solo puede haber un name input, que (casi) siempre debe estar
@@ -260,7 +258,7 @@ def tr_umb(image_name: str) -> Image:
     new_name = get_tr_name_value(image)
     umb      = get_tr_int_value()
     # 2. Procesamos
-    new_data = transform_from_threshold(image, umb)
+    new_data = to_binary(image, umb)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 

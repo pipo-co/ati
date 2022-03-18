@@ -5,7 +5,7 @@ from typing import Callable, List
 import numpy as np
 
 import rng
-from image_utils import Image, normalize, MAX_COLOR
+from image_utils import Image, MAX_COLOR
 
 NoiseSupplier = Callable[[], float]
 
@@ -34,7 +34,7 @@ def pollute(img: Image, noise_supplier: NoiseSupplier, noise_type: NoiseType, pe
 def pollute_channel(channel: np.ndarray, noise_supplier: NoiseSupplier, noise_type: NoiseType, percentage: int) -> np.ndarray:
     p = percentage / 100
     shape = np.shape(channel)
-    ret = normalize(np.array([(noise_type(xi, noise_supplier() * MAX_COLOR)) if rng.random() < p else xi for xi in channel.flatten()]))
+    ret = np.array([(noise_type(xi, int(noise_supplier() * MAX_COLOR))) if rng.random() < p else xi for xi in channel.flatten()])
     return np.reshape(ret, shape)
 
 def salt(img: Image, percentage: int) -> np.ndarray:

@@ -4,7 +4,7 @@ import dearpygui.dearpygui as dpg
 import numpy as np
 
 from image_utils import image_to_rgba_array, load_image, valid_image_formats, Image, save_image, get_extension, \
-    create_square_image, create_circle_image, CIRCLE_IMAGE_NAME, SQUARE_IMAGE_NAME
+    create_square_image, create_circle_image, CIRCLE_IMAGE_NAME, SQUARE_IMAGE_NAME, normalize
 import images_repo as img_repo
 from interface_utils import render_error
 from metadata_repo import set_metadata_file
@@ -109,7 +109,6 @@ def build_reduced_histogram_plot(image_name: str, theme: str, hist: np.ndarray, 
     dpg.add_button(label='Expand', user_data=(image_name, theme, hist, bins), callback=lambda s, ad, ud: build_expanded_histogram_plot(*ud))
     dpg.add_separator()
 
-# TODO(tobi): Capaz agregar un boton para mostrar la acumulada encima? Esta piola para la funcion equalize
 @render_error
 def build_expanded_histogram_plot(image_name: str, theme: str, hist: np.ndarray, bins: np.ndarray) -> None:
     with dpg.window(label=f'Histogram - {image_name} - {theme.split("_")[0].capitalize()} Channel'):
