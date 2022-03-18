@@ -2,6 +2,7 @@ import itertools
 from typing import Callable, List, Optional
 
 import dearpygui.dearpygui as dpg
+import numpy as np
 
 import denoising
 import images_repo as img_repo
@@ -24,6 +25,7 @@ TR_IMG_INPUT: str               = 'tr_img_input'
 TR_INT_VALUE_SELECTOR: str      = 'tr_int_value_input'
 TR_FLOAT_VALUE_SELECTOR: str    = 'tr_float_value_input'
 TR_RADIO_BUTTONS: str           = 'tr_radio_buttons'
+TR_INT_TABLE: str               = 'tr_int_table'
 
 TrHandler = Callable[[str], Image]
 
@@ -47,8 +49,9 @@ def build_transformations_menu(image_name: str) -> None:
             build_tr_menu_item(TR_NOISE_RAYLEIGH, build_noise_rayleigh_dialog, image_name)
             build_tr_menu_item(TR_NOISE_SALT,     build_noise_salt_dialog, image_name)
         with dpg.menu(label='Denoise'):
-            build_tr_menu_item(TR_MEAN,     build_denoise_mean_dialog, image_name)
-            build_tr_menu_item(TR_MEDIAN,   build_denoise_median_dialog, image_name)
+            build_tr_menu_item(TR_MEAN,             build_denoise_mean_dialog, image_name)
+            build_tr_menu_item(TR_MEDIAN,           build_denoise_median_dialog, image_name)
+            build_tr_menu_item(TR_WEIGHTED_MEDIAN,  build_denoise_weighted_median_dialog, image_name)
 
 def build_tr_menu_item(tr_id: str, tr_dialog_builder: Callable[[str], None], image_name: str) -> None:
     dpg.add_menu_item(label=tr_id.capitalize(), user_data=(tr_dialog_builder, image_name), callback=lambda s, ad, ud: ud[0](ud[1]))
@@ -111,6 +114,25 @@ def build_tr_img_selector(image_name: str) -> None:
     dpg.add_text('Select Another Image to combine')
     dpg.add_listbox(image_list, tag=TR_IMG_INPUT)
 
+def build_tr_input_table(size: int = 3, tag: str = TR_INT_TABLE):
+    
+    with dpg.table(header_row=False, resizable=False, policy=dpg.mvTable_SizingStretchProp):
+
+        dpg.add_table_column()
+        dpg.add_table_column()
+        dpg.add_table_column()
+
+        for row in range(0, size):
+            with dpg.table_row():
+                for col in range(0, size):
+                    with dpg.table_cell():
+                        cell_tag = get_table_field_name(tag, row, col)
+                        # TODO: Conseguir min y max mas honestos
+                        dpg.add_input_int(min_value=1, max_value=50, step=0, tag=cell_tag)
+
+def get_table_field_name(tag: str, row: int, col: int) -> str:
+    return f'{tag}_{row}_{col}'
+
 # ******************** Input Getters and Requirements ********************* #
 
 def get_tr_name_value(image: Image) -> str:
@@ -148,6 +170,17 @@ def get_tr_percentage_value(percentage_input: str = TR_FLOAT_VALUE_SELECTOR) -> 
     if not 0 <= percentage <= 100:
         raise ValueError('Percentage must be between 0 and 100')
     return percentage
+
+def get_tr_input_table_values(size: int = 3, table_tag: str = TR_INT_TABLE) -> List[int]:
+    
+    table_values = []
+    for row in range(0, size):
+        table_values.append([])
+        for col in range(0, size):
+            cell_tag = get_table_field_name(table_tag, row, col)
+            table_values[row].append(dpg.get_value(cell_tag))
+
+    return table_values
 
 def require_odd(n: int, msg: str) -> int:
     if n % 2 == 0:
@@ -478,5 +511,25 @@ def tr_median(image_name: str) -> Image:
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
     new_data = denoising.median(image, kernel_size, padding_str)
+    # 3. Creamos Imagen
+    return Image(new_name, image.format, new_data)
+
+TR_WEIGHTED_MEDIAN: str = 'weighted median'
+@render_error
+def build_denoise_weighted_median_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_WEIGHTED_MEDIAN):
+        build_tr_name_input(TR_WEIGHTED_MEDIAN, image_name)
+        build_tr_radio_buttons(denoising.PaddingStrategy.names())
+        build_tr_input_table()
+        build_tr_dialog_end_buttons(TR_WEIGHTED_MEDIAN, image_name, tr_weighted_median)
+
+def tr_weighted_median(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image       = img_repo.get_image(image_name)
+    new_name    = get_tr_name_value(image)
+    kernel      = np.array(get_tr_input_table_values())
+    padding     = PaddingStrategy.from_str(get_tr_radio_buttons_value())
+    # 2. Procesamos - Puede ser async
+    new_data = denoising.weighted_median(image, kernel, padding)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
