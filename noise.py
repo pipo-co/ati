@@ -31,7 +31,6 @@ def pollute(img: Image, noise_supplier: NoiseSupplier, noise_type: NoiseType, pe
     return img.apply_over_channels(pollute_channel, noise_supplier, noise_type, percentage)
 
 # TODO(tobi, nacho): Vectorizar
-# TODO(tobi): Para mi esta mal multiplicar por MAX_COLOR de manera naive
 def pollute_channel(channel: np.ndarray, noise_supplier: NoiseSupplier, noise_type: NoiseType, percentage: int) -> np.ndarray:
     p = percentage / 100
     shape = np.shape(channel)
