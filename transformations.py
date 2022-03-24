@@ -11,8 +11,7 @@ import noise
 import rng
 from denoising import PaddingStrategy
 from image_utils import Image, strip_extension, add_images, sub_images, multiply_images, \
-    power_function, negate, \
-    to_binary, equalize, ImageFormat, MAX_COLOR, get_extension
+    power_function, negate, to_binary, equalize, ImageFormat, MAX_COLOR, get_extension, normalize
 from interface_utils import render_error
 from noise import NoiseType
 
@@ -34,6 +33,7 @@ def build_transformations_menu(image_name: str) -> None:
         with dpg.menu(label='Utils'):
             build_tr_menu_item(TR_COPY,     build_copy_dialog, image_name)
             build_tr_menu_item(TR_REFORMAT, build_reformat_dialog, image_name)
+            build_tr_menu_item(TR_NORMALIZE, build_normalize_dialog, image_name)
         with dpg.menu(label='Basic'):
             build_tr_menu_item(TR_NEG,      build_neg_dialog, image_name)
             build_tr_menu_item(TR_POW,      build_pow_dialog, image_name)
@@ -233,6 +233,23 @@ def tr_reformat(image_name: str) -> Image:
     # Do Nothing
     # 3. Creamos Imagen
     return Image(new_name, new_fmt, image.data)
+
+
+TR_NORMALIZE: str = 'normalize'
+@render_error
+def build_normalize_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_COPY):
+        build_tr_name_input(TR_NORMALIZE, image_name)
+        build_tr_dialog_end_buttons(TR_NORMALIZE, image_name, tr_normalize)
+
+def tr_normalize(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image    = img_repo.get_image(image_name)
+    new_name = get_tr_name_value(image)
+    # 2. Procesamos
+    new_data = normalize(image.data, np.float64)
+    # 3. Creamos Imagen
+    return Image(new_name, image.format, new_data)
 
 ########################################################
 # ********************** Basic *********************** #
