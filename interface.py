@@ -49,7 +49,12 @@ def render_image_window(image_name: str):
             with dpg.group(horizontal=True):
                 with dpg.group(width=image.width):
                     dpg.add_image(image_name, tag=f'image_{image_name}', width=image.width, height=image.height)
-                    dpg.add_text(f'Height: {image.height}  Width: {image.width}')
+                    with dpg.group(horizontal=True):
+                        dpg.add_text(f'Height {image.height}')
+                        dpg.add_separator()
+                        dpg.add_text(f'Width {image.width}')
+                        dpg.add_separator()
+                        dpg.add_text(f'Type {image.type}')
                     dpg.add_text('', tag=f'image_{image_name}_region')
                     dpg.add_text('', tag=f'image_{image_name}_pointer')
 

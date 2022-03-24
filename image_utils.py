@@ -104,6 +104,10 @@ class Image:
         return self.data.shape[1]
 
     @property
+    def type(self) -> int:
+        return self.data.dtype
+
+    @property
     def channels(self) -> int:
         shape = self.data.shape
         return 1 if len(shape) == 2 else shape[2]
