@@ -52,8 +52,15 @@ def salted_pixel(xi: int, p: float) -> int:
     else:
         return xi
 
-# TODO(tobi, nacho): Vectorizar
 def salt_channel(channel: np.ndarray, percentage: int) -> np.ndarray:
     p = percentage / 100
-    new_arr = np.array([salted_pixel(xi, p) for xi in channel.flatten()], dtype=channel.dtype)
-    return np.reshape(new_arr, channel.shape)
+
+    shape = np.shape(channel)
+    uniform = rng.rng.uniform(size=channel.size)
+    
+    noised_channel = channel.flatten()
+    noised_channel[uniform < p]   = 0
+    noised_channel[uniform > 1-p] = MAX_COLOR
+
+    return np.reshape(noised_channel, shape)
+
