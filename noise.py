@@ -1,6 +1,5 @@
 import functools
 from enum import Enum
-from math import floor
 from typing import Callable, List
 
 import numpy as np
@@ -11,8 +10,8 @@ from image_utils import Image, MAX_COLOR
 NoiseSupplier = Callable[[int], float]
 
 class NoiseType(Enum):
-    ADDITIVE        = functools.partial(lambda val, noise: val + noise * MAX_COLOR)
-    MULTIPLICATIVE  = functools.partial(lambda val, noise: val * noise)
+    ADDITIVE        = functools.partial(lambda vals, noise: vals + noise * MAX_COLOR)
+    MULTIPLICATIVE  = functools.partial(lambda vals, noise: vals * noise)
 
     @classmethod
     def names(cls) -> List[str]:
@@ -25,16 +24,15 @@ class NoiseType(Enum):
             raise ValueError(f'"{name.capitalize()}" is not a supported noise type')
         return cls[name]
 
-    def __call__(self, val: int, noise: float) -> np.ndarray:
-        return self.value(val, noise)
+    def __call__(self, vals: np.ndarray, noise: float) -> np.ndarray:
+        return self.value(vals, noise)
 
 def pollute(img: Image, noise_supplier: NoiseSupplier, noise_type: NoiseType, percentage: int) -> np.ndarray:
     return img.apply_over_channels(pollute_channel, noise_supplier, noise_type, percentage)
 
-# TODO(tobi, nacho): Vectorizar
 def pollute_channel(channel: np.ndarray, noise_supplier: NoiseSupplier, noise_type: NoiseType, percentage: int) -> np.ndarray:
     p = percentage / 100
-    n = floor(channel.size * p)
+    n = int(channel.size * p)
     shape = np.shape(channel)
     indices = rng.rng.choice(channel.size, n, replace=False) 
     ret = channel.flatten()
