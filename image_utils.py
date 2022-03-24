@@ -158,7 +158,7 @@ def load_image(path: str) -> Image:
     else:
         data = np.asarray(PImage.open(path), dtype=np.uint8) # noqa
 
-    return Image(name, fmt, data)
+    return Image(name, fmt, data.astype(np.int64))
 
 def save_image(image: Image, dir_path: str) -> None:
     normalized_data = normalize(image.data)
@@ -178,7 +178,7 @@ CREATED_IMAGE_LEN: int = 200
 CIRCLE_RADIUS: int = 100
 def create_circle_image() -> Image:
     mask = create_circular_mask(CREATED_IMAGE_LEN, CREATED_IMAGE_LEN, radius=CIRCLE_RADIUS)
-    data = np.zeros((CREATED_IMAGE_LEN, CREATED_IMAGE_LEN), dtype=np.uint8)
+    data = np.zeros((CREATED_IMAGE_LEN, CREATED_IMAGE_LEN), dtype=np.int64)
     data[mask] = 255
     return Image(CIRCLE_IMAGE_NAME, ImageFormat.PGM, data, allow_reserved=True)
 
@@ -201,7 +201,7 @@ def create_square_image() -> Image:
     diff = (CREATED_IMAGE_LEN - SQUARE_LEN) // 2
     min_square = diff
     max_square = CREATED_IMAGE_LEN - diff
-    data = np.zeros((CREATED_IMAGE_LEN, CREATED_IMAGE_LEN), dtype=np.uint8)
+    data = np.zeros((CREATED_IMAGE_LEN, CREATED_IMAGE_LEN), dtype=np.int64)
     data[min_square:max_square, min_square:max_square] = 255
 
     return Image(SQUARE_IMAGE_NAME, ImageFormat.PGM, data, allow_reserved=True)
@@ -216,16 +216,16 @@ def multiply_images(first_img: Image, second_img: Image) -> np.ndarray:
     return np.multiply(first_img.data, second_img.data)
 
 # Normalizes to uint8 ndarray
-def normalize(data: np.ndarray) -> np.ndarray:
+def normalize(data: np.ndarray, as_type=np.uint8) -> np.ndarray:
     if data.dtype == np.uint8:
-        return data
+        return data.astype(as_type, copy=False)
     elif np.can_cast(data.dtype, np.uint8, casting='safe'):
-        return data.astype(np.uint8, casting='safe', copy=False)
+        return data.astype(as_type, copy=False)
     else:
         rng = data.max() - data.min()
         amin = data.min()
         ret = (data - amin) * 255 // rng
-        return ret.astype(np.uint8, copy=False)
+        return ret.astype(as_type, copy=False)
 
 # TODO(tobi, nacho): Vectorizar
 def power_function(img: Image, gamma: float) -> np.ndarray:
@@ -245,12 +245,12 @@ def channel_to_binary(channel: np.ndarray, umb: int) -> np.ndarray:
     return np.reshape(new_arr, shape)
 
 def channel_histogram(channel: np.ndarray) -> Hist:
-    channel = normalize(channel)
+    channel = normalize(channel, np.int64)
     hist, bins = np.histogram(channel.flatten(), bins=COLOR_DEPTH, range=(0, COLOR_DEPTH))
     return hist / channel.size, bins
 
 def channel_equalization(channel: np.ndarray)  -> np.ndarray:
-    channel = normalize(channel)
+    channel = normalize(channel, np.int64)
     normed_hist, bins = channel_histogram(channel)
     s = normed_hist.cumsum()
     masked_s = np.ma.masked_equal(s, 0)

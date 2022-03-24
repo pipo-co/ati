@@ -60,7 +60,7 @@ def weighted_median_channel(channel: np.ndarray, kernel: np.ndarray, padding_str
     if not is_kernel_valid(kernel):
         raise ValueError(f'Invalid kernel: {kernel}')
     sw = sliding_window(channel, kernel.shape, padding_str)
-    return np.median(np.repeat(sw.reshape(*channel.shape, -1), kernel.flatten(), axis=2), axis=2).astype(np.uint8)
+    return np.median(np.repeat(sw.reshape(*channel.shape, -1), kernel.flatten(), axis=2), axis=2)
 
 def median_channel(channel: np.ndarray, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
     return weighted_median_channel(channel, np.full((kernel_size, kernel_size), 1), padding_str)
@@ -82,6 +82,7 @@ def median(image: Image, kernel_size: int, padding_str: PaddingStrategy) -> np.n
 
 def weighted_median(image: Image, kernel: np.ndarray, padding_str: PaddingStrategy) -> np.ndarray:
     return image.apply_over_channels(weighted_median_channel, kernel, padding_str)
+
 def gauss(image: Image, sigma: float, padding_str: PaddingStrategy) -> np.ndarray:
     return image.apply_over_channels(gauss_channel, sigma, padding_str)
 

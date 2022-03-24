@@ -8,7 +8,6 @@ def contains_image(image_name: str) -> bool:
     return image_name in _loaded_images
 
 def get_image(image_name: str) -> Image:
-    print(_loaded_images[image_name].data.dtype, _loaded_images[image_name].data)
     return _loaded_images[image_name]
 
 def persist_image(image: Image) -> None:
