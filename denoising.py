@@ -80,13 +80,10 @@ def mean(image: Image, kernel_size: int, padding_str: PaddingStrategy) -> np.nda
 def median(image: Image, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
     return image.apply_over_channels(median_channel, kernel_size, padding_str)
 
-<<<<<<< Updated upstream
 def weighted_median(image: Image, kernel: np.ndarray, padding_str: PaddingStrategy) -> np.ndarray:
     return image.apply_over_channels(weighted_median_channel, kernel, padding_str)
-=======
 def gauss(image: Image, sigma: float, padding_str: PaddingStrategy) -> np.ndarray:
     return image.apply_over_channels(gauss_channel, sigma, padding_str)
 
 def high(image: Image, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
     return image.apply_over_channels(high_channel, kernel_size, padding_str)
->>>>>>> Stashed changes
