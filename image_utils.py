@@ -223,9 +223,12 @@ def normalize(data: np.ndarray, as_type=np.uint8) -> np.ndarray:
         return data.astype(as_type, copy=False)
     else:
         rng = data.max() - data.min()
-        amin = data.min()
-        ret = (data - amin) * 255 // rng
-        return ret.astype(as_type, copy=False)
+        if rng == 0:
+            return np.zeros(data.shape, as_type)
+        else:
+            amin = data.min()
+            ret = (data - amin) * 255 // rng
+            return ret.astype(as_type, copy=False)
 
 # TODO(tobi, nacho): Vectorizar
 def power_function(img: Image, gamma: float) -> np.ndarray:
