@@ -52,6 +52,8 @@ def build_transformations_menu(image_name: str) -> None:
             build_tr_menu_item(TR_MEAN,             build_denoise_mean_dialog, image_name)
             build_tr_menu_item(TR_MEDIAN,           build_denoise_median_dialog, image_name)
             build_tr_menu_item(TR_WEIGHTED_MEDIAN,  build_denoise_weighted_median_dialog, image_name)
+            build_tr_menu_item(TR_GAUSS,            build_denoise_gauss_dialog, image_name)
+            build_tr_menu_item(TR_HIGH_FILTER,      build_denoise_high_dialog, image_name)
 
 def build_tr_menu_item(tr_id: str, tr_dialog_builder: Callable[[str], None], image_name: str) -> None:
     dpg.add_menu_item(label=tr_id.capitalize(), user_data=(tr_dialog_builder, image_name), callback=lambda s, ad, ud: ud[0](ud[1]))
@@ -531,5 +533,45 @@ def tr_weighted_median(image_name: str) -> Image:
     padding     = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos - Puede ser async
     new_data = denoising.weighted_median(image, kernel, padding)
+    # 3. Creamos Imagen
+    return Image(new_name, image.format, new_data)
+
+TR_GAUSS: str = 'gauss'
+@render_error
+def build_denoise_gauss_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_GAUSS):
+        build_tr_name_input(TR_GAUSS, image_name)
+        build_tr_value_float_selector('sigma', 1, 7)
+        build_tr_radio_buttons(PaddingStrategy.names())
+        build_tr_dialog_end_buttons(TR_GAUSS, image_name, tr_d_gauss)
+
+def tr_d_gauss(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image       = img_repo.get_image(image_name)
+    new_name    = get_tr_name_value(image)
+    sigma       = get_tr_float_value()
+    padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
+    # 2. Procesamos
+    new_data = denoising.gauss(image, sigma, padding_str)
+    # 3. Creamos Imagen
+    return Image(new_name, image.format, new_data)
+
+TR_HIGH_FILTER: str = 'high'
+@render_error
+def build_denoise_high_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_HIGH_FILTER):
+        build_tr_name_input(TR_HIGH_FILTER, image_name)
+        build_tr_value_int_selector('kernel size', 3, 23, step=2)
+        build_tr_radio_buttons(PaddingStrategy.names())
+        build_tr_dialog_end_buttons(TR_HIGH_FILTER, image_name, tr_high)
+
+def tr_high(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image       = img_repo.get_image(image_name)
+    new_name    = get_tr_name_value(image)
+    kernel_size = require_odd(get_tr_int_value(), 'Kernel size must be odd')
+    padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
+    # 2. Procesamos
+    new_data = denoising.high(image, kernel_size, padding_str)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)

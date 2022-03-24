@@ -34,6 +34,16 @@ def is_kernel_valid(kernel: np.ndarray) -> bool:
            and kernel.shape[0] % 2 == 1 \
            and kernel.shape[0] > 1
 
+def generate_gauss_kernel(sigma: float) -> np.ndarray:
+    kernel_size = int(sigma * 2 + 1)
+    print(kernel_size)
+    indices = np.array(list(np.ndindex((kernel_size, kernel_size)))) - kernel_size//2
+    indices = np.reshape(indices[:,:], (kernel_size, kernel_size, -1)) 
+    indices = np.sum(indices**2, axis=2)
+    indices = np.exp(-1*indices / sigma ** 2)
+    print(indices)
+    return indices / (2 * np.pi * sigma ** 2)
+
 def sliding_window(matrix: np.ndarray, shape: Tuple[int, ...], padding_str: PaddingStrategy) -> np.ndarray:
     return sliding_window_view(padding_str.pad(matrix, shape), shape)
 
@@ -41,8 +51,8 @@ def weighted_mean(channel: np.ndarray, kernel: np.ndarray, padding_str: PaddingS
     if not is_kernel_valid(kernel):
         raise ValueError(f'Invalid kernel: {kernel}')
     sw = sliding_window(channel, kernel.shape, padding_str)
-    return np.mean(sw[:, :] * kernel, axis=(2, 3)).astype(np.uint8)
-
+    return np.mean(sw[:, :] * kernel, axis=(2, 3))
+    
 def mean_channel(channel: np.ndarray, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
     return weighted_mean(channel, np.full((kernel_size, kernel_size), 1), padding_str)
 
@@ -55,6 +65,14 @@ def weighted_median_channel(channel: np.ndarray, kernel: np.ndarray, padding_str
 def median_channel(channel: np.ndarray, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
     return weighted_median_channel(channel, np.full((kernel_size, kernel_size), 1), padding_str)
 
+def gauss_channel(channel: np.ndarray, sigma: float, padding_str: PaddingStrategy) -> np.ndarray:
+    return weighted_mean(channel, generate_gauss_kernel(sigma), padding_str)
+
+def high_channel(channel: np.ndarray, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
+    kernel = np.full((kernel_size, kernel_size), -1)
+    kernel[kernel_size // 2 , kernel_size // 2] = kernel_size ** 2 - 1 
+    return weighted_mean(channel, kernel, padding_str)
+
 # ******************* Export Functions ********************** #
 def mean(image: Image, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
     return image.apply_over_channels(mean_channel, kernel_size, padding_str)
@@ -62,5 +80,13 @@ def mean(image: Image, kernel_size: int, padding_str: PaddingStrategy) -> np.nda
 def median(image: Image, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
     return image.apply_over_channels(median_channel, kernel_size, padding_str)
 
+<<<<<<< Updated upstream
 def weighted_median(image: Image, kernel: np.ndarray, padding_str: PaddingStrategy) -> np.ndarray:
     return image.apply_over_channels(weighted_median_channel, kernel, padding_str)
+=======
+def gauss(image: Image, sigma: float, padding_str: PaddingStrategy) -> np.ndarray:
+    return image.apply_over_channels(gauss_channel, sigma, padding_str)
+
+def high(image: Image, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
+    return image.apply_over_channels(high_channel, kernel_size, padding_str)
+>>>>>>> Stashed changes
