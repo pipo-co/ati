@@ -158,7 +158,7 @@ def load_image(path: str) -> Image:
     else:
         data = np.asarray(PImage.open(path), dtype=np.uint8) # noqa
 
-    return Image(name, fmt, data.astype(np.int64))
+    return Image(name, fmt, data.astype(np.float64))
 
 def save_image(image: Image, dir_path: str) -> None:
     normalized_data = normalize(image.data)
@@ -178,7 +178,7 @@ CREATED_IMAGE_LEN: int = 200
 CIRCLE_RADIUS: int = 100
 def create_circle_image() -> Image:
     mask = create_circular_mask(CREATED_IMAGE_LEN, CREATED_IMAGE_LEN, radius=CIRCLE_RADIUS)
-    data = np.zeros((CREATED_IMAGE_LEN, CREATED_IMAGE_LEN), dtype=np.int64)
+    data = np.zeros((CREATED_IMAGE_LEN, CREATED_IMAGE_LEN), dtype=np.float64)
     data[mask] = 255
     return Image(CIRCLE_IMAGE_NAME, ImageFormat.PGM, data, allow_reserved=True)
 
@@ -201,7 +201,7 @@ def create_square_image() -> Image:
     diff = (CREATED_IMAGE_LEN - SQUARE_LEN) // 2
     min_square = diff
     max_square = CREATED_IMAGE_LEN - diff
-    data = np.zeros((CREATED_IMAGE_LEN, CREATED_IMAGE_LEN), dtype=np.int64)
+    data = np.zeros((CREATED_IMAGE_LEN, CREATED_IMAGE_LEN), dtype=np.float64)
     data[min_square:max_square, min_square:max_square] = 255
 
     return Image(SQUARE_IMAGE_NAME, ImageFormat.PGM, data, allow_reserved=True)
@@ -247,12 +247,12 @@ def channel_to_binary(channel: np.ndarray, umb: int) -> np.ndarray:
     return np.reshape(new_arr, shape)
 
 def channel_histogram(channel: np.ndarray) -> Hist:
-    channel = normalize(channel, np.int64)
+    channel = normalize(channel, np.float64)
     hist, bins = np.histogram(channel.flatten(), bins=COLOR_DEPTH, range=(0, COLOR_DEPTH))
     return hist / channel.size, bins
 
 def channel_equalization(channel: np.ndarray)  -> np.ndarray:
-    channel = normalize(channel, np.int64)
+    channel = normalize(channel, np.float64)
     normed_hist, bins = channel_histogram(channel)
     s = normed_hist.cumsum()
     masked_s = np.ma.masked_equal(s, 0)
