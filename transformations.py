@@ -122,12 +122,11 @@ def build_tr_input_table(size: int = 3, tag: str = TR_INT_TABLE):
         dpg.add_table_column()
         dpg.add_table_column()
 
-        for row in range(0, size):
+        for row in range(size):
             with dpg.table_row():
-                for col in range(0, size):
+                for col in range(size):
                     with dpg.table_cell():
                         cell_tag = get_table_field_name(tag, row, col)
-                        # TODO: Conseguir min y max mas honestos
                         dpg.add_input_int(min_value=1, max_value=50, step=0, tag=cell_tag)
 
 def get_table_field_name(tag: str, row: int, col: int) -> str:
