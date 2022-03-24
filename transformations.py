@@ -348,7 +348,7 @@ def build_noise_exp_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_NOISE_EXP):
         build_tr_name_input(TR_NOISE_EXP, image_name)
         build_tr_radio_buttons(NoiseType.names())
-        build_tr_value_float_selector('lambda', 0, 1, tag='lambda')
+        build_tr_value_float_selector('lambda', 1, 5, tag='lambda')
         build_tr_percentage_selector('noise percentage', tag='percentage')
         build_tr_dialog_end_buttons(TR_NOISE_EXP, image_name, tr_noise_exp)
 
