@@ -337,7 +337,7 @@ def tr_noise_gauss(image_name: str) -> Image:
     percentage  = get_tr_percentage_value('percentage')
     noise_type  = NoiseType.from_name(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data = noise.pollute(image, lambda: rng.gaussian(0, sigma), noise_type, percentage)
+    new_data = noise.pollute(image, lambda size: rng.gaussian(0, sigma, size), noise_type, percentage)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 
@@ -360,7 +360,7 @@ def tr_noise_exp(image_name: str) -> Image:
     percentage  = get_tr_percentage_value('percentage')
     noise_type  = NoiseType.from_name(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data = noise.pollute(image, lambda: rng.exponential(lam), noise_type, percentage)
+    new_data = noise.pollute(image, lambda size: rng.exponential(lam, size), noise_type, percentage)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 
@@ -383,7 +383,7 @@ def tr_noise_rayleigh(image_name: str) -> Image:
     percentage  = dpg.get_value('percentage')
     noise_type  = NoiseType.from_name(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data = noise.pollute(image, lambda: rng.rayleigh(epsilon), noise_type, percentage)
+    new_data = noise.pollute(image, lambda size: rng.rayleigh(epsilon, size), noise_type, percentage)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 

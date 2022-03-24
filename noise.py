@@ -1,5 +1,6 @@
 import functools
 from enum import Enum
+from math import floor
 from typing import Callable, List
 
 import numpy as np
@@ -7,7 +8,7 @@ import numpy as np
 import rng
 from image_utils import Image, MAX_COLOR
 
-NoiseSupplier = Callable[[], float]
+NoiseSupplier = Callable[[int], float]
 
 class NoiseType(Enum):
     ADDITIVE        = functools.partial(lambda val, noise: val + noise * MAX_COLOR)
@@ -24,7 +25,7 @@ class NoiseType(Enum):
             raise ValueError(f'"{name.capitalize()}" is not a supported noise type')
         return cls[name]
 
-    def __call__(self, val: int, noise: float) -> float:
+    def __call__(self, val: int, noise: float) -> np.ndarray:
         return self.value(val, noise)
 
 def pollute(img: Image, noise_supplier: NoiseSupplier, noise_type: NoiseType, percentage: int) -> np.ndarray:
@@ -33,8 +34,12 @@ def pollute(img: Image, noise_supplier: NoiseSupplier, noise_type: NoiseType, pe
 # TODO(tobi, nacho): Vectorizar
 def pollute_channel(channel: np.ndarray, noise_supplier: NoiseSupplier, noise_type: NoiseType, percentage: int) -> np.ndarray:
     p = percentage / 100
+    n = floor(channel.size * p)
     shape = np.shape(channel)
-    ret = np.array([(noise_type(xi, noise_supplier())) if rng.random() < p else xi for xi in channel.flatten()])
+    indices = rng.rng.choice(channel.size, n, replace=False) 
+    ret = channel.flatten()
+    noise = noise_supplier(n)
+    ret[indices] = noise_type(ret[indices], noise)
     return np.reshape(ret, shape)
 
 def salt(img: Image, percentage: int) -> np.ndarray:
