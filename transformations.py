@@ -117,9 +117,7 @@ def build_tr_img_selector(image_name: str) -> None:
     dpg.add_listbox(image_list, tag=TR_IMG_INPUT)
 
 def build_tr_input_table(size: int = 3, tag: str = TR_INT_TABLE):
-    
     with dpg.table(header_row=False, resizable=False, policy=dpg.mvTable_SizingStretchProp):
-
         dpg.add_table_column()
         dpg.add_table_column()
         dpg.add_table_column()
@@ -173,8 +171,7 @@ def get_tr_percentage_value(percentage_input: str = TR_FLOAT_VALUE_SELECTOR) -> 
         raise ValueError('Percentage must be between 0 and 100')
     return percentage
 
-def get_tr_input_table_values(size: int = 3, table_tag: str = TR_INT_TABLE) -> List[int]:
-    
+def get_tr_input_table_values(size: int = 3, table_tag: str = TR_INT_TABLE) -> List[List[int]]:
     table_values = []
     for row in range(0, size):
         table_values.append([])

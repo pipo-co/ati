@@ -57,6 +57,5 @@ def salted_pixel(xi: int, p: float) -> int:
 # TODO(tobi, nacho): Vectorizar
 def salt_channel(channel: np.ndarray, percentage: int) -> np.ndarray:
     p = percentage / 100
-    shape = np.shape(channel)
-    new_arr = np.array([salted_pixel(xi, p) for xi in channel.flatten()], dtype=np.uint8)
-    return np.reshape(new_arr, shape)
+    new_arr = np.array([salted_pixel(xi, p) for xi in channel.flatten()], dtype=channel.dtype)
+    return np.reshape(new_arr, channel.shape)

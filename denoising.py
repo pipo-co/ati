@@ -36,11 +36,11 @@ def is_kernel_valid(kernel: np.ndarray) -> bool:
 
 def generate_gauss_kernel(sigma: float) -> np.ndarray:
     kernel_size = int(sigma * 2 + 1)
-    indices = np.array(list(np.ndindex((kernel_size, kernel_size)))) - kernel_size//2
-    indices = np.reshape(indices, (kernel_size, kernel_size, -1)) 
+    indices = np.array(list(np.ndindex((kernel_size, kernel_size)))) - kernel_size//2 # noqa
+    indices = np.reshape(indices, (kernel_size, kernel_size, 2))
     indices = np.sum(indices**2, axis=2)
-    indices = np.exp(-1*indices / sigma ** 2)
-    return indices / (2 * np.pi * sigma ** 2)
+    indices = np.exp(-indices / sigma**2)
+    return indices / (2 * np.pi * sigma**2)
 
 def sliding_window(matrix: np.ndarray, shape: Tuple[int, ...], padding_str: PaddingStrategy) -> np.ndarray:
     return sliding_window_view(padding_str.pad(matrix, shape), shape)
@@ -68,7 +68,7 @@ def gauss_channel(channel: np.ndarray, sigma: float, padding_str: PaddingStrateg
 
 def high_channel(channel: np.ndarray, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
     kernel = np.full((kernel_size, kernel_size), -1 / kernel_size)
-    kernel[kernel_size // 2 , kernel_size // 2] = (kernel_size ** 2 - 1) / kernel_size 
+    kernel[kernel_size // 2, kernel_size // 2] = (kernel_size ** 2 - 1) / kernel_size
     return weighted_mean(channel, kernel, padding_str)
 
 # ******************* Export Functions ********************** #
