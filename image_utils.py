@@ -230,10 +230,9 @@ def normalize(data: np.ndarray, as_type=np.uint8) -> np.ndarray:
             ret = (data - amin) * 255 // rng
             return ret.astype(as_type, copy=False)
 
-# TODO(tobi, nacho): Vectorizar
 def power_function(img: Image, gamma: float) -> np.ndarray:
-    c: float = MAX_COLOR/(MAX_COLOR**gamma)
-    return np.array([c*xi**gamma for xi in img.data])
+    c = MAX_COLOR**(1 - gamma)
+    return c*(img.data**gamma)
 
 def negate(img: Image) -> np.ndarray:
     return np.array([MAX_COLOR - xi for xi in img.data])
