@@ -252,7 +252,7 @@ def channel_histogram(channel: np.ndarray) -> Hist:
     return hist / channel.size, bins
 
 def channel_equalization(channel: np.ndarray)  -> np.ndarray:
-    channel = normalize(channel, np.float64)
+    channel = normalize(channel, np.int64)
     normed_hist, bins = channel_histogram(channel)
     s = normed_hist.cumsum()
     masked_s = np.ma.masked_equal(s, 0)
