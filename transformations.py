@@ -9,7 +9,7 @@ import images_repo as img_repo
 import interface
 import noise
 import rng
-from denoising import PaddingStrategy
+from denoising import PaddingStrategy, DirectionalOperator
 from image_utils import Image, strip_extension, add_images, sub_images, multiply_images, \
     power_function, negate, to_binary, equalize, ImageFormat, MAX_COLOR, get_extension, normalize
 from interface_utils import render_error
@@ -54,6 +54,7 @@ def build_transformations_menu(image_name: str) -> None:
             build_tr_menu_item(TR_DENOISE_WEIGHTED_MEDIAN, build_denoise_weighted_median_dialog, image_name)
             build_tr_menu_item(TR_DENOISE_GAUSS, build_denoise_gauss_dialog, image_name)
             build_tr_menu_item(TR_DENOISE_HIGH, build_denoise_high_dialog, image_name)
+            build_tr_menu_item(TR_DIRECTIONAL, build_directional_dialog, image_name)
 
 def build_tr_menu_item(tr_id: str, tr_dialog_builder: Callable[[str], None], image_name: str) -> None:
     dpg.add_menu_item(label=tr_id.capitalize(), user_data=(tr_dialog_builder, image_name), callback=lambda s, ad, ud: ud[0](ud[1]))
@@ -583,5 +584,26 @@ def tr_denoise_high(image_name: str) -> Image:
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
     new_data = denoising.high(image, kernel_size, padding_str)
+    # 3. Creamos Imagen
+    return Image(new_name, image.format, new_data)
+
+TR_DIRECTIONAL: str = 'directional'
+@render_error
+def build_directional_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_DIRECTIONAL):
+        build_tr_name_input(TR_DIRECTIONAL, image_name)
+        build_tr_radio_buttons(PaddingStrategy.names())
+        build_tr_radio_buttons(DirectionalOperator.names(), tag="direction")
+        build_tr_dialog_end_buttons(TR_DIRECTIONAL, image_name, tr_directional)
+
+def tr_directional(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image       = img_repo.get_image(image_name)
+    new_name    = get_tr_name_value(image)
+    padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
+    rotations = DirectionalOperator.from_str(get_tr_radio_buttons_value(radio_buttons="direction"))
+    print(rotations)
+    # 2. Procesamos
+    new_data = denoising.directional(image, padding_str, rotations)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)

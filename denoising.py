@@ -28,6 +28,23 @@ class PaddingStrategy(Enum):
             raise ValueError(f'"{strategy_name.capitalize()}" is not a supported padding strategy')
         return cls[strategy_name]
 
+class DirectionalOperator(Enum):
+    VERTICAL = 0
+    RIGHT_DIAGONAL = 1
+    HORIZONTAL = 2
+    LEFT_DIAGONAL = 3
+
+    @classmethod
+    def names(cls):
+        return list(map(lambda c: c.name, cls))
+
+    @classmethod
+    def from_str(cls, direction: str) -> 'DirectionalOperator':
+        direction_name = direction.upper()
+        if direction_name not in DirectionalOperator.names():
+            raise ValueError(f'"{direction_name.capitalize()}" is not a supported direction')
+        return cls[direction_name].value
+
 def is_kernel_valid(kernel: np.ndarray) -> bool:
     return len(kernel.shape) == 2 \
            and kernel.shape[0] == kernel.shape[1] \
@@ -71,6 +88,25 @@ def high_channel(channel: np.ndarray, kernel_size: int, padding_str: PaddingStra
     kernel[kernel_size // 2, kernel_size // 2] = (kernel_size ** 2 - 1) / kernel_size
     return weighted_mean(channel, kernel, padding_str)
 
+def directional_channel(channel: np.ndarray, rotations: int, padding_str: PaddingStrategy) -> np.ndarray:
+    kernel = np.full((3, 3), 1)
+    kernel[1, 1] = -2
+    kernel[-1,:] = -1
+    kernel = rotate_steps(kernel, rotations)
+    return weighted_mean(channel, kernel, padding_str)
+
+def outer_slice(x):
+    return np.r_[x[0],x[1:-1,-1],x[-1,:0:-1],x[-1:0:-1,0]]
+
+def rotate_steps(x, shift):
+    out = np.empty_like(x)
+    N = x.shape[0]
+    idx = np.arange(x.size).reshape(x.shape)
+    for n in range((N+1)//2):
+        sliced_idx = outer_slice(idx[n:N-n,n:N-n])
+        out.ravel()[sliced_idx] = np.roll(np.take(x,sliced_idx), shift)
+    return out
+
 # ******************* Export Functions ********************** #
 def mean(image: Image, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
     return image.apply_over_channels(mean_channel, kernel_size, padding_str)
@@ -86,3 +122,6 @@ def gauss(image: Image, sigma: float, padding_str: PaddingStrategy) -> np.ndarra
 
 def high(image: Image, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
     return image.apply_over_channels(high_channel, kernel_size, padding_str)
+
+def directional(image: Image, padding_str: PaddingStrategy, rotations: int) -> np.ndarray:
+    return image.apply_over_channels(directional_channel, rotations, padding_str)
