@@ -11,7 +11,7 @@ import noise
 import rng
 from denoising import PaddingStrategy, DirectionalOperator
 from image_utils import Image, strip_extension, add_images, sub_images, multiply_images, \
-    power_function, negate, to_binary, equalize, ImageFormat, MAX_COLOR, get_extension, normalize
+    power_function, negate, to_binary, equalize, ImageFormat, MAX_COLOR, get_extension, normalize, universal_to_binary
 from interface_utils import render_error
 from noise import NoiseType
 
@@ -57,6 +57,7 @@ def build_transformations_menu(image_name: str) -> None:
             build_tr_menu_item(TR_DIRECTIONAL, build_directional_dialog, image_name)
             build_tr_menu_item(TR_PREWITT,          build_denoise_prewitt_dialog, image_name)
             build_tr_menu_item(TR_SOBEL,            build_denoise_sobel_dialog, image_name)
+            build_tr_menu_item(TR_GLOBAL_UMBRAL, build_global_umbral_dialog, image_name)
 
 def build_tr_menu_item(tr_id: str, tr_dialog_builder: Callable[[str], None], image_name: str) -> None:
     dpg.add_menu_item(label=tr_id.capitalize(), user_data=(tr_dialog_builder, image_name), callback=lambda s, ad, ud: ud[0](ud[1]))
@@ -604,7 +605,6 @@ def tr_directional(image_name: str) -> Image:
     new_name    = get_tr_name_value(image)
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     rotations = DirectionalOperator.from_str(get_tr_radio_buttons_value(radio_buttons="direction"))
-    print(rotations)
     # 2. Procesamos
     new_data = denoising.directional(image, padding_str, rotations)
     # 3. Creamos Imagen
@@ -647,5 +647,20 @@ def tr_sobel(image_name: str) -> Image:
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
     new_data = denoising.sobel(image, kernel_size, padding_str)
+TR_GLOBAL_UMBRAL: str = 'global umbral'
+@render_error
+def build_global_umbral_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_GLOBAL_UMBRAL):
+        build_tr_name_input(TR_GLOBAL_UMBRAL, image_name)
+        build_tr_value_int_selector('threshold', 0, MAX_COLOR)
+        build_tr_dialog_end_buttons(TR_GLOBAL_UMBRAL, image_name, tr_global_umbral)
+
+def tr_global_umbral(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image       = img_repo.get_image(image_name)
+    new_name    = get_tr_name_value(image)
+    umb         = get_tr_int_value()
+    # 2. Procesamos
+    new_data = universal_to_binary(image, umb)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)

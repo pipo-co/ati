@@ -237,6 +237,20 @@ def power_function(img: Image, gamma: float) -> np.ndarray:
 def negate(img: Image) -> np.ndarray:
     return np.array([MAX_COLOR - xi for xi in img.data])
 
+def universal_to_binary(img: Image, umb: int) -> np.ndarray:
+    return img.apply_over_channels(universal_channel_to_binary, umb)
+    
+def universal_channel_to_binary(channel: np.ndarray, umb: int) -> np.ndarray:
+    old_umbral = 0
+    new_umbral = umb
+    while abs(old_umbral - new_umbral) > 1: 
+        old_umbral = new_umbral   
+        minor_umbral = np.mean(channel[channel < old_umbral])
+        mayor_umbral = np.mean(channel[channel >= old_umbral])
+        new_umbral = (minor_umbral + mayor_umbral) // 2
+        
+    return channel_to_binary(channel, new_umbral)
+
 def to_binary(img: Image, umb: int) -> np.ndarray:
     return img.apply_over_channels(channel_to_binary, umb)
 
