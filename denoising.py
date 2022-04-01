@@ -62,14 +62,14 @@ def generate_gauss_kernel(sigma: float) -> np.ndarray:
 def sliding_window(matrix: np.ndarray, shape: Tuple[int, ...], padding_str: PaddingStrategy) -> np.ndarray:
     return sliding_window_view(padding_str.pad(matrix, shape), shape)
 
-def weighted_mean(channel: np.ndarray, kernel: np.ndarray, padding_str: PaddingStrategy) -> np.ndarray:
+def weighted_sum(channel: np.ndarray, kernel: np.ndarray, padding_str: PaddingStrategy) -> np.ndarray:
     if not is_kernel_valid(kernel):
         raise ValueError(f'Invalid kernel: {kernel}')
     sw = sliding_window(channel, kernel.shape, padding_str)
     return np.sum(sw[:, :] * kernel, axis=(2, 3))
     
 def mean_channel(channel: np.ndarray, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
-    return weighted_mean(channel, np.full((kernel_size, kernel_size), 1 / kernel_size**2), padding_str)
+    return weighted_sum(channel, np.full((kernel_size, kernel_size), 1 / kernel_size**2), padding_str)
 
 def weighted_median_channel(channel: np.ndarray, kernel: np.ndarray, padding_str: PaddingStrategy) -> np.ndarray:
     if not is_kernel_valid(kernel):
@@ -81,11 +81,34 @@ def median_channel(channel: np.ndarray, kernel_size: int, padding_str: PaddingSt
     return weighted_median_channel(channel, np.full((kernel_size, kernel_size), 1), padding_str)
 
 def gauss_channel(channel: np.ndarray, sigma: float, padding_str: PaddingStrategy) -> np.ndarray:
-    return weighted_mean(channel, generate_gauss_kernel(sigma), padding_str)
+    return weighted_sum(channel, generate_gauss_kernel(sigma), padding_str)
 
 def high_channel(channel: np.ndarray, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
     kernel = np.full((kernel_size, kernel_size), -1 / kernel_size)
     kernel[kernel_size // 2, kernel_size // 2] = (kernel_size ** 2 - 1) / kernel_size
+    return weighted_sum(channel, kernel, padding_str)
+
+def prewitt_kernel(kernel_size: int) -> np.ndarray:
+    kernel = np.zeros((kernel_size, kernel_size))
+    kernel[0, :] = -1
+    kernel[-1, :] = 1
+    return kernel
+
+def prewitt_channel(channel: np.ndarray, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
+    kernel = prewitt_kernel(kernel_size)
+    y_channel = weighted_sum(channel, kernel, padding_str)
+    kernel = np.rot90(kernel)
+    x_channel = weighted_sum(channel, kernel, padding_str)
+    return np.sqrt(y_channel ** 2 + x_channel ** 2)
+
+def sobel_channel(channel: np.ndarray, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
+    kernel = prewitt_kernel(kernel_size)
+    kernel[0, kernel_size//2] = -2
+    kernel[0, kernel_size//2] = 2
+    y_channel = weighted_sum(channel, kernel, padding_str)
+    kernel = np.rot90(kernel)
+    x_channel = weighted_sum(channel, kernel, padding_str)
+    return np.sqrt(y_channel ** 2 + x_channel ** 2)
     return weighted_mean(channel, kernel, padding_str)
 
 def directional_channel(channel: np.ndarray, rotations: int, padding_str: PaddingStrategy) -> np.ndarray:
@@ -93,7 +116,7 @@ def directional_channel(channel: np.ndarray, rotations: int, padding_str: Paddin
     kernel[1, 1] = -2
     kernel[-1,:] = -1
     kernel = rotate_steps(kernel, rotations)
-    return weighted_mean(channel, kernel, padding_str)
+    return weighted_sum(channel, kernel, padding_str)
 
 def outer_slice(x):
     return np.r_[x[0],x[1:-1,-1],x[-1,:0:-1],x[-1:0:-1,0]]
@@ -125,3 +148,8 @@ def high(image: Image, kernel_size: int, padding_str: PaddingStrategy) -> np.nda
 
 def directional(image: Image, padding_str: PaddingStrategy, rotations: int) -> np.ndarray:
     return image.apply_over_channels(directional_channel, rotations, padding_str)
+def prewitt(image: Image, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
+    return image.apply_over_channels(prewitt_channel, kernel_size, padding_str)
+
+def sobel(image: Image, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
+    return image.apply_over_channels(sobel_channel, kernel_size, padding_str)
