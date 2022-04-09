@@ -673,7 +673,7 @@ TR_ANYSOTROPIC_DIFUSION: str = 'anysotropic difusion'
 def build_anysotropic_difusion_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_ANYSOTROPIC_DIFUSION):
         build_tr_name_input(TR_ANYSOTROPIC_DIFUSION, image_name)
-        build_tr_value_int_selector('iterations', 0, MAX_TIME)
+        build_tr_value_int_selector('iterations', 0, MAX_TIME, default_value=10)
         build_tr_value_int_selector('sigma', 1, 10, default_value=4, tag='sigma')
         build_tr_radio_buttons(PaddingStrategy.names())
         build_tr_dialog_end_buttons(TR_ANYSOTROPIC_DIFUSION, image_name, tr_anysotropic_difusion)
@@ -683,7 +683,7 @@ def tr_anysotropic_difusion(image_name: str) -> Image:
     image       = img_repo.get_image(image_name)
     new_name    = get_tr_name_value(image)
     iterations  = get_tr_int_value()
-    sigma  = get_tr_int_value(int_input='sigma')
+    sigma       = get_tr_int_value(int_input='sigma')
 
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos

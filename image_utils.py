@@ -123,19 +123,19 @@ class Image:
 
 class DirectionalDerivatives(Enum):
 
-    NORTH = np.zeros((3,3))
-    # NORTH = np.array([[0, 1, 0], [0, -1, 0], [0, 0, 0]])
-    # EAST = np.array([[0, 0, 0], [0, -1, 1], [0, 0, 0]])
-    # SOUTH = np.array([[0, 0, 0], [1, -1, 0], [0, 0, 0]])
-    # WEST = np.array([[0, 0, 0], [0, -1, 0], [0, -1, 0]])
+    NORTH = [[0, 1, 0], [0, -1, 0], [0, 0, 0]]
+    EAST  = [[0, 0, 0], [0, -1, 1], [0, 0, 0]]
+    SOUTH = [[0, 0, 0], [1, -1, 0], [0, 0, 0]]
+    WEST  = [[0, 0, 0], [0, -1, 0], [0, -1, 0]]
 
+    
     @classmethod
     def values(cls):
-        return list(map(lambda c: c.value, cls))
+        return list(map(lambda c: np.array(c.value), cls))
 
     @classmethod
     def kernel_size(cls) -> Tuple[int]:
-        return cls.NORTH.value.shape
+        return np.array(cls.NORTH.value).shape
 
 
 def valid_image_formats() -> Iterable[str]:
@@ -299,8 +299,8 @@ def channel_equalization(channel: np.ndarray)  -> np.ndarray:
 def equalize(image: Image) -> np.ndarray:
     return image.apply_over_channels(channel_equalization)
 
-def anysotropic_difusion(img: Image, iterations: int, padding_str: PaddingStrategy) -> np.ndarray:
-    return img.apply_over_channels(channel_anysotropic_difusion, iterations, padding_str)
+def anysotropic_difusion(img: Image, iterations: int, sigma: int, padding_str: PaddingStrategy) -> np.ndarray:
+    return img.apply_over_channels(channel_anysotropic_difusion, iterations, sigma, padding_str)
            
 def channel_anysotropic_difusion(channel: np.ndarray, iterations: int, sigma: int, padding_str: PaddingStrategy) -> np.ndarray:
     new_channel = channel
@@ -311,15 +311,14 @@ def channel_anysotropic_difusion(channel: np.ndarray, iterations: int, sigma: in
        
 def get_directional_derivatives(channel: np.ndarray, padding_str: PaddingStrategy, sigma: int) -> np.ndarray:
     
-    sw = sliding_window(channel, (3,3), padding_str)
+    sw = sliding_window(channel, DirectionalDerivatives.kernel_size(), padding_str)
     new_channel = channel
-    for kernel in DirectionalDerivatives.values:
-        new_channel = new_channel + applicate_function_to_directional_derivative(np.sum(sw[:, :] * kernel, axis=(2, 3)))
-        
+    for kernel in DirectionalDerivatives.values():
+        new_channel = new_channel + applicate_function_to_directional_derivative(np.sum(sw[:, :] * kernel, axis=(2, 3)), sigma)
     return new_channel
 
 def applicate_function_to_directional_derivative(derivatives: np.ndarray, sigma: int) -> np.ndarray:
-    return leclerc(derivatives, sigma) * derivatives * 1/4
+    return leclerc(derivatives, sigma) * derivatives / 4
 
 def leclerc(derivatives: np.ndarray, sigma: int) -> np.ndarray:
-    return  np.exp(-(abs(derivatives) ** 2) / sigma)
+    return  np.exp(-(abs(derivatives) ** 2) / sigma**2)
