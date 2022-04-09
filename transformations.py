@@ -10,7 +10,7 @@ import interface
 import noise
 import rng
 from denoising import PaddingStrategy, DirectionalOperator
-from image_utils import Image, strip_extension, add_images, sub_images, multiply_images, \
+from image_utils import MAX_TIME, Image, anysotropic_difusion, strip_extension, add_images, sub_images, multiply_images, \
     power_function, negate, to_binary, equalize, ImageFormat, MAX_COLOR, get_extension, normalize, universal_to_binary
 from interface_utils import render_error
 from noise import NoiseType
@@ -58,6 +58,7 @@ def build_transformations_menu(image_name: str) -> None:
             build_tr_menu_item(TR_PREWITT,          build_denoise_prewitt_dialog, image_name)
             build_tr_menu_item(TR_SOBEL,            build_denoise_sobel_dialog, image_name)
             build_tr_menu_item(TR_GLOBAL_UMBRAL, build_global_umbral_dialog, image_name)
+            build_tr_menu_item(TR_ANYSOTROPIC_DIFUSION, build_anysotropic_difusion_dialog, image_name)
 
 def build_tr_menu_item(tr_id: str, tr_dialog_builder: Callable[[str], None], image_name: str) -> None:
     dpg.add_menu_item(label=tr_id.capitalize(), user_data=(tr_dialog_builder, image_name), callback=lambda s, ad, ud: ud[0](ud[1]))
@@ -617,7 +618,7 @@ def build_denoise_prewitt_dialog(image_name: str) -> None:
         build_tr_name_input(TR_PREWITT, image_name)
         build_tr_value_int_selector('kernel size', 3, 23, step=2)
         build_tr_radio_buttons(PaddingStrategy.names())
-        build_tr_dialog_end_buttons(TR_PREWITT, image_name, tr_high)
+        build_tr_dialog_end_buttons(TR_PREWITT, image_name, tr_prewitt)
 
 def tr_prewitt(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -637,7 +638,7 @@ def build_denoise_sobel_dialog(image_name: str) -> None:
         build_tr_name_input(TR_SOBEL, image_name)
         build_tr_value_int_selector('kernel size', 3, 23, step=2)
         build_tr_radio_buttons(PaddingStrategy.names())
-        build_tr_dialog_end_buttons(TR_SOBEL, image_name, tr_high)
+        build_tr_dialog_end_buttons(TR_SOBEL, image_name, tr_prewitt)
 
 def tr_sobel(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -647,6 +648,7 @@ def tr_sobel(image_name: str) -> Image:
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
     new_data = denoising.sobel(image, kernel_size, padding_str)
+
 TR_GLOBAL_UMBRAL: str = 'global umbral'
 @render_error
 def build_global_umbral_dialog(image_name: str) -> None:
@@ -662,5 +664,29 @@ def tr_global_umbral(image_name: str) -> Image:
     umb         = get_tr_int_value()
     # 2. Procesamos
     new_data = universal_to_binary(image, umb)
+    # 3. Creamos Imagen
+    return Image(new_name, image.format, new_data)
+
+
+TR_ANYSOTROPIC_DIFUSION: str = 'anysotropic difusion'
+@render_error
+def build_anysotropic_difusion_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_ANYSOTROPIC_DIFUSION):
+        build_tr_name_input(TR_ANYSOTROPIC_DIFUSION, image_name)
+        build_tr_value_int_selector('iterations', 0, MAX_TIME)
+        build_tr_value_int_selector('sigma', 1, 10, default_value=4, tag='sigma')
+        build_tr_radio_buttons(PaddingStrategy.names())
+        build_tr_dialog_end_buttons(TR_ANYSOTROPIC_DIFUSION, image_name, tr_anysotropic_difusion)
+
+def tr_anysotropic_difusion(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image       = img_repo.get_image(image_name)
+    new_name    = get_tr_name_value(image)
+    iterations  = get_tr_int_value()
+    sigma  = get_tr_int_value(int_input='sigma')
+
+    padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
+    # 2. Procesamos
+    new_data = anysotropic_difusion(image, iterations, sigma, padding_str)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)

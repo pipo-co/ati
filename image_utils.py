@@ -2,11 +2,14 @@ import itertools
 import os
 from dataclasses import dataclass
 from enum import Enum
+from tkinter import N
 from typing import Iterable, Tuple, Callable, Union, Any
+from sliding import PaddingStrategy, sliding_window
 
 import metadata_repo
 
 import numpy as np
+
 from PIL import Image as PImage
 
 CIRCLE_IMAGE_NAME: str = 'circle.pgm'
@@ -14,6 +17,7 @@ SQUARE_IMAGE_NAME: str = 'square.pgm'
 RESERVED_IMAGE_NAMES: Tuple[str, ...] = (CIRCLE_IMAGE_NAME, SQUARE_IMAGE_NAME)
 COLOR_DEPTH: int = 256
 MAX_COLOR: int = COLOR_DEPTH - 1
+MAX_TIME: int = 20
 
 # (hist, bins)
 Hist = Tuple[np.ndarray, np.ndarray]
@@ -116,6 +120,23 @@ class Image:
     def name_from_path(path: str) -> str:
         split_name = os.path.splitext(os.path.basename(path))
         return split_name[0] + split_name[1].lower()
+
+class DirectionalDerivatives(Enum):
+
+    NORTH = np.zeros((3,3))
+    # NORTH = np.array([[0, 1, 0], [0, -1, 0], [0, 0, 0]])
+    # EAST = np.array([[0, 0, 0], [0, -1, 1], [0, 0, 0]])
+    # SOUTH = np.array([[0, 0, 0], [1, -1, 0], [0, 0, 0]])
+    # WEST = np.array([[0, 0, 0], [0, -1, 0], [0, -1, 0]])
+
+    @classmethod
+    def values(cls):
+        return list(map(lambda c: c.value, cls))
+
+    @classmethod
+    def kernel_size(cls) -> Tuple[int]:
+        return cls.NORTH.value.shape
+
 
 def valid_image_formats() -> Iterable[str]:
     formats = list(map(lambda fmt: fmt.to_extension(), ImageFormat))
@@ -277,3 +298,28 @@ def channel_equalization(channel: np.ndarray)  -> np.ndarray:
 
 def equalize(image: Image) -> np.ndarray:
     return image.apply_over_channels(channel_equalization)
+
+def anysotropic_difusion(img: Image, iterations: int, padding_str: PaddingStrategy) -> np.ndarray:
+    return img.apply_over_channels(channel_anysotropic_difusion, iterations, padding_str)
+           
+def channel_anysotropic_difusion(channel: np.ndarray, iterations: int, sigma: int, padding_str: PaddingStrategy) -> np.ndarray:
+    new_channel = channel
+    for i in range(iterations):
+        new_channel = get_directional_derivatives(new_channel, padding_str, sigma)
+
+    return new_channel  
+       
+def get_directional_derivatives(channel: np.ndarray, padding_str: PaddingStrategy, sigma: int) -> np.ndarray:
+    
+    sw = sliding_window(channel, (3,3), padding_str)
+    new_channel = channel
+    for kernel in DirectionalDerivatives.values:
+        new_channel = new_channel + applicate_function_to_directional_derivative(np.sum(sw[:, :] * kernel, axis=(2, 3)))
+        
+    return new_channel
+
+def applicate_function_to_directional_derivative(derivatives: np.ndarray, sigma: int) -> np.ndarray:
+    return leclerc(derivatives, sigma) * derivatives * 1/4
+
+def leclerc(derivatives: np.ndarray, sigma: int) -> np.ndarray:
+    return  np.exp(-(abs(derivatives) ** 2) / sigma)
