@@ -10,7 +10,7 @@ import interface
 import noise
 import rng
 from denoising import PaddingStrategy, DirectionalOperator
-from image_utils import MAX_TIME, Image, anysotropic_difusion, strip_extension, add_images, sub_images, multiply_images, \
+from image_utils import MAX_TIME, AnysotropicFunction, Image, anysotropic_difusion, strip_extension, add_images, sub_images, multiply_images, \
     power_function, negate, to_binary, equalize, ImageFormat, MAX_COLOR, get_extension, normalize, universal_to_binary
 from interface_utils import render_error
 from noise import NoiseType
@@ -676,6 +676,7 @@ def build_anysotropic_difusion_dialog(image_name: str) -> None:
         build_tr_value_int_selector('iterations', 0, MAX_TIME, default_value=10)
         build_tr_value_int_selector('sigma', 1, 10, default_value=4, tag='sigma')
         build_tr_radio_buttons(PaddingStrategy.names())
+        build_tr_radio_buttons(AnysotropicFunction.names(), tag='function')
         build_tr_dialog_end_buttons(TR_ANYSOTROPIC_DIFUSION, image_name, tr_anysotropic_difusion)
 
 def tr_anysotropic_difusion(image_name: str) -> Image:
@@ -686,7 +687,8 @@ def tr_anysotropic_difusion(image_name: str) -> Image:
     sigma       = get_tr_int_value(int_input='sigma')
 
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
+    function = AnysotropicFunction.from_str(get_tr_radio_buttons_value(radio_buttons='function'))
     # 2. Procesamos
-    new_data = anysotropic_difusion(image, iterations, sigma, padding_str)
+    new_data = anysotropic_difusion(image, iterations, sigma, padding_str, function)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
