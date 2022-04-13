@@ -638,7 +638,7 @@ def build_denoise_sobel_dialog(image_name: str) -> None:
         build_tr_name_input(TR_SOBEL, image_name)
         build_tr_value_int_selector('kernel size', 3, 23, step=2)
         build_tr_radio_buttons(PaddingStrategy.names())
-        build_tr_dialog_end_buttons(TR_SOBEL, image_name, tr_prewitt)
+        build_tr_dialog_end_buttons(TR_SOBEL, image_name, tr_sobel)
 
 def tr_sobel(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -648,6 +648,9 @@ def tr_sobel(image_name: str) -> Image:
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
     new_data = denoising.sobel(image, kernel_size, padding_str)
+    
+    return Image(new_name, image.format, new_data)
+
 
 TR_GLOBAL_UMBRAL: str = 'global umbral'
 @render_error
