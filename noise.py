@@ -43,15 +43,6 @@ def pollute_channel(channel: np.ndarray, noise_supplier: NoiseSupplier, noise_ty
 def salt(img: Image, percentage: int) -> np.ndarray:
     return img.apply_over_channels(salt_channel, percentage)
 
-def salted_pixel(xi: int, p: float) -> int:
-    obs = rng.random()
-    if obs > 1 - p:
-        return MAX_COLOR
-    elif obs < p:
-        return 0
-    else:
-        return xi
-
 def salt_channel(channel: np.ndarray, percentage: int) -> np.ndarray:
     p = percentage / 100
 
