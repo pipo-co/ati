@@ -3,7 +3,6 @@ import itertools
 import os
 from dataclasses import dataclass
 from enum import Enum
-from tkinter import N
 from typing import Iterable, Tuple, Callable, Union, Any
 from sliding import PaddingStrategy, sliding_window
 
