@@ -15,6 +15,10 @@ class PaddingStrategy(Enum):
     def pad(self, matrix: np.ndarray, shape: Tuple[int, ...]) -> np.ndarray:
         return self.value(matrix, (shape[0] - 1) // 2)
 
+    def pad_tensor(self, tensor: np.ndarray, shape: Tuple[int, ...]) -> np.ndarray:
+        pad_size = (shape[0] - 1) // 2
+        return self.value(tensor, ((pad_size, pad_size), (pad_size, pad_size), (0,0)))
+
     @classmethod
     def names(cls):
         return list(map(lambda c: c.name, cls))
@@ -28,3 +32,9 @@ class PaddingStrategy(Enum):
 
 def sliding_window(matrix: np.ndarray, shape: Tuple[int, ...], padding_str: PaddingStrategy) -> np.ndarray:
     return sliding_window_view(padding_str.pad(matrix, shape), shape)
+
+def sliding_window_tensor(matrix: np.ndarray, shape: Tuple[int, ...], padding_str: PaddingStrategy) -> np.ndarray:
+    return sliding_window_view(padding_str.pad_tensor(matrix, shape), shape)
+
+# def reshape_image(image_data: np.ndarray) -> np.ndarray:
+#     return np.reshape()

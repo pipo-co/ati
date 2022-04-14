@@ -59,6 +59,7 @@ def build_transformations_menu(image_name: str) -> None:
             build_tr_menu_item(TR_SOBEL,            build_denoise_sobel_dialog, image_name)
             build_tr_menu_item(TR_GLOBAL_UMBRAL, build_global_umbral_dialog, image_name)
             build_tr_menu_item(TR_ANYSOTROPIC_DIFUSION, build_anysotropic_difusion_dialog, image_name)
+            build_tr_menu_item(TR_BILATERAL, build_bilateral_filter_dialog, image_name)
 
 def build_tr_menu_item(tr_id: str, tr_dialog_builder: Callable[[str], None], image_name: str) -> None:
     dpg.add_menu_item(label=tr_id.capitalize(), user_data=(tr_dialog_builder, image_name), callback=lambda s, ad, ud: ud[0](ud[1]))
@@ -693,5 +694,28 @@ def tr_anysotropic_difusion(image_name: str) -> Image:
     function = AnysotropicFunction.from_str(get_tr_radio_buttons_value(radio_buttons='function'))
     # 2. Procesamos
     new_data = anysotropic_difusion(image, iterations, sigma, padding_str, function)
+    # 3. Creamos Imagen
+    return Image(new_name, image.format, new_data)
+
+TR_BILATERAL: str = 'bilateral filter'
+@render_error
+def build_bilateral_filter_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_BILATERAL):
+        build_tr_name_input(TR_BILATERAL, image_name)
+        build_tr_value_int_selector('sigma_space', 0, 10, default_value=2, tag='sigma_space')
+        build_tr_value_int_selector('sigma_intensity', 0, 20, default_value=3, tag='sigma_intensity')
+        build_tr_radio_buttons(PaddingStrategy.names())
+        build_tr_dialog_end_buttons(TR_BILATERAL, image_name, tr_anysotropic_difusion)
+
+def tr_anysotropic_difusion(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image       = img_repo.get_image(image_name)
+    new_name    = get_tr_name_value(image)
+    sigma_space  = get_tr_int_value(int_input='sigma_space')
+    sigma_intensity       = get_tr_int_value(int_input='sigma_intensity')
+
+    padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
+    # 2. Procesamos
+    new_data = denoising.bilateral_filter(image, sigma_space, sigma_intensity, padding_str)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
