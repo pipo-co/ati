@@ -133,30 +133,31 @@ def sobel(image: Image, kernel_size: int, padding_str: PaddingStrategy) -> np.nd
 def bilateral_filter(image: Image, sigma_space: int, sigma_intensity: int, padding_str: PaddingStrategy) -> np.ndarray:
     kernel_size = int(sigma_space * 4 + 1)
 
+    data = image.data 
+    
     #Agrego la dimension extra a las imagenes en greyscale para que se comporten como a color
     if image.channels == 1: 
-        data = np.reshape(image.data, (*image.data.shape, -1)) 
-    else:
-        data = image.data 
+        data = np.expand_dims(data, axis=2)
         
     sw = sliding_window_tensor(data, data[:kernel_size, :kernel_size].shape, padding_str)
     #Mato la dimension que corresponde a la sliding window
     sw = np.squeeze(sw, axis=2)
     kernel = generate_bilateral_kernel(sw, sigma_space, sigma_intensity, kernel_size)
     #Agrego la dimension extra al kernel para que pueda ser multiplicable por el sw
-    kernel = np.reshape(kernel, (*kernel.shape, -1))
+    kernel = np.expand_dims(kernel, axis=4)
     new_data = np.sum(sw * kernel, axis=(2,3)) / np.sum(kernel, axis=(2,3))
-    return new_data
+    
+    return np.squeeze(new_data)
 
 def generate_bilateral_kernel(sliding_window: np.ndarray, sigma_space: int, sigma_intensity: int, kernel_size: int) -> np.ndarray:
     
     indexes = np.array(list(np.ndindex((kernel_size, kernel_size)))) - kernel_size//2 # noqa
     indexes = np.reshape(indexes, (kernel_size, kernel_size, 2))
-    spacial_kernel = np.sum(indexes**2, axis=2) / (-2* sigma_space**2)
+    spacial_kernel = - np.sum(indexes**2, axis=2) / (2* sigma_space**2)
     
     #A cada valor de la ventana se le resta el valor del medio de la ventana, para eso se agregan dos dimensiones 
     #al valor central de la sw para que luego se tenga que estirar contra la coleccion completa
-    intensity_kernel = np.linalg.norm(sliding_window - np.expand_dims(sliding_window[:,:,kernel_size // 2, kernel_size//2], axis=(2,3)), axis=4) / (-2*sigma_intensity**2)
+    intensity_kernel = -np.linalg.norm(sliding_window - np.expand_dims(sliding_window[:,:,kernel_size // 2, kernel_size//2], axis=(2,3)), axis=4) / (2*sigma_intensity**2)
     result_kernel = np.exp(intensity_kernel - np.expand_dims(spacial_kernel, axis=(0,1)))
     
     return result_kernel
