@@ -76,17 +76,17 @@ def high_pass_channel(channel: np.ndarray, kernel_size: int, padding_str: Paddin
     kernel[kernel_size // 2, kernel_size // 2] = (kernel_size ** 2 - 1) / kernel_size
     return weighted_sum(channel, kernel, padding_str)
 
-def modulus_derivative_synthesis(img: np.ndarray, kernel: np.ndarray, padding_str: PaddingStrategy) -> np.ndarray:
+def gradient_modulus(img: np.ndarray, kernel: np.ndarray, padding_str: PaddingStrategy) -> np.ndarray:
     y_channel = weighted_sum(img, kernel, padding_str)
     kernel = np.rot90(kernel)
     x_channel = weighted_sum(img, kernel, padding_str)
     return np.sqrt(y_channel ** 2 + x_channel ** 2)
 
 def prewitt_channel(channel: np.ndarray, padding_str: PaddingStrategy) -> np.ndarray:
-    return modulus_derivative_synthesis(channel, FamousKernel.PREWITT.kernel, padding_str)
+    return gradient_modulus(channel, FamousKernel.PREWITT.kernel, padding_str)
 
 def sobel_channel(channel: np.ndarray, padding_str: PaddingStrategy) -> np.ndarray:
-    return modulus_derivative_synthesis(channel, FamousKernel.SOBEL.kernel, padding_str)
+    return gradient_modulus(channel, FamousKernel.SOBEL.kernel, padding_str)
 
 def zero_crossing_vertical(data: np.ndarray, threshold: int) -> np.ndarray:
     ans = np.empty(data.shape, dtype=np.bool8)
@@ -110,16 +110,34 @@ def zero_crossing_horizontal(data: np.ndarray, threshold: int) -> np.ndarray:
 
     return ans
 
+def zero_crossing_borders(data: np.ndarray, threshold: int) -> np.ndarray:
+    mask = zero_crossing_vertical(data, threshold) | zero_crossing_horizontal(data, threshold)
+    ret = np.zeros(data.shape)
+    ret[mask] = MAX_COLOR
+    return ret
+
 def laplacian_channel(channel: np.ndarray, crossing_threshold: int, padding_str: PaddingStrategy) -> np.ndarray:
     # Derivada segunda
     channel = weighted_sum(channel, FamousKernel.LAPLACE.kernel, padding_str)
 
     # Queremos ver donde se hace 0, pues son los minimos/maximos de la derivada => borde
-    mask = zero_crossing_vertical(channel, crossing_threshold) | zero_crossing_horizontal(channel, crossing_threshold)
-    ret = np.zeros(channel.shape)
-    ret[mask] = MAX_COLOR
+    return zero_crossing_borders(channel, crossing_threshold)
 
-    return ret
+def log_kernel(sigma: float) -> np.ndarray:
+    kernel_size = int(sigma * 2 + 1)
+    indices = np.array(list(np.ndindex((kernel_size, kernel_size)))) - kernel_size//2 # noqa
+    indices = np.reshape(indices, (kernel_size, kernel_size, 2))
+    sum_squared_over_sigma = np.sum(indices**2, axis=2) / sigma**2  # (x^2 + y^2) / sigma^2
+    k = (np.sqrt(2 * np.pi) * sigma**3)                             # sqrt(2pi) * sigma^3
+    return - ((2 - sum_squared_over_sigma) / k) * np.exp(-sum_squared_over_sigma/2)
+
+def log_channel(channel: np.ndarray, sigma: float, crossing_threshold: int, padding_str: PaddingStrategy) -> np.ndarray:
+    # Derivada segunda con gauss
+    channel = weighted_sum(channel, log_kernel(sigma), padding_str)
+
+    # Queremos ver donde se hace 0, pues son los minimos/maximos de la derivada => borde
+    # return channel
+    return zero_crossing_borders(channel, crossing_threshold)
 
 # ******************* Export Functions ********************** #
 def directional(image: Image, kernel: FamousKernel, border_dir: Direction, padding_str: PaddingStrategy) -> np.ndarray:
@@ -136,3 +154,6 @@ def sobel(image: Image, padding_str: PaddingStrategy) -> np.ndarray:
 
 def laplace(image: Image, crossing_threshold: int, padding_str: PaddingStrategy) -> np.ndarray:
     return image.apply_over_channels(laplacian_channel, crossing_threshold, padding_str)
+
+def log(image: Image, sigma: float, crossing_threshold: int, padding_str: PaddingStrategy) -> np.ndarray:
+    return image.apply_over_channels(log_channel, sigma, crossing_threshold, padding_str)

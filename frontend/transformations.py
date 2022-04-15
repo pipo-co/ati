@@ -58,6 +58,7 @@ def build_transformations_menu(image_name: str) -> None:
             build_tr_menu_item(TR_BORDER_PREWITT,           build_border_prewitt_dialog,            image_name)
             build_tr_menu_item(TR_BORDER_SOBEL,             build_border_sobel_dialog,              image_name)
             build_tr_menu_item(TR_BORDER_LAPLACIAN,         build_border_laplacian_dialog,          image_name)
+            build_tr_menu_item(TR_BORDER_LOG,               build_border_log_dialog,                image_name)
         with dpg.menu(label='Combine'):
             build_tr_menu_item(TR_COMBINE_ADD,              build_combine_add_dialog,               image_name)
             build_tr_menu_item(TR_COMBINE_SUB,              build_combine_sub_dialog,               image_name)
@@ -674,7 +675,7 @@ def build_border_laplacian_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_THRESH_OTSU):
         build_tr_name_input(TR_THRESH_OTSU, image_name)
         build_tr_radio_buttons(PaddingStrategy.names())
-        build_tr_value_int_selector('crossing threshold', 0, MAX_COLOR, default_value=100, tag='crossing')
+        build_tr_value_int_selector('crossing threshold', 0, MAX_COLOR, default_value=100)
         build_tr_dialog_end_buttons(TR_THRESH_OTSU, image_name, tr_border_laplacian_border)
 
 def tr_border_laplacian_border(image_name: str) -> Image:
@@ -682,9 +683,31 @@ def tr_border_laplacian_border(image_name: str) -> Image:
     image       = img_repo.get_image(image_name)
     new_name    = get_tr_name_value(image)
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
-    crossing_threshold = get_tr_int_value('crossing')
+    crossing_threshold = get_tr_int_value()
     # 2. Procesamos
     new_data = border.laplace(image, crossing_threshold, padding_str)
+    # 3. Creamos Imagen
+    return Image(new_name, image.format, new_data)
+
+TR_BORDER_LOG: str = 'LOG'
+@render_error
+def build_border_log_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_BORDER_LOG):
+        build_tr_name_input(TR_BORDER_LOG, image_name)
+        build_tr_radio_buttons(PaddingStrategy.names())
+        build_tr_value_float_selector('sigma', 1, 20, default_value=5)
+        build_tr_value_int_selector('crossing threshold', 0, MAX_COLOR, default_value=100)
+        build_tr_dialog_end_buttons(TR_BORDER_LOG, image_name, tr_border_log_border)
+
+def tr_border_log_border(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image       = img_repo.get_image(image_name)
+    new_name    = get_tr_name_value(image)
+    padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
+    sigma = get_tr_float_value()
+    crossing_threshold = get_tr_int_value()
+    # 2. Procesamos
+    new_data = border.log(image, sigma, crossing_threshold, padding_str)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 
