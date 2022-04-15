@@ -22,7 +22,7 @@ class Direction(Enum):
             raise ValueError(f'"{direction_name.title()}" is not a supported direction')
         return cls[direction_name]
 
-    # TODO(faus, nacho): link a stack overflow
+    # https://stackoverflow.com/a/41506120/12270520
     @staticmethod
     def _outer_slice(x):
         return np.r_[x[0], x[1:-1, -1], x[-1, :0:-1], x[-1:0:-1, 0]]
@@ -124,7 +124,7 @@ def laplacian_channel(channel: np.ndarray, crossing_threshold: int, padding_str:
     return zero_crossing_borders(channel, crossing_threshold)
 
 def log_kernel(sigma: float) -> np.ndarray:
-    kernel_size = int(sigma * 2 + 1)
+    kernel_size = int(sigma * 10 + 1)
     indices = np.array(list(np.ndindex((kernel_size, kernel_size)))) - kernel_size//2 # noqa
     indices = np.reshape(indices, (kernel_size, kernel_size, 2))
     sum_squared_over_sigma = np.sum(indices**2, axis=2) / sigma**2  # (x^2 + y^2) / sigma^2
