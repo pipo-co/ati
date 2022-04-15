@@ -50,7 +50,7 @@ def build_transformations_menu(image_name: str) -> None:
             build_tr_menu_item(TR_DENOISE_MEDIAN,           build_denoise_median_dialog,            image_name)
             build_tr_menu_item(TR_DENOISE_WEIGHTED_MEDIAN,  build_denoise_weighted_median_dialog,   image_name)
             build_tr_menu_item(TR_DENOISE_GAUSS,            build_denoise_gauss_dialog,             image_name)
-            build_tr_menu_item(TR_DENOISE_ANISOTROPIC,      build_denoise_anisotropic_dialog,       image_name)
+            build_tr_menu_item(TR_DENOISE_DIFFUSION,        build_denoise_diffusion_dialog, image_name)
             build_tr_menu_item(TR_DENOISE_BILATERAL,        build_denoise_bilateral_dialog,         image_name)
         with dpg.menu(label='Border'):
             build_tr_menu_item(TR_BORDER_DIRECTIONAL,       build_border_directional_dialog,        image_name)
@@ -540,27 +540,27 @@ def tr_denoise_gauss(image_name: str) -> Image:
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 
-TR_DENOISE_ANISOTROPIC: str = 'anisotropic diffusion'
+TR_DENOISE_DIFFUSION: str = 'diffusion'
 @render_error
-def build_denoise_anisotropic_dialog(image_name: str) -> None:
-    with build_tr_dialog(TR_DENOISE_ANISOTROPIC):
-        build_tr_name_input(TR_DENOISE_ANISOTROPIC, image_name)
+def build_denoise_diffusion_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_DENOISE_DIFFUSION):
+        build_tr_name_input(TR_DENOISE_DIFFUSION, image_name)
         build_tr_value_int_selector('iterations', 0, denoise.MAX_ANISOTROPIC_ITERATIONS, default_value=10)
         build_tr_value_int_selector('sigma', 1, 10, default_value=4, tag='sigma')
         build_tr_radio_buttons(PaddingStrategy.names())
-        build_tr_radio_buttons(denoise.AnisotropicStrategy.names(), tag='function')
-        build_tr_dialog_end_buttons(TR_DENOISE_ANISOTROPIC, image_name, tr_denoise_anisotropic_diffusion)
+        build_tr_radio_buttons(denoise.DiffusionStrategy.names(), tag='function')
+        build_tr_dialog_end_buttons(TR_DENOISE_DIFFUSION, image_name, tr_denoise_diffusion)
 
-def tr_denoise_anisotropic_diffusion(image_name: str) -> Image:
+def tr_denoise_diffusion(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image       = img_repo.get_image(image_name)
     new_name    = get_tr_name_value(image)
     iterations  = get_tr_int_value()
     sigma       = get_tr_int_value(int_input='sigma')
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
-    function = denoise.AnisotropicStrategy.from_str(get_tr_radio_buttons_value(radio_buttons='function'))
+    function = denoise.DiffusionStrategy.from_str(get_tr_radio_buttons_value(radio_buttons='function'))
     # 2. Procesamos
-    new_data = denoise.anisotropic_diffusion(image, iterations, sigma, padding_str, function)
+    new_data = denoise.diffusion(image, iterations, sigma, padding_str, function)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 

@@ -36,7 +36,8 @@ class DirectionalDerivatives(Enum):
     def kernel_size() -> Tuple[int, int]:
         return 3, 3
 
-class AnisotropicStrategy(Enum):
+class DiffusionStrategy(Enum):
+    ISOTROPIC   = functools.partial(lambda derivatives, sigma: 1)
     LECLERC     = functools.partial(lambda derivatives, sigma: np.exp(-(abs(derivatives) ** 2) / sigma ** 2))
     LORENTZIANO = functools.partial(lambda derivatives, sigma: 1 / ((abs(derivatives) ** 2 / sigma ** 2) + 1))
 
@@ -48,9 +49,9 @@ class AnisotropicStrategy(Enum):
         return list(map(lambda c: c.name, cls))
 
     @classmethod
-    def from_str(cls, strategy: str) -> 'AnisotropicStrategy':
+    def from_str(cls, strategy: str) -> 'DiffusionStrategy':
         strategy_name = strategy.upper()
-        if strategy_name not in AnisotropicStrategy.names():
+        if strategy_name not in DiffusionStrategy.names():
             raise ValueError(f'"{strategy_name.title()}" is not a supported anisotropic function')
         return cls[strategy_name]
     
@@ -76,14 +77,14 @@ def gauss_kernel(sigma: float) -> np.ndarray:
 def gauss_channel(channel: np.ndarray, sigma: float, padding_str: PaddingStrategy) -> np.ndarray:
     return weighted_sum(channel, gauss_kernel(sigma), padding_str)
 
-def channel_anisotropic_diffusion(channel: np.ndarray, iterations: int, sigma: int, padding_str: PaddingStrategy, function: AnisotropicStrategy) -> np.ndarray:
+def diffusion_channel(channel: np.ndarray, iterations: int, sigma: int, padding_str: PaddingStrategy, function: DiffusionStrategy) -> np.ndarray:
     new_channel = channel
     for i in range(iterations):
-        new_channel = anisotropic_diffusion_step(new_channel, sigma, padding_str, function)
+        new_channel = diffusion_step(new_channel, sigma, padding_str, function)
     return new_channel
 
 MAX_ANISOTROPIC_ITERATIONS: int = 20
-def anisotropic_diffusion_step(channel: np.ndarray, sigma: int, padding_str: PaddingStrategy, function: AnisotropicStrategy) -> np.ndarray:
+def diffusion_step(channel: np.ndarray, sigma: int, padding_str: PaddingStrategy, function: DiffusionStrategy) -> np.ndarray:
     sw = sliding_window(channel, DirectionalDerivatives.kernel_size(), padding_str)
     new_channel = channel
     for kernel in DirectionalDerivatives.values():
@@ -134,8 +135,8 @@ def weighted_median(image: Image, kernel: np.ndarray, padding_str: PaddingStrate
 def gauss(image: Image, sigma: float, padding_str: PaddingStrategy) -> np.ndarray:
     return image.apply_over_channels(gauss_channel, sigma, padding_str)
 
-def anisotropic_diffusion(img: Image, iterations: int, sigma: int, padding_str: PaddingStrategy, function: AnisotropicStrategy) -> np.ndarray:
-    return img.apply_over_channels(channel_anisotropic_diffusion, iterations, sigma, padding_str, function)
+def diffusion(img: Image, iterations: int, sigma: int, padding_str: PaddingStrategy, function: DiffusionStrategy) -> np.ndarray:
+    return img.apply_over_channels(diffusion_channel, iterations, sigma, padding_str, function)
 
 def bilateral(image: Image, sigma_space: int, sigma_intensity: int, padding_str: PaddingStrategy) -> np.ndarray:
     return bilateral_filter(image, sigma_space, sigma_intensity, padding_str)
