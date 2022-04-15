@@ -24,6 +24,7 @@ TR_IMG_INPUT: str               = 'tr_img_input'
 TR_INT_VALUE_SELECTOR: str      = 'tr_int_value_input'
 TR_FLOAT_VALUE_SELECTOR: str    = 'tr_float_value_input'
 TR_RADIO_BUTTONS: str           = 'tr_radio_buttons'
+TR_CHECKBOX: str                = 'tr_checkbox'
 TR_INT_TABLE: str               = 'tr_int_table'
 
 TrHandler = Callable[[str], Image]
@@ -116,6 +117,9 @@ def build_tr_radio_buttons(names: List[str], default_value: Optional[str] = None
     else:
         default_value = names[0]
     dpg.add_radio_button(items=names, default_value=default_value, horizontal=horizontal, tag=tag)
+
+def build_tr_checkbox(name: str, tag: str = TR_CHECKBOX) -> None:
+    dpg.add_checkbox(label=name, tag=tag)
     
 def build_tr_img_selector(image_name: str) -> None:
     image_list = list(map(lambda img: img.name, img_repo.get_same_shape_images(image_name)))
@@ -157,6 +161,9 @@ def get_tr_img_value(img_input: str = TR_IMG_INPUT) -> Image:
 
 def get_tr_radio_buttons_value(radio_buttons: str = TR_RADIO_BUTTONS) -> str:
     return dpg.get_value(radio_buttons)
+
+def get_tr_checkbox_value(checkbox: str = TR_CHECKBOX) -> bool:
+    return dpg.get_value(checkbox)
 
 def get_tr_int_value(int_input: str = TR_INT_VALUE_SELECTOR) -> int:
     return dpg.get_value(int_input)
@@ -592,6 +599,7 @@ def tr_denoise_high(image_name: str) -> Image:
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 
+
 TR_DIRECTIONAL: str = 'directional'
 @render_error
 def build_directional_dialog(image_name: str) -> None:
@@ -599,6 +607,7 @@ def build_directional_dialog(image_name: str) -> None:
         build_tr_name_input(TR_DIRECTIONAL, image_name)
         build_tr_radio_buttons(PaddingStrategy.names())
         build_tr_radio_buttons(DirectionalOperator.names(), tag="direction")
+        build_tr_checkbox('Alternative Kernel')
         build_tr_dialog_end_buttons(TR_DIRECTIONAL, image_name, tr_directional)
 
 def tr_directional(image_name: str) -> Image:
@@ -607,10 +616,12 @@ def tr_directional(image_name: str) -> Image:
     new_name    = get_tr_name_value(image)
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     rotations = DirectionalOperator.from_str(get_tr_radio_buttons_value(radio_buttons="direction"))
+    kernel = denoising.ALTERNATIVE_DERIVATIVE_KERNEL if get_tr_checkbox_value() else denoising.STANDARD_DERIVATIVE_KERNEL
     # 2. Procesamos
-    new_data = denoising.directional(image, padding_str, rotations)
+    new_data = denoising.directional(image, kernel, padding_str, rotations.value)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
+
 
 TR_PREWITT: str = 'prewitt'
 @render_error
@@ -632,6 +643,7 @@ def tr_prewitt(image_name: str) -> Image:
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 
+
 TR_SOBEL: str = 'sobel'
 @render_error
 def build_denoise_sobel_dialog(image_name: str) -> None:
@@ -649,7 +661,7 @@ def tr_sobel(image_name: str) -> Image:
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
     new_data = denoising.sobel(image, kernel_size, padding_str)
-    
+    # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 
 

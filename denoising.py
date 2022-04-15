@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import Tuple
+from typing import List
 
 import numpy as np
 from sliding import PaddingStrategy, sliding_window, sliding_window_tensor
@@ -7,10 +7,10 @@ from image_utils import Image
 
 
 class DirectionalOperator(Enum):
-    VERTICAL = 0
-    RIGHT_DIAGONAL = 1
-    HORIZONTAL = 2
-    LEFT_DIAGONAL = 3
+    VERTICAL            = 0
+    NEGATIVE_DIAGONAL   = 1
+    HORIZONTAL          = 2
+    POSITIVE_DIAGONAL   = 3
 
     @classmethod
     def names(cls):
@@ -20,8 +20,8 @@ class DirectionalOperator(Enum):
     def from_str(cls, direction: str) -> 'DirectionalOperator':
         direction_name = direction.upper()
         if direction_name not in DirectionalOperator.names():
-            raise ValueError(f'"{direction_name.capitalize()}" is not a supported direction')
-        return cls[direction_name].value
+            raise ValueError(f'"{direction_name.title()}" is not a supported direction')
+        return cls[direction_name]
 
 def is_kernel_valid(kernel: np.ndarray) -> bool:
     return len(kernel.shape) == 2 \
@@ -63,6 +63,12 @@ def high_channel(channel: np.ndarray, kernel_size: int, padding_str: PaddingStra
     kernel[kernel_size // 2, kernel_size // 2] = (kernel_size ** 2 - 1) / kernel_size
     return weighted_sum(channel, kernel, padding_str)
 
+def modulus_derivative_synthesis(img: np.ndarray, kernel: np.ndarray, padding_str: PaddingStrategy) -> np.ndarray:
+    y_channel = weighted_sum(img, kernel, padding_str)
+    kernel = np.rot90(kernel)
+    x_channel = weighted_sum(img, kernel, padding_str)
+    return np.sqrt(y_channel ** 2 + x_channel ** 2)
+
 def prewitt_kernel(kernel_size: int) -> np.ndarray:
     kernel = np.zeros((kernel_size, kernel_size))
     kernel[0, :] = -1
@@ -70,39 +76,45 @@ def prewitt_kernel(kernel_size: int) -> np.ndarray:
     return kernel
 
 def prewitt_channel(channel: np.ndarray, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
-    kernel = prewitt_kernel(kernel_size)
-    y_channel = weighted_sum(channel, kernel, padding_str)
-    kernel = np.rot90(kernel)
-    x_channel = weighted_sum(channel, kernel, padding_str)
-    return np.sqrt(y_channel ** 2 + x_channel ** 2)
+    return modulus_derivative_synthesis(channel, prewitt_kernel(kernel_size), padding_str)
 
-def sobel_channel(channel: np.ndarray, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
+def sobel_kernel(kernel_size: int) -> np.ndarray:
     kernel = prewitt_kernel(kernel_size)
     kernel[0, kernel_size//2] = -2
-    kernel[0, kernel_size//2] = 2
-    y_channel = weighted_sum(channel, kernel, padding_str)
-    kernel = np.rot90(kernel)
-    x_channel = weighted_sum(channel, kernel, padding_str)
-    return np.sqrt(y_channel ** 2 + x_channel ** 2)
-    return weighted_mean(channel, kernel, padding_str)
+    kernel[-1, kernel_size//2] = 2
+    return kernel
 
-def directional_channel(channel: np.ndarray, rotations: int, padding_str: PaddingStrategy) -> np.ndarray:
-    kernel = np.full((3, 3), 1)
-    kernel[1, 1] = -2
-    kernel[-1,:] = -1
+def sobel_channel(channel: np.ndarray, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
+    return modulus_derivative_synthesis(channel, sobel_kernel(kernel_size), padding_str)
+
+
+STANDARD_DERIVATIVE_KERNEL: List[List[int]] = [
+    [1, 0, -1],
+    [1, 0, -1],
+    [1, 0, -1]
+]
+
+ALTERNATIVE_DERIVATIVE_KERNEL: List[List[int]] = [
+    [ 1,  1,  1],
+    [ 1, -2,  1],
+    [-1, -1, -1]
+]
+
+def directional_channel(channel: np.ndarray, base_kernel: List[List[int]], rotations: int, padding_str: PaddingStrategy) -> np.ndarray:
+    kernel = np.array(base_kernel)
     kernel = rotate_steps(kernel, rotations)
     return weighted_sum(channel, kernel, padding_str)
 
 def outer_slice(x):
-    return np.r_[x[0],x[1:-1,-1],x[-1,:0:-1],x[-1:0:-1,0]]
+    return np.r_[x[0], x[1:-1, -1], x[-1, :0:-1], x[-1:0:-1, 0]]
 
 def rotate_steps(x, shift):
     out = np.empty_like(x)
     N = x.shape[0]
     idx = np.arange(x.size).reshape(x.shape)
-    for n in range((N+1)//2):
-        sliced_idx = outer_slice(idx[n:N-n,n:N-n])
-        out.ravel()[sliced_idx] = np.roll(np.take(x,sliced_idx), shift)
+    for n in range((N+1) // 2):
+        sliced_idx = outer_slice(idx[n:N-n, n:N-n])
+        out.ravel()[sliced_idx] = np.roll(np.take(x, sliced_idx), shift)
     return out
 
 # ******************* Export Functions ********************** #
@@ -121,8 +133,8 @@ def gauss(image: Image, sigma: float, padding_str: PaddingStrategy) -> np.ndarra
 def high(image: Image, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
     return image.apply_over_channels(high_channel, kernel_size, padding_str)
 
-def directional(image: Image, padding_str: PaddingStrategy, rotations: int) -> np.ndarray:
-    return image.apply_over_channels(directional_channel, rotations, padding_str)
+def directional(image: Image, kernel: List[List[int]], padding_str: PaddingStrategy, rotations: int) -> np.ndarray:
+    return image.apply_over_channels(directional_channel, kernel, rotations, padding_str)
 
 def prewitt(image: Image, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
     return image.apply_over_channels(prewitt_channel, kernel_size, padding_str)
