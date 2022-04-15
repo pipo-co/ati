@@ -4,7 +4,7 @@ from typing import Callable, List, Optional
 import dearpygui.dearpygui as dpg
 import numpy as np
 
-from transformations import basic, border, combine, denoising, noise, threshold as thresh
+from transformations import basic, border, combine, denoise, noise, threshold as thresh
 from repositories import images_repo as img_repo
 from . import interface
 import rng
@@ -475,7 +475,7 @@ def tr_denoise_mean(image_name: str) -> Image:
     kernel_size = require_odd(get_tr_int_value(), 'Kernel size must be odd')
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data = denoising.mean(image, kernel_size, padding_str)
+    new_data = denoise.mean(image, kernel_size, padding_str)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 
@@ -485,7 +485,7 @@ def build_denoise_median_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_DENOISE_MEDIAN):
         build_tr_name_input(TR_DENOISE_MEDIAN, image_name)
         build_tr_value_int_selector('kernel size', 3, 23, step=2)
-        build_tr_radio_buttons(denoising.PaddingStrategy.names())
+        build_tr_radio_buttons(denoise.PaddingStrategy.names())
         build_tr_dialog_end_buttons(TR_DENOISE_MEDIAN, image_name, tr_denoise_median)
 
 def tr_denoise_median(image_name: str) -> Image:
@@ -495,7 +495,7 @@ def tr_denoise_median(image_name: str) -> Image:
     kernel_size = require_odd(get_tr_int_value(), 'Kernel size must be odd')
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data = denoising.median(image, kernel_size, padding_str)
+    new_data = denoise.median(image, kernel_size, padding_str)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 
@@ -504,7 +504,7 @@ TR_DENOISE_WEIGHTED_MEDIAN: str = 'weighted median'
 def build_denoise_weighted_median_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_DENOISE_WEIGHTED_MEDIAN):
         build_tr_name_input(TR_DENOISE_WEIGHTED_MEDIAN, image_name)
-        build_tr_radio_buttons(denoising.PaddingStrategy.names())
+        build_tr_radio_buttons(denoise.PaddingStrategy.names())
         build_tr_input_table()
         build_tr_dialog_end_buttons(TR_DENOISE_WEIGHTED_MEDIAN, image_name, tr_denoise_weighted_median)
 
@@ -515,7 +515,7 @@ def tr_denoise_weighted_median(image_name: str) -> Image:
     kernel      = np.array(get_tr_input_table_values())
     padding     = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos - Puede ser async
-    new_data = denoising.weighted_median(image, kernel, padding)
+    new_data = denoise.weighted_median(image, kernel, padding)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 
@@ -535,7 +535,7 @@ def tr_denoise_gauss(image_name: str) -> Image:
     sigma       = get_tr_float_value()
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data = denoising.gauss(image, sigma, padding_str)
+    new_data = denoise.gauss(image, sigma, padding_str)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 
@@ -544,10 +544,10 @@ TR_DENOISE_ANISOTROPIC: str = 'anisotropic diffusion'
 def build_denoise_anisotropic_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_DENOISE_ANISOTROPIC):
         build_tr_name_input(TR_DENOISE_ANISOTROPIC, image_name)
-        build_tr_value_int_selector('iterations', 0, denoising.MAX_ANISOTROPIC_ITERATIONS, default_value=10)
+        build_tr_value_int_selector('iterations', 0, denoise.MAX_ANISOTROPIC_ITERATIONS, default_value=10)
         build_tr_value_int_selector('sigma', 1, 10, default_value=4, tag='sigma')
         build_tr_radio_buttons(PaddingStrategy.names())
-        build_tr_radio_buttons(denoising.AnisotropicStrategy.names(), tag='function')
+        build_tr_radio_buttons(denoise.AnisotropicStrategy.names(), tag='function')
         build_tr_dialog_end_buttons(TR_DENOISE_ANISOTROPIC, image_name, tr_denoise_anisotropic_diffusion)
 
 def tr_denoise_anisotropic_diffusion(image_name: str) -> Image:
@@ -557,9 +557,9 @@ def tr_denoise_anisotropic_diffusion(image_name: str) -> Image:
     iterations  = get_tr_int_value()
     sigma       = get_tr_int_value(int_input='sigma')
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
-    function = denoising.AnisotropicStrategy.from_str(get_tr_radio_buttons_value(radio_buttons='function'))
+    function = denoise.AnisotropicStrategy.from_str(get_tr_radio_buttons_value(radio_buttons='function'))
     # 2. Procesamos
-    new_data = denoising.anisotropic_diffusion(image, iterations, sigma, padding_str, function)
+    new_data = denoise.anisotropic_diffusion(image, iterations, sigma, padding_str, function)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 
@@ -582,7 +582,7 @@ def tr_denoise_bilateral_filter(image_name: str) -> Image:
 
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data = denoising.bilateral_filter(image, sigma_space, sigma_intensity, padding_str)
+    new_data = denoise.bilateral_filter(image, sigma_space, sigma_intensity, padding_str)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 
