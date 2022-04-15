@@ -286,7 +286,7 @@ def normalize(data: np.ndarray, as_type=np.uint8) -> np.ndarray:
     else:
         rng = data.max() - data.min()
         if rng == 0:
-            return np.zeros(data.shape, as_type)
+            return np.full(data.shape, min(abs(int(data[0])), MAX_COLOR))
         else:
             amin = data.min()
             ret = (data - amin) * 255 // rng
