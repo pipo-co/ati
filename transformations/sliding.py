@@ -7,9 +7,9 @@ import numpy as np
 from numpy.lib.stride_tricks import sliding_window_view
 
 class PaddingStrategy(Enum):
-    ZEROS   = functools.partial(lambda c, n: np.pad(c, n, mode='constant', constant_values=0))
     REFLECT = functools.partial(lambda c, n: np.pad(c, n, mode='reflect'))
     EDGE    = functools.partial(lambda c, n: np.pad(c, n, mode='edge'))
+    ZEROS   = functools.partial(lambda c, n: np.pad(c, n, mode='constant', constant_values=0))
 
     def pad(self, matrix: np.ndarray, shape: Tuple[int, ...]) -> np.ndarray:
         return self.value(matrix, (shape[0] - 1) // 2)
