@@ -10,11 +10,12 @@ import numpy as np
 
 from PIL import Image as PImage
 
+COLOR_DEPTH: int = 256
+MAX_COLOR: int = COLOR_DEPTH - 1
+
 CIRCLE_IMAGE_NAME: str = 'circle.pgm'
 SQUARE_IMAGE_NAME: str = 'square.pgm'
 RESERVED_IMAGE_NAMES: Tuple[str, ...] = (CIRCLE_IMAGE_NAME, SQUARE_IMAGE_NAME)
-COLOR_DEPTH: int = 256
-MAX_COLOR: int = COLOR_DEPTH - 1
 
 # (hist, bins)
 Hist = Tuple[np.ndarray, np.ndarray]
@@ -175,6 +176,27 @@ def save_image(image: Image, dir_path: str) -> None:
     else:
         PImage.fromarray(normalized_data).save(path)
 
+# Normalizes to uint8 ndarray
+def normalize(data: np.ndarray, as_type=np.uint8) -> np.ndarray:
+    if data.dtype == np.uint8:
+        return data.astype(as_type, copy=False)
+    elif np.can_cast(data.dtype, np.uint8, casting='safe'):
+        return data.astype(as_type, copy=False)
+    else:
+        rng = data.max() - data.min()
+        if rng == 0:
+            return np.full(data.shape, min(abs(int(data[0])), MAX_COLOR))
+        else:
+            amin = data.min()
+            ret = (data - amin) * 255 // rng
+            return ret.astype(as_type, copy=False)
+
+def channel_histogram(channel: np.ndarray) -> Hist:
+    channel = normalize(channel, np.float64)
+    hist, bins = np.histogram(channel.flatten(), bins=COLOR_DEPTH, range=(0, COLOR_DEPTH))
+    return hist / channel.size, bins
+
+# ***************************** Default Images ******************************** #
 
 CREATED_IMAGE_LEN: int = 200
 CIRCLE_RADIUS: int = 100
@@ -207,23 +229,3 @@ def create_square_image() -> Image:
     data[min_square:max_square, min_square:max_square] = 255
 
     return Image(SQUARE_IMAGE_NAME, ImageFormat.PGM, data, allow_reserved=True)
-
-# Normalizes to uint8 ndarray
-def normalize(data: np.ndarray, as_type=np.uint8) -> np.ndarray:
-    if data.dtype == np.uint8:
-        return data.astype(as_type, copy=False)
-    elif np.can_cast(data.dtype, np.uint8, casting='safe'):
-        return data.astype(as_type, copy=False)
-    else:
-        rng = data.max() - data.min()
-        if rng == 0:
-            return np.full(data.shape, min(abs(int(data[0])), MAX_COLOR))
-        else:
-            amin = data.min()
-            ret = (data - amin) * 255 // rng
-            return ret.astype(as_type, copy=False)
-
-def channel_histogram(channel: np.ndarray) -> Hist:
-    channel = normalize(channel, np.float64)
-    hist, bins = np.histogram(channel.flatten(), bins=COLOR_DEPTH, range=(0, COLOR_DEPTH))
-    return hist / channel.size, bins

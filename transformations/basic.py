@@ -1,6 +1,6 @@
 import numpy as np
 
-from image_utils import Image, MAX_COLOR, normalize, channel_histogram
+from image import Image, MAX_COLOR, normalize, channel_histogram
 
 def channel_equalization(channel: np.ndarray)  -> np.ndarray:
     channel = normalize(channel, np.int64)

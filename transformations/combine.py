@@ -1,6 +1,6 @@
 import numpy as np
 
-from image_utils import Image
+from image import Image
 
 def add(first_img: Image, second_img: Image) -> np.ndarray:
     return np.add(first_img.data, second_img.data)

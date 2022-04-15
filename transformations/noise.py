@@ -5,7 +5,7 @@ from typing import Callable, List
 import numpy as np
 
 import rng
-from image_utils import Image, MAX_COLOR
+from image import Image, MAX_COLOR
 
 NoiseSupplier = Callable[[int], float]
 
