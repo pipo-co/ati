@@ -21,7 +21,7 @@ class NoiseType(Enum):
     def from_name(cls, name: str) -> 'NoiseType':
         name = name.upper()
         if name not in cls.__members__:
-            raise ValueError(f'"{name.capitalize()}" is not a supported noise type')
+            raise ValueError(f'"{name.title()}" is not a supported noise type')
         return cls[name]
 
     def __call__(self, vals: np.ndarray, noise: float) -> np.ndarray:

@@ -63,7 +63,7 @@ def build_transformations_menu(image_name: str) -> None:
             build_tr_menu_item(TR_BILATERAL, build_bilateral_filter_dialog, image_name)
 
 def build_tr_menu_item(tr_id: str, tr_dialog_builder: Callable[[str], None], image_name: str) -> None:
-    dpg.add_menu_item(label=tr_id.capitalize(), user_data=(tr_dialog_builder, image_name), callback=lambda s, ad, ud: ud[0](ud[1]))
+    dpg.add_menu_item(label=tr_id.title(), user_data=(tr_dialog_builder, image_name), callback=lambda s, ad, ud: ud[0](ud[1]))
 
 @render_error
 def execute_transformation(image_name: str, handler: TrHandler) -> None:
@@ -77,7 +77,7 @@ def execute_transformation(image_name: str, handler: TrHandler) -> None:
     interface.render_image_window(new_image.name)
 
 def build_tr_dialog(tr_id: str) -> int:
-    return dpg.window(label=f'Apply {tr_id.capitalize()} Transformation', tag=TR_DIALOG, modal=True, no_close=True, pos=interface.CENTER_POS)
+    return dpg.window(label=f'Apply {tr_id.title()} Transformation', tag=TR_DIALOG, modal=True, no_close=True, pos=interface.CENTER_POS)
 
 def build_tr_dialog_end_buttons(tr_id: str, image_name: str, handle: TrHandler) -> None:
     with dpg.group(horizontal=True):
@@ -111,9 +111,9 @@ def build_tr_percentage_selector(name: str, default_value: int = 20, tag: str = 
     build_tr_value_int_selector(name, 0, 100, default_value=default_value, suffix='%', tag=tag)
 
 def build_tr_radio_buttons(names: List[str], default_value: Optional[str] = None, horizontal: bool = True, tag: str = TR_RADIO_BUTTONS) -> None:
-    names = list(map(str.capitalize, names))
+    names = list(map(lambda s: s.replace('_', ' ').title(), names))
     if default_value:
-        default_value = default_value.capitalize()
+        default_value = default_value.title()
     else:
         default_value = names[0]
     dpg.add_radio_button(items=names, default_value=default_value, horizontal=horizontal, tag=tag)
@@ -160,7 +160,7 @@ def get_tr_img_value(img_input: str = TR_IMG_INPUT) -> Image:
     return img_repo.get_image(img_name)
 
 def get_tr_radio_buttons_value(radio_buttons: str = TR_RADIO_BUTTONS) -> str:
-    return dpg.get_value(radio_buttons)
+    return dpg.get_value(radio_buttons).replace(' ', '_')
 
 def get_tr_checkbox_value(checkbox: str = TR_CHECKBOX) -> bool:
     return dpg.get_value(checkbox)
