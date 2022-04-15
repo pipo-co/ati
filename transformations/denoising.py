@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Tuple
 
 import numpy as np
-from sliding import PaddingStrategy, sliding_window, sliding_window_tensor, require_valid_kernel, weighted_sum
+from .sliding import PaddingStrategy, sliding_window, sliding_window_tensor, require_valid_kernel, weighted_sum
 from image_utils import Image
 
 class DirectionalDerivatives(Enum):

@@ -5,11 +5,11 @@ import numpy as np
 
 from image_utils import image_to_rgba_array, load_image, valid_image_formats, Image, save_image, get_extension, \
     create_square_image, create_circle_image, CIRCLE_IMAGE_NAME, SQUARE_IMAGE_NAME
-    
-import images_repo as img_repo
-from interface_utils import render_error
-from metadata_repo import set_metadata_file
-from transformations import build_transformations_menu
+
+from repositories import images_repo as img_repo
+from .interface_utils import render_error
+from repositories.metadata_repo import set_metadata_file
+from .transformations import build_transformations_menu
 
 # General Items
 PRIMARY_WINDOW: str = 'primary'
@@ -171,14 +171,14 @@ def trigger_save_image_dialog(image_name: str) -> None:
     dpg.show_item(SAVE_IMAGE_DIALOG)
 
 def build_save_image_dialog() -> None:
-    dpg.add_file_dialog(tag=SAVE_IMAGE_DIALOG, default_path='images', directory_selector=True, show=False, modal=True, width=1024, height=512, callback=lambda s, ad, ud: save_image_handler(ad, ud))
+    dpg.add_file_dialog(tag=SAVE_IMAGE_DIALOG, default_path='../images', directory_selector=True, show=False, modal=True, width=1024, height=512, callback=lambda s, ad, ud: save_image_handler(ad, ud))
 
-def build_load_image_dialog() -> None:
-    with dpg.file_dialog(label='Choose file to load...', tag=LOAD_IMAGE_DIALOG, default_path='images', directory_selector=False, show=False, modal=True, width=1024, height=512, callback=lambda s, ad: load_image_handler(ad)):
+def build_load_image_dialog(default_path: str) -> None:
+    with dpg.file_dialog(label='Choose file to load...', tag=LOAD_IMAGE_DIALOG, default_path=default_path, directory_selector=False, show=False, modal=True, width=1024, height=512, callback=lambda s, ad: load_image_handler(ad)):
         dpg.add_file_extension(f'Image{{{",".join(valid_image_formats())}}}')
 
 def build_load_metadata_dialog() -> None:
-    with dpg.file_dialog(label='Choose metadata file to load...', tag=LOAD_METADATA_DIALOG, default_path='images', directory_selector=False, show=False, modal=True, width=1024, height=512, callback=lambda s, ad: load_metadata_handler(ad)):
+    with dpg.file_dialog(label='Choose metadata file to load...', tag=LOAD_METADATA_DIALOG, default_path='../images', directory_selector=False, show=False, modal=True, width=1024, height=512, callback=lambda s, ad: load_metadata_handler(ad)):
         dpg.add_file_extension('.tsv')
 
 def get_pixel_pos_in_image(window: Union[int, str], image_name: str) -> Tuple[int, int]:

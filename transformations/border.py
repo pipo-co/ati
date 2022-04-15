@@ -3,7 +3,7 @@ from enum import Enum
 import numpy as np
 
 from image_utils import Image, MAX_COLOR
-from sliding import PaddingStrategy, weighted_sum
+from .sliding import PaddingStrategy, weighted_sum
 
 class Direction(Enum):
     VERTICAL            = 0

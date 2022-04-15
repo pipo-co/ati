@@ -1,9 +1,11 @@
 import dearpygui.dearpygui as dpg
 
-from interface import build_load_image_dialog, build_load_metadata_dialog, create_circle_handler, create_square_handler, \
+from frontend.interface import build_load_image_dialog, build_load_metadata_dialog, create_circle_handler, create_square_handler, \
     LOAD_IMAGE_DIALOG, LOAD_METADATA_DIALOG, PRIMARY_WINDOW, TEXTURE_REGISTRY, IMAGES_MENU, build_save_image_dialog, \
     build_image_handler_registry, build_hist_themes
-from metadata_repo import set_metadata_file
+from repositories.metadata_repo import set_metadata_file
+
+DEFAULT_IMAGES_PATH: str = 'images'
 DEFAULT_METADATA_PATH: str = 'images/raw_metadata.tsv'
 
 def main():
@@ -18,7 +20,7 @@ def main():
     build_image_handler_registry()
 
     # Dialog
-    build_load_image_dialog()
+    build_load_image_dialog(DEFAULT_IMAGES_PATH)
     build_save_image_dialog()
     build_load_metadata_dialog()
     

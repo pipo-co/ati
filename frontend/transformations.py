@@ -4,18 +4,13 @@ from typing import Callable, List, Optional
 import dearpygui.dearpygui as dpg
 import numpy as np
 
-import basic
-import border
-import combine
-import denoising
-import images_repo as img_repo
-import interface
-import noise
+from transformations import basic, border, combine, denoising, noise, threshold as thresh
+from repositories import images_repo as img_repo
+from . import interface
 import rng
-import threshold as thresh
 from image_utils import Image, strip_extension, get_extension, ImageFormat, normalize, MAX_COLOR
-from interface_utils import render_error
-from sliding import PaddingStrategy
+from frontend.interface_utils import render_error
+from transformations.sliding import PaddingStrategy
 
 # General Items
 TR_DIALOG: str = 'tr_dialog'

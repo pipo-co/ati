@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Iterable, Tuple, Callable, Union, Any
 
-import metadata_repo
+from repositories import metadata_repo
 
 import numpy as np
 
