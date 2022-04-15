@@ -313,14 +313,13 @@ def universal_channel_to_binary(channel: np.ndarray, umb: int) -> np.ndarray:
         
     return channel_to_binary(channel, new_umbral)
 
-def to_binary(img: Image, umb: int) -> np.ndarray:
-    return img.apply_over_channels(channel_to_binary, umb)
+def to_binary(img: Image, t: int) -> np.ndarray:
+    return img.apply_over_channels(channel_to_binary, t)
 
-# TODO(tobi, nacho): Vectorizar
-def channel_to_binary(channel: np.ndarray, umb: int) -> np.ndarray:
-    shape = np.shape(channel)
-    new_arr = np.array([MAX_COLOR if xi >= umb else 0 for xi in channel.flatten()])
-    return np.reshape(new_arr, shape)
+def channel_to_binary(channel: np.ndarray, t: int) -> np.ndarray:
+    ret = np.zeros(channel.shape)
+    ret[channel > t] = MAX_COLOR
+    return ret
 
 def channel_histogram(channel: np.ndarray) -> Hist:
     channel = normalize(channel, np.float64)
