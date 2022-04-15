@@ -60,6 +60,7 @@ def build_transformations_menu(image_name: str) -> None:
             build_tr_menu_item(TR_SOBEL,            build_denoise_sobel_dialog, image_name)
             build_tr_menu_item(TR_GLOBAL_UMBRAL, build_global_umbral_dialog, image_name)
             build_tr_menu_item(TR_ANISOTROPIC_DIFFUSION, build_anisotropic_diffusion_dialog, image_name)
+            build_tr_menu_item(TR_OTSU_THRESHOLD, build_otsu_threshold_dialog, image_name)
             build_tr_menu_item(TR_BILATERAL, build_bilateral_filter_dialog, image_name)
 
 def build_tr_menu_item(tr_id: str, tr_dialog_builder: Callable[[str], None], image_name: str) -> None:
@@ -707,6 +708,23 @@ def tr_anisotropic_diffusion(image_name: str) -> Image:
     new_data = anisotropic_diffusion(image, iterations, sigma, padding_str, function)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
+
+TR_OTSU_THRESHOLD: str = 'otsu'
+@render_error
+def build_otsu_threshold_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_OTSU_THRESHOLD):
+        build_tr_name_input(TR_OTSU_THRESHOLD, image_name)
+        build_tr_dialog_end_buttons(TR_OTSU_THRESHOLD, image_name, tr_otsu_threshold)
+
+def tr_otsu_threshold(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image       = img_repo.get_image(image_name)
+    new_name    = get_tr_name_value(image)
+    # 2. Procesamos
+    new_data = denoising.otsu_threshold(image)
+    # 3. Creamos Imagen
+    return Image(new_name, image.format, new_data)
+
 
 TR_BILATERAL: str = 'bilateral filter'
 @render_error

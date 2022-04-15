@@ -3,7 +3,7 @@ from typing import List
 
 import numpy as np
 from sliding import PaddingStrategy, sliding_window, sliding_window_tensor
-from image_utils import Image
+from image_utils import Image, channel_histogram, channel_to_binary, MAX_COLOR
 
 
 class DirectionalOperator(Enum):
@@ -100,6 +100,22 @@ ALTERNATIVE_DERIVATIVE_KERNEL: List[List[int]] = [
     [-1, -1, -1]
 ]
 
+# intra_variance = (p1.m0 - p0.m1)^2 / p0.p1
+def channel_otsu_threshold(channel: np.ndarray) -> np.ndarray:
+    hist, bins = channel_histogram(channel)
+    hist = hist[:-1]
+
+    p = np.cumsum(hist)
+    m = np.cumsum(np.arange(hist.size) * hist)
+    mg = m[-1]
+
+    intra_variance = (mg*p - m)**2 / (p * (1-p))
+    max_variance = np.ravel(np.where(intra_variance == np.amax(intra_variance)))
+    t = int(max_variance.mean().round())
+    print(f'Otsu Umbral Chosen: {t}')
+
+    return channel_to_binary(channel, t)
+
 def directional_channel(channel: np.ndarray, base_kernel: List[List[int]], rotations: int, padding_str: PaddingStrategy) -> np.ndarray:
     kernel = np.array(base_kernel)
     kernel = rotate_steps(kernel, rotations)
@@ -142,15 +158,18 @@ def prewitt(image: Image, kernel_size: int, padding_str: PaddingStrategy) -> np.
 def sobel(image: Image, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
     return image.apply_over_channels(sobel_channel, kernel_size, padding_str)
 
+def otsu_threshold(image: Image) -> np.ndarray:
+    return image.apply_over_channels(channel_otsu_threshold)
+
 def bilateral_filter(image: Image, sigma_space: int, sigma_intensity: int, padding_str: PaddingStrategy) -> np.ndarray:
     kernel_size = int(sigma_space * 4 + 1)
 
-    data = image.data 
-    
+    data = image.data
+
     #Agrego la dimension extra a las imagenes en greyscale para que se comporten como a color
-    if image.channels == 1: 
+    if image.channels == 1:
         data = np.expand_dims(data, axis=2)
-        
+
     sw = sliding_window_tensor(data, data[:kernel_size, :kernel_size].shape, padding_str)
     #Mato la dimension que corresponde a la sliding window
     sw = np.squeeze(sw, axis=2)
@@ -158,18 +177,18 @@ def bilateral_filter(image: Image, sigma_space: int, sigma_intensity: int, paddi
     #Agrego la dimension extra al kernel para que pueda ser multiplicable por el sw
     kernel = np.expand_dims(kernel, axis=4)
     new_data = np.sum(sw * kernel, axis=(2,3)) / np.sum(kernel, axis=(2,3))
-    
+
     return np.squeeze(new_data)
 
 def generate_bilateral_kernel(sliding_window: np.ndarray, sigma_space: int, sigma_intensity: int, kernel_size: int) -> np.ndarray:
-    
+
     indexes = np.array(list(np.ndindex((kernel_size, kernel_size)))) - kernel_size//2 # noqa
     indexes = np.reshape(indexes, (kernel_size, kernel_size, 2))
     spacial_kernel = - np.sum(indexes**2, axis=2) / (2* sigma_space**2)
-    
-    #A cada valor de la ventana se le resta el valor del medio de la ventana, para eso se agregan dos dimensiones 
+
+    #A cada valor de la ventana se le resta el valor del medio de la ventana, para eso se agregan dos dimensiones
     #al valor central de la sw para que luego se tenga que estirar contra la coleccion completa
     intensity_kernel = -np.linalg.norm(sliding_window - np.expand_dims(sliding_window[:,:,kernel_size // 2, kernel_size//2], axis=(2,3)), axis=4) / (2*sigma_intensity**2)
     result_kernel = np.exp(intensity_kernel - np.expand_dims(spacial_kernel, axis=(0,1)))
-    
+
     return result_kernel
