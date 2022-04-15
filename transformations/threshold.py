@@ -22,11 +22,14 @@ def channel_global(channel: np.ndarray, t: int) -> np.ndarray:
 # intra_variance = (p1.m0 - p0.m1)^2 / p0.p1
 def channel_otsu(channel: np.ndarray) -> np.ndarray:
     hist, bins = channel_histogram(channel)
-    hist = hist[:-1]
 
     p = np.cumsum(hist)
     m = np.cumsum(np.arange(hist.size) * hist)
     mg = m[-1]
+
+    # intra_variance(L - 1) = undefined => La matamos
+    p = p[:-1]
+    m = m[:-1]
 
     intra_variance = (mg*p - m)**2 / (p * (1-p))
     max_variance = np.ravel(np.where(intra_variance == np.amax(intra_variance)))
