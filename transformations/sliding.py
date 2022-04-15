@@ -37,7 +37,7 @@ def is_kernel_valid(kernel: np.ndarray) -> bool:
 
 def require_valid_kernel(kernel: np.ndarray) -> None:
     if not is_kernel_valid(kernel):
-        raise ValueError(f'Invalid kernel: {kernel}')
+        raise ValueError(f'Invalid kernel: {kernel.shape}')
 
 def sliding_window(matrix: np.ndarray, shape: Tuple[int, ...], padding_str: PaddingStrategy) -> np.ndarray:
     return sliding_window_view(padding_str.pad(matrix, shape), shape)
