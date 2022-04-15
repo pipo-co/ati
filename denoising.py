@@ -133,6 +133,41 @@ def rotate_steps(x, shift):
         out.ravel()[sliced_idx] = np.roll(np.take(x, sliced_idx), shift)
     return out
 
+def zero_crossing_vertical(data: np.ndarray, threshold: int) -> np.ndarray:
+    ans = np.empty(data.shape, dtype=np.bool8)
+    # Cambios de signo directos
+    ans[:-1] = (data[:-1] * data[1:] < 0) & (np.abs(data[:-1] - data[1:]) > threshold)
+    # Cambios con un 0 en el medio
+    ans[:-2] |= (data[:-2] * data[2:] < 0) & (data[1:-1] == 0) & (np.abs(data[:-2] - data[2:]) > threshold)
+    # Ultimo nunca cruza
+    ans[-1] = False
+
+    return ans
+
+def zero_crossing_horizontal(data: np.ndarray, threshold: int) -> np.ndarray:
+    ans = np.empty(data.shape, dtype=np.bool8)
+    # Cambios de signo directos
+    ans[:, :-1] = (data[:, :-1] * data[:, 1:] < 0) & (np.abs(data[:, :-1] - data[:, 1:]) > threshold)
+    # Cambios con un 0 en el medio
+    ans[:, :-2] |= (data[:, :-2] * data[:, 2:] < 0) & (data[:, 1:-1] == 0) & (np.abs(data[:, :-2] - data[:, 2:]) > threshold)
+    # Ultimo nunca cruza
+    ans[:, -1] = False
+
+    return ans
+
+def laplacian_channel(channel: np.ndarray, crossing_threshold: int, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
+    kernel = np.zeros((kernel_size, kernel_size))
+    kernel[kernel_size // 2, :] = -1
+    kernel[:, kernel_size // 2] = -1
+    kernel[kernel_size // 2, kernel_size // 2] = 2 * (kernel_size - 1)
+    channel = weighted_sum(channel, kernel, padding_str)
+
+    mask = zero_crossing_vertical(channel, crossing_threshold) | zero_crossing_horizontal(channel, crossing_threshold)
+    ret = np.zeros(channel.shape)
+    ret[mask] = MAX_COLOR
+
+    return ret
+
 # ******************* Export Functions ********************** #
 def mean(image: Image, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
     return image.apply_over_channels(mean_channel, kernel_size, padding_str)
@@ -192,3 +227,5 @@ def generate_bilateral_kernel(sliding_window: np.ndarray, sigma_space: int, sigm
     result_kernel = np.exp(intensity_kernel - np.expand_dims(spacial_kernel, axis=(0,1)))
 
     return result_kernel
+def laplace(image: Image, crossing_threshold: int, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
+    return image.apply_over_channels(laplacian_channel, crossing_threshold, kernel_size, padding_str)

@@ -62,6 +62,7 @@ def build_transformations_menu(image_name: str) -> None:
             build_tr_menu_item(TR_ANISOTROPIC_DIFFUSION, build_anisotropic_diffusion_dialog, image_name)
             build_tr_menu_item(TR_OTSU_THRESHOLD, build_otsu_threshold_dialog, image_name)
             build_tr_menu_item(TR_BILATERAL, build_bilateral_filter_dialog, image_name)
+            build_tr_menu_item(TR_LAPLACIAN_BORDER, build_laplacian_border_dialog, image_name)
 
 def build_tr_menu_item(tr_id: str, tr_dialog_builder: Callable[[str], None], image_name: str) -> None:
     dpg.add_menu_item(label=tr_id.title(), user_data=(tr_dialog_builder, image_name), callback=lambda s, ad, ud: ud[0](ud[1]))
@@ -746,5 +747,28 @@ def tr_bilateral_filter(image_name: str) -> Image:
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
     new_data = denoising.bilateral_filter(image, sigma_space, sigma_intensity, padding_str)
+    # 3. Creamos Imagen
+    return Image(new_name, image.format, new_data)
+
+
+TR_LAPLACIAN_BORDER: str = 'laplacian'
+@render_error
+def build_laplacian_border_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_OTSU_THRESHOLD):
+        build_tr_name_input(TR_OTSU_THRESHOLD, image_name)
+        build_tr_value_int_selector('kernel size', 3, 23, step=2)
+        build_tr_radio_buttons(PaddingStrategy.names())
+        build_tr_value_int_selector('crossing threshold', 0, MAX_COLOR, default_value=100, tag='thresh')
+        build_tr_dialog_end_buttons(TR_OTSU_THRESHOLD, image_name, tr_laplacian_border)
+
+def tr_laplacian_border(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image       = img_repo.get_image(image_name)
+    new_name    = get_tr_name_value(image)
+    kernel_size = require_odd(get_tr_int_value(), 'Kernel size must be odd')
+    padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
+    crossing_threshold = get_tr_int_value('thresh')
+    # 2. Procesamos
+    new_data = denoising.laplace(image, crossing_threshold, kernel_size, padding_str)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
