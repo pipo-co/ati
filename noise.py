@@ -9,7 +9,7 @@ from image_utils import Image, MAX_COLOR
 
 NoiseSupplier = Callable[[int], float]
 
-class NoiseType(Enum):
+class Type(Enum):
     ADDITIVE        = functools.partial(lambda vals, noise: vals + noise * MAX_COLOR)
     MULTIPLICATIVE  = functools.partial(lambda vals, noise: vals * noise)
 
@@ -18,7 +18,7 @@ class NoiseType(Enum):
         return list(map(lambda c: c.name, cls))
 
     @classmethod
-    def from_name(cls, name: str) -> 'NoiseType':
+    def from_name(cls, name: str) -> 'Type':
         name = name.upper()
         if name not in cls.__members__:
             raise ValueError(f'"{name.title()}" is not a supported noise type')
@@ -27,10 +27,10 @@ class NoiseType(Enum):
     def __call__(self, vals: np.ndarray, noise: float) -> np.ndarray:
         return self.value(vals, noise)
 
-def pollute(img: Image, noise_supplier: NoiseSupplier, noise_type: NoiseType, percentage: int) -> np.ndarray:
+def pollute(img: Image, noise_supplier: NoiseSupplier, noise_type: Type, percentage: int) -> np.ndarray:
     return img.apply_over_channels(pollute_channel, noise_supplier, noise_type, percentage)
 
-def pollute_channel(channel: np.ndarray, noise_supplier: NoiseSupplier, noise_type: NoiseType, percentage: int) -> np.ndarray:
+def pollute_channel(channel: np.ndarray, noise_supplier: NoiseSupplier, noise_type: Type, percentage: int) -> np.ndarray:
     p = percentage / 100
     n = int(channel.size * p)
     shape = np.shape(channel)
@@ -54,4 +54,3 @@ def salt_channel(channel: np.ndarray, percentage: int) -> np.ndarray:
     noised_channel[uniform > 1-p] = MAX_COLOR
 
     return np.reshape(noised_channel, shape)
-

@@ -1,10 +1,8 @@
-import functools
 import itertools
 import os
 from dataclasses import dataclass
 from enum import Enum
 from typing import Iterable, Tuple, Callable, Union, Any
-from sliding import PaddingStrategy, sliding_window
 
 import metadata_repo
 
@@ -17,7 +15,6 @@ SQUARE_IMAGE_NAME: str = 'square.pgm'
 RESERVED_IMAGE_NAMES: Tuple[str, ...] = (CIRCLE_IMAGE_NAME, SQUARE_IMAGE_NAME)
 COLOR_DEPTH: int = 256
 MAX_COLOR: int = COLOR_DEPTH - 1
-MAX_ANISOTROPIC_ITERATIONS: int = 20
 
 # (hist, bins)
 Hist = Tuple[np.ndarray, np.ndarray]
@@ -121,63 +118,6 @@ class Image:
         split_name = os.path.splitext(os.path.basename(path))
         return split_name[0] + split_name[1].lower()
 
-class DirectionalDerivatives(Enum):
-    NORTH = [
-        [0,  1,  0],
-        [0, -1,  0],
-        [0,  0,  0]
-    ]
-    EAST  = [
-        [0,  0,  0],
-        [0, -1,  1],
-        [0,  0,  0]
-    ]
-    SOUTH = [
-        [0,  0,  0],
-        [0, -1,  0],
-        [0,  1,  0]
-    ]
-    WEST = [
-        [0,  0,  0],
-        [1, -1,  0],
-        [0,  0,  0]
-    ]
-
-    @classmethod
-    def values(cls):
-        return list(map(lambda c: np.array(c.value), cls))
-
-    @staticmethod
-    def kernel_size() -> Tuple[int, int]:
-        return 3, 3
-
-def leclerc_anisotropic_w(derivatives: np.ndarray, sigma: int) -> np.ndarray:
-    return np.exp(-(abs(derivatives) ** 2) / sigma**2)
-
-def lorenziano_anisotropic_w(derivatives: np.ndarray, sigma: int) -> np.ndarray:
-    return 1 / ((abs(derivatives) ** 2 / sigma**2) + 1)
-
-class AnisotropicFunction(Enum):
-    LECLERC     = functools.partial(leclerc_anisotropic_w)
-    LORENTZIANO = functools.partial(lorenziano_anisotropic_w)
-
-    def __call__(self, *args, **kwargs) -> np.ndarray:
-        return self.value(*args, **kwargs)
-
-    def pad(self, matrix: np.ndarray, shape: Tuple[int, ...]) -> np.ndarray:
-        return self.value(matrix, (shape[0] - 1) // 2)
-
-    @classmethod
-    def names(cls):
-        return list(map(lambda c: c.name, cls))
-
-    @classmethod
-    def from_str(cls, strategy: str) -> 'AnisotropicFunction':
-        strategy_name = strategy.upper()
-        if strategy_name not in AnisotropicFunction.names():
-            raise ValueError(f'"{strategy_name.title()}" is not a supported anisotropic function')
-        return cls[strategy_name]
-
 
 def valid_image_formats() -> Iterable[str]:
     formats = list(map(lambda fmt: fmt.to_extension(), ImageFormat))
@@ -268,15 +208,6 @@ def create_square_image() -> Image:
 
     return Image(SQUARE_IMAGE_NAME, ImageFormat.PGM, data, allow_reserved=True)
 
-def add_images(first_img: Image, second_img: Image) -> np.ndarray:
-    return np.add(first_img.data, second_img.data)
-
-def sub_images(first_img: Image, second_img: Image) -> np.ndarray:
-    return np.subtract(first_img.data, second_img.data)
-
-def multiply_images(first_img: Image, second_img: Image) -> np.ndarray:
-    return np.multiply(first_img.data, second_img.data)
-
 # Normalizes to uint8 ndarray
 def normalize(data: np.ndarray, as_type=np.uint8) -> np.ndarray:
     if data.dtype == np.uint8:
@@ -292,66 +223,7 @@ def normalize(data: np.ndarray, as_type=np.uint8) -> np.ndarray:
             ret = (data - amin) * 255 // rng
             return ret.astype(as_type, copy=False)
 
-def power_function(img: Image, gamma: float) -> np.ndarray:
-    c = MAX_COLOR**(1 - gamma)
-    return c*(img.data**gamma)
-
-def negate(img: Image) -> np.ndarray:
-    return np.array([MAX_COLOR - xi for xi in img.data])
-
-def universal_to_binary(img: Image, umb: int) -> np.ndarray:
-    return img.apply_over_channels(universal_channel_to_binary, umb)
-    
-def universal_channel_to_binary(channel: np.ndarray, umb: int) -> np.ndarray:
-    old_umbral = 0
-    new_umbral = umb
-    while abs(old_umbral - new_umbral) > 1: 
-        old_umbral = new_umbral   
-        minor_umbral = np.mean(channel[channel < old_umbral])
-        mayor_umbral = np.mean(channel[channel >= old_umbral])
-        new_umbral = (minor_umbral + mayor_umbral) // 2
-        
-    return channel_to_binary(channel, new_umbral)
-
-def to_binary(img: Image, t: int) -> np.ndarray:
-    return img.apply_over_channels(channel_to_binary, t)
-
-def channel_to_binary(channel: np.ndarray, t: int) -> np.ndarray:
-    ret = np.zeros(channel.shape)
-    ret[channel > t] = MAX_COLOR
-    return ret
-
 def channel_histogram(channel: np.ndarray) -> Hist:
     channel = normalize(channel, np.float64)
     hist, bins = np.histogram(channel.flatten(), bins=COLOR_DEPTH, range=(0, COLOR_DEPTH))
     return hist / channel.size, bins
-
-def channel_equalization(channel: np.ndarray)  -> np.ndarray:
-    channel = normalize(channel, np.int64)
-    normed_hist, bins = channel_histogram(channel)
-    s = normed_hist.cumsum()
-    masked_s = np.ma.masked_equal(s, 0)
-    masked_min = masked_s.min()
-    masked_s = (masked_s - masked_min) * MAX_COLOR / (masked_s.max() - masked_min)
-    s = np.ma.filled(masked_s, 0)
-    return s[channel]
-
-def equalize(image: Image) -> np.ndarray:
-    return image.apply_over_channels(channel_equalization)
-
-def anisotropic_diffusion(img: Image, iterations: int, sigma: int, padding_str: PaddingStrategy, function: AnisotropicFunction) -> np.ndarray:
-    return img.apply_over_channels(channel_anisotropic_diffusion, iterations, sigma, padding_str, function)
-           
-def channel_anisotropic_diffusion(channel: np.ndarray, iterations: int, sigma: int, padding_str: PaddingStrategy, function: AnisotropicFunction) -> np.ndarray:
-    new_channel = channel
-    for i in range(iterations):
-        new_channel = get_directional_derivatives(new_channel, sigma, padding_str, function)
-    return new_channel  
-       
-def get_directional_derivatives(channel: np.ndarray, sigma: int, padding_str: PaddingStrategy, function: AnisotropicFunction) -> np.ndarray:
-    sw = sliding_window(channel, DirectionalDerivatives.kernel_size(), padding_str)
-    new_channel = channel
-    for kernel in DirectionalDerivatives.values():
-        derivatives = np.sum(sw[:, :] * kernel, axis=(2, 3))
-        new_channel += function(derivatives, sigma) * derivatives / 4
-    return new_channel
