@@ -17,7 +17,7 @@ SQUARE_IMAGE_NAME: str = 'square.pgm'
 RESERVED_IMAGE_NAMES: Tuple[str, ...] = (CIRCLE_IMAGE_NAME, SQUARE_IMAGE_NAME)
 COLOR_DEPTH: int = 256
 MAX_COLOR: int = COLOR_DEPTH - 1
-MAX_TIME: int = 20
+MAX_ANISOTROPIC_ITERATIONS: int = 20
 
 # (hist, bins)
 Hist = Tuple[np.ndarray, np.ndarray]
@@ -122,24 +122,47 @@ class Image:
         return split_name[0] + split_name[1].lower()
 
 class DirectionalDerivatives(Enum):
+    NORTH = [
+        [0,  1,  0],
+        [0, -1,  0],
+        [0,  0,  0]
+    ]
+    EAST  = [
+        [0,  0,  0],
+        [0, -1,  1],
+        [0,  0,  0]
+    ]
+    SOUTH = [
+        [0,  0,  0],
+        [0, -1,  0],
+        [0,  1,  0]
+    ]
+    WEST = [
+        [0,  0,  0],
+        [1, -1,  0],
+        [0,  0,  0]
+    ]
 
-    NORTH = [[0, 1, 0], [0, -1, 0], [0, 0, 0]]
-    EAST  = [[0, 0, 0], [0, -1, 1], [0, 0, 0]]
-    SOUTH = [[0, 0, 0], [1, -1, 0], [0, 0, 0]]
-    WEST  = [[0, 0, 0], [0, -1, 0], [0, -1, 0]]
-
-    
     @classmethod
     def values(cls):
         return list(map(lambda c: np.array(c.value), cls))
 
-    @classmethod
-    def kernel_size(cls) -> Tuple[int]:
-        return np.array(cls.NORTH.value).shape
+    @staticmethod
+    def kernel_size() -> Tuple[int, int]:
+        return 3, 3
 
-class AnysotropicFunction(Enum):
-    LECLERC   = functools.partial(lambda c, n: leclerc(c, n))
-    LORENTZIANO = functools.partial(lambda c, n: lorenziano(c, n))
+def leclerc_anisotropic_w(derivatives: np.ndarray, sigma: int) -> np.ndarray:
+    return np.exp(-(abs(derivatives) ** 2) / sigma**2)
+
+def lorenziano_anisotropic_w(derivatives: np.ndarray, sigma: int) -> np.ndarray:
+    return 1 / ((abs(derivatives) ** 2 / sigma**2) + 1)
+
+class AnisotropicFunction(Enum):
+    LECLERC     = functools.partial(leclerc_anisotropic_w)
+    LORENTZIANO = functools.partial(lorenziano_anisotropic_w)
+
+    def __call__(self, *args, **kwargs) -> np.ndarray:
+        return self.value(*args, **kwargs)
 
     def pad(self, matrix: np.ndarray, shape: Tuple[int, ...]) -> np.ndarray:
         return self.value(matrix, (shape[0] - 1) // 2)
@@ -149,10 +172,10 @@ class AnysotropicFunction(Enum):
         return list(map(lambda c: c.name, cls))
 
     @classmethod
-    def from_str(cls, strategy: str) -> 'AnysotropicFunction':
+    def from_str(cls, strategy: str) -> 'AnisotropicFunction':
         strategy_name = strategy.upper()
-        if strategy_name not in AnysotropicFunction.names():
-            raise ValueError(f'"{strategy_name.capitalize()}" is not a supported anysotropic function')
+        if strategy_name not in AnisotropicFunction.names():
+            raise ValueError(f'"{strategy_name.title()}" is not a supported anisotropic function')
         return cls[strategy_name]
 
 
@@ -317,29 +340,19 @@ def channel_equalization(channel: np.ndarray)  -> np.ndarray:
 def equalize(image: Image) -> np.ndarray:
     return image.apply_over_channels(channel_equalization)
 
-def anysotropic_difusion(img: Image, iterations: int, sigma: int, padding_str: PaddingStrategy, function: AnysotropicFunction) -> np.ndarray:
-    return img.apply_over_channels(channel_anysotropic_difusion, iterations, sigma, padding_str, function)
+def anisotropic_diffusion(img: Image, iterations: int, sigma: int, padding_str: PaddingStrategy, function: AnisotropicFunction) -> np.ndarray:
+    return img.apply_over_channels(channel_anisotropic_diffusion, iterations, sigma, padding_str, function)
            
-def channel_anysotropic_difusion(channel: np.ndarray, iterations: int, sigma: int, padding_str: PaddingStrategy, function: AnysotropicFunction) -> np.ndarray:
+def channel_anisotropic_diffusion(channel: np.ndarray, iterations: int, sigma: int, padding_str: PaddingStrategy, function: AnisotropicFunction) -> np.ndarray:
     new_channel = channel
     for i in range(iterations):
-        new_channel = get_directional_derivatives(new_channel, sigma ,padding_str, function)
-
+        new_channel = get_directional_derivatives(new_channel, sigma, padding_str, function)
     return new_channel  
        
-def get_directional_derivatives(channel: np.ndarray, sigma: int, padding_str: PaddingStrategy, function: AnysotropicFunction) -> np.ndarray:
-    
+def get_directional_derivatives(channel: np.ndarray, sigma: int, padding_str: PaddingStrategy, function: AnisotropicFunction) -> np.ndarray:
     sw = sliding_window(channel, DirectionalDerivatives.kernel_size(), padding_str)
     new_channel = channel
     for kernel in DirectionalDerivatives.values():
-        new_channel = new_channel + applicate_function_to_directional_derivative(np.sum(sw[:, :] * kernel, axis=(2, 3)), sigma, function)
+        derivatives = np.sum(sw[:, :] * kernel, axis=(2, 3))
+        new_channel += function(derivatives, sigma) * derivatives / 4
     return new_channel
-
-def applicate_function_to_directional_derivative(derivatives: np.ndarray, sigma: int, anysotropic_function: AnysotropicFunction) -> np.ndarray:
-    return anysotropic_function.value(derivatives, sigma) * derivatives / 4
-
-def leclerc(derivatives: np.ndarray, sigma: int) -> np.ndarray:
-    return  np.exp(-(abs(derivatives) ** 2) / sigma**2)
-
-def lorenziano(derivatives: np.ndarray, sigma: int) -> np.ndarray:
-    return  1 /((abs(derivatives) ** 2 / sigma**2) + 1)

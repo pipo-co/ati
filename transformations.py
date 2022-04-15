@@ -10,7 +10,7 @@ import interface
 import noise
 import rng
 from denoising import PaddingStrategy, DirectionalOperator
-from image_utils import MAX_TIME, AnysotropicFunction, Image, anysotropic_difusion, strip_extension, add_images, sub_images, multiply_images, \
+from image_utils import MAX_ANISOTROPIC_ITERATIONS, AnisotropicFunction, Image, anisotropic_diffusion, strip_extension, add_images, sub_images, multiply_images, \
     power_function, negate, to_binary, equalize, ImageFormat, MAX_COLOR, get_extension, normalize, universal_to_binary
 from interface_utils import render_error
 from noise import NoiseType
@@ -59,7 +59,7 @@ def build_transformations_menu(image_name: str) -> None:
             build_tr_menu_item(TR_PREWITT,          build_denoise_prewitt_dialog, image_name)
             build_tr_menu_item(TR_SOBEL,            build_denoise_sobel_dialog, image_name)
             build_tr_menu_item(TR_GLOBAL_UMBRAL, build_global_umbral_dialog, image_name)
-            build_tr_menu_item(TR_ANYSOTROPIC_DIFUSION, build_anysotropic_difusion_dialog, image_name)
+            build_tr_menu_item(TR_ANISOTROPIC_DIFFUSION, build_anisotropic_diffusion_dialog, image_name)
             build_tr_menu_item(TR_BILATERAL, build_bilateral_filter_dialog, image_name)
 
 def build_tr_menu_item(tr_id: str, tr_dialog_builder: Callable[[str], None], image_name: str) -> None:
@@ -684,28 +684,27 @@ def tr_global_umbral(image_name: str) -> Image:
     return Image(new_name, image.format, new_data)
 
 
-TR_ANYSOTROPIC_DIFUSION: str = 'anysotropic difusion'
+TR_ANISOTROPIC_DIFFUSION: str = 'anisotropic'
 @render_error
-def build_anysotropic_difusion_dialog(image_name: str) -> None:
-    with build_tr_dialog(TR_ANYSOTROPIC_DIFUSION):
-        build_tr_name_input(TR_ANYSOTROPIC_DIFUSION, image_name)
-        build_tr_value_int_selector('iterations', 0, MAX_TIME, default_value=10)
+def build_anisotropic_diffusion_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_ANISOTROPIC_DIFFUSION):
+        build_tr_name_input(TR_ANISOTROPIC_DIFFUSION, image_name)
+        build_tr_value_int_selector('iterations', 0, MAX_ANISOTROPIC_ITERATIONS, default_value=10)
         build_tr_value_int_selector('sigma', 1, 10, default_value=4, tag='sigma')
         build_tr_radio_buttons(PaddingStrategy.names())
-        build_tr_radio_buttons(AnysotropicFunction.names(), tag='function')
-        build_tr_dialog_end_buttons(TR_ANYSOTROPIC_DIFUSION, image_name, tr_anysotropic_difusion)
+        build_tr_radio_buttons(AnisotropicFunction.names(), tag='function')
+        build_tr_dialog_end_buttons(TR_ANISOTROPIC_DIFFUSION, image_name, tr_anisotropic_diffusion)
 
-def tr_anysotropic_difusion(image_name: str) -> Image:
+def tr_anisotropic_diffusion(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image       = img_repo.get_image(image_name)
     new_name    = get_tr_name_value(image)
     iterations  = get_tr_int_value()
     sigma       = get_tr_int_value(int_input='sigma')
-
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
-    function = AnysotropicFunction.from_str(get_tr_radio_buttons_value(radio_buttons='function'))
+    function = AnisotropicFunction.from_str(get_tr_radio_buttons_value(radio_buttons='function'))
     # 2. Procesamos
-    new_data = anysotropic_difusion(image, iterations, sigma, padding_str, function)
+    new_data = anisotropic_diffusion(image, iterations, sigma, padding_str, function)
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data)
 
@@ -717,9 +716,9 @@ def build_bilateral_filter_dialog(image_name: str) -> None:
         build_tr_value_int_selector('sigma_space', 0, 10, default_value=2, tag='sigma_space')
         build_tr_value_int_selector('sigma_intensity', 0, 20, default_value=3, tag='sigma_intensity')
         build_tr_radio_buttons(PaddingStrategy.names())
-        build_tr_dialog_end_buttons(TR_BILATERAL, image_name, tr_anysotropic_difusion)
+        build_tr_dialog_end_buttons(TR_BILATERAL, image_name, tr_bilateral_filter)
 
-def tr_anysotropic_difusion(image_name: str) -> Image:
+def tr_bilateral_filter(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image       = img_repo.get_image(image_name)
     new_name    = get_tr_name_value(image)
