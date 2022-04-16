@@ -1,6 +1,6 @@
 import dearpygui.dearpygui as dpg
 
-from frontend.interface import build_load_image_dialog, build_load_metadata_dialog, create_circle_handler, create_square_handler, \
+from frontend.interface import build_load_image_dialog, build_load_metadata_dialog, close_all_windows, create_circle_handler, create_square_handler, \
     LOAD_IMAGE_DIALOG, LOAD_METADATA_DIALOG, PRIMARY_WINDOW, TEXTURE_REGISTRY, IMAGES_MENU, build_save_image_dialog, \
     build_image_handler_registry, build_hist_themes
 from repositories.metadata_repo import set_metadata_file
@@ -35,6 +35,8 @@ def main():
             dpg.add_menu_item(label='Square', callback=create_square_handler)
 
         dpg.add_menu(label='Catalog', tag=IMAGES_MENU)
+
+        dpg.add_menu_item(label='Clear', callback=lambda: close_all_windows())
 
         with dpg.menu(label='Configuration'):
             dpg.add_text('Metadata file for raw images: ')

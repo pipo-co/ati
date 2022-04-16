@@ -197,6 +197,13 @@ def get_focused_hovered_image_window() -> Union[int, str]:
     else:
         return 0
 
+@render_error
+def close_all_windows() -> None:
+    for win_id in dpg.get_windows():
+        win = dpg.get_item_alias(win_id)
+        if is_image_window(win):
+            dpg.delete_item(win)
+
 def build_image_handler_registry() -> None:
     @render_error
     def mouse_move_handler() -> None:
