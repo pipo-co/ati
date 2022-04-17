@@ -24,6 +24,8 @@ TR_RADIO_BUTTONS: str           = 'tr_radio_buttons'
 TR_CHECKBOX: str                = 'tr_checkbox'
 TR_INT_TABLE: str               = 'tr_int_table'
 
+DECIMAL_PLACES=2
+
 TrHandler = Callable[[str], Image]
 
 def build_transformations_menu(image_name: str) -> None:
@@ -298,7 +300,7 @@ def tr_pow(image_name: str) -> Image:
     # 2. Procesamos
     new_data = basic.power(image, gamma)
     new_trasformations = image.transformations.copy()
-    new_trasformations.append(Transformation(TR_POW, gamma=gamma))
+    new_trasformations.append(Transformation(TR_POW, gamma=round(gamma,2)))
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data, transformations=new_trasformations)
 
@@ -406,7 +408,7 @@ def tr_noise_gauss(image_name: str) -> Image:
     # 2. Procesamos
     new_data = noise.pollute(image, lambda size: rng.gaussian(0, sigma, size), noise_type, percentage)
     new_trasformations = image.transformations.copy()
-    new_trasformations.append(Transformation(TR_NOISE_GAUSS,sigma=sigma, percentage=percentage))
+    new_trasformations.append(Transformation(TR_NOISE_GAUSS, sigma=round(sigma, DECIMAL_PLACES), percentage=percentage))
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data, transformations=new_trasformations)
 
@@ -430,7 +432,7 @@ def tr_noise_exp(image_name: str) -> Image:
     # 2. Procesamos
     new_data = noise.pollute(image, lambda size: rng.exponential(lam, size), noise_type, percentage)
     new_trasformations = image.transformations.copy()
-    new_trasformations.append(Transformation(TR_NOISE_EXP, lam=lam, percentage=percentage))
+    new_trasformations.append(Transformation(TR_NOISE_EXP, lam=round(lam, DECIMAL_PLACES), percentage=percentage))
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data, transformations=new_trasformations)
 
@@ -566,7 +568,7 @@ def tr_denoise_gauss(image_name: str) -> Image:
     # 2. Procesamos
     new_data = denoise.gauss(image, sigma, padding_str)
     new_trasformations = image.transformations.copy()
-    new_trasformations.append(Transformation(TR_DENOISE_GAUSS,  sigma=sigma))
+    new_trasformations.append(Transformation(TR_DENOISE_GAUSS,  sigma=round(sigma, DECIMAL_PLACES)))
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data, transformations=new_trasformations)
 
@@ -753,7 +755,7 @@ def tr_border_log_border(image_name: str) -> Image:
     # 2. Procesamos
     new_data = border.log(image, sigma, crossing_threshold, padding_str)
     new_trasformations = image.transformations.copy()
-    new_trasformations.append(Transformation(TR_BORDER_LOG, sigma=sigma, crossing_threshold=crossing_threshold))
+    new_trasformations.append(Transformation(TR_BORDER_LOG, sigma=round(sigma, DECIMAL_PLACES), crossing_threshold=crossing_threshold))
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data, transformations=new_trasformations)
 
