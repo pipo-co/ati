@@ -56,6 +56,10 @@ def render_image_window(image_name: str):
                         dpg.add_text(f'Width {image.width}')
                         dpg.add_separator()
                         dpg.add_text(f'Type {image.type}')
+                    
+                    for i, tr in enumerate(image.transformations):
+                        dpg.add_text(str(tr), tag=f'image_{image_name}_transformations_{i}')
+
                     dpg.add_text('', tag=f'image_{image_name}_region')
                     dpg.add_text('', tag=f'image_{image_name}_pointer')
 

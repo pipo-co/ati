@@ -2,7 +2,7 @@ import itertools
 import os
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterable, Tuple, Callable, Union, Any
+from typing import Dict, Iterable, List, Tuple, Callable, Union, Any
 
 from repositories import metadata_repo
 
@@ -45,21 +45,35 @@ class ImageFormat(Enum):
         return '.' + self.value
 
 @dataclass
+class Transformation:
+    name: str
+    properties: Dict[str, Any]
+
+    def __init__(self, name: str, **kwargs):
+        self.name = name
+        self.properties = kwargs
+
+    def __str__(self) -> str:
+        return '[{0}] {1}'.format(self.name, ", ".join([f'{k}={v}' for k,v in self.properties.items()]))
+
+@dataclass
 class Image:
     name:   str
     format: ImageFormat
     data:   np.ndarray
+    transformations: List[Transformation]
 
     RED_CHANNEL:    int = 0
     GREEN_CHANNEL:  int = 1
     BLUE_CHANNEL:   int = 2
 
-    def __init__(self, name: str, fmt: ImageFormat, data: np.ndarray, allow_reserved: bool = False):
+    def __init__(self, name: str, fmt: ImageFormat, data: np.ndarray, allow_reserved: bool = False, transformations: List[Transformation] = None):
         if not allow_reserved and name in RESERVED_IMAGE_NAMES:
             raise ValueError(f'name cannot be any of this names: {RESERVED_IMAGE_NAMES}')
         self.name = name
         self.format = fmt
         self.data = data
+        self.transformations = transformations if transformations else []
 
     def valid_pixel(self, pixel: Tuple[int, int]) -> bool:
         x, y = pixel
