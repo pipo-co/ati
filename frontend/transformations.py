@@ -716,11 +716,11 @@ def tr_border_sobel(image_name: str) -> Image:
 TR_BORDER_LAPLACIAN: str = 'laplacian'
 @render_error
 def build_border_laplacian_dialog(image_name: str) -> None:
-    with build_tr_dialog(TR_THRESH_OTSU):
-        build_tr_name_input(TR_THRESH_OTSU, image_name)
+    with build_tr_dialog(TR_BORDER_LAPLACIAN):
+        build_tr_name_input(TR_BORDER_LAPLACIAN, image_name)
         build_tr_radio_buttons(PaddingStrategy.names())
         build_tr_value_int_selector('crossing threshold', 0, MAX_COLOR, default_value=100)
-        build_tr_dialog_end_buttons(TR_THRESH_OTSU, image_name, tr_border_laplacian_border)
+        build_tr_dialog_end_buttons(TR_BORDER_LAPLACIAN, image_name, tr_border_laplacian_border)
 
 def tr_border_laplacian_border(image_name: str) -> Image:
     # 1. Obtenemos inputs
