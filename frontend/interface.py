@@ -28,6 +28,7 @@ MIN_IMAGE_WIDTH: int = 235
 MIN_IMAGE_HEIGHT: int = 200
 HIST_OFFSET: int = 20
 HIST_WIDTH: int = 200
+HISTORY_WIDTH: int = 400
 
 # Creates window only if it doesn't exist
 @render_error
@@ -41,11 +42,12 @@ def render_image_window(image_name: str):
         width, height = calculate_image_window_size(image)
         hists = image.get_histograms()
 
-        with dpg.window(label=image_name, tag=f'image_window_{image_name}', width=width, height=height, no_scrollbar=True, no_resize=True, user_data={'image_name': image_name, 'hists_toggled': False}, on_close=lambda: dpg.delete_item(window)) as window:
+        with dpg.window(label=image_name, tag=f'image_window_{image_name}', width=width, height=height, no_scrollbar=True, no_resize=True, user_data={'image_name': image_name, 'hists_toggled': False, 'history_toggled': False}, on_close=lambda: dpg.delete_item(window)) as window:
             with dpg.menu_bar():
                 dpg.add_menu_item(label='Save', user_data=image_name, callback=lambda s, ad, ud: trigger_save_image_dialog(ud))
                 build_transformations_menu(image_name)
-                dpg.add_menu_item(label='Show Histograms', tag=f'hists_toggle_{image_name}', user_data=image_name, callback=lambda s, ad, ud: toggle_hists(ud))
+                dpg.add_menu_item(label='Histograms', tag=f'hists_toggle_{image_name}', user_data=image_name, callback=lambda s, ad, ud: toggle_hists(ud))
+                dpg.add_menu_item(label='History', tag=f'history_toggle_{image_name}', user_data=image_name, callback=lambda s, ad, ud: toggle_history(ud))
 
             with dpg.group(horizontal=True):
                 with dpg.group(width=image.width):
@@ -56,10 +58,6 @@ def render_image_window(image_name: str):
                         dpg.add_text(f'Width {image.width}')
                         dpg.add_separator()
                         dpg.add_text(f'Type {image.type}')
-                    
-                    for i, tr in enumerate(image.transformations):
-                        dpg.add_text(str(tr), tag=f'image_{image_name}_transformations_{i}')
-
                     dpg.add_text('', tag=f'image_{image_name}_region')
                     dpg.add_text('', tag=f'image_{image_name}_pointer')
 
@@ -70,6 +68,10 @@ def render_image_window(image_name: str):
                         build_reduced_histogram_plot(image_name, 'red_hist_theme',   *hists[Image.RED_CHANNEL])
                         build_reduced_histogram_plot(image_name, 'green_hist_theme', *hists[Image.GREEN_CHANNEL])
                         build_reduced_histogram_plot(image_name, 'blue_hist_theme',  *hists[Image.BLUE_CHANNEL])
+
+                with dpg.group(tag=f'history_group_{image.name}', width=HISTORY_WIDTH, show=False):
+                    for i, tr in enumerate(image.transformations):
+                        dpg.add_text(f'{i}. {tr}', tag=f'image_{image_name}_transformations_{i}')
 
 def calculate_image_window_size(image: Image) -> Tuple[int, int]:
     # 15 = padding, 120 = menu_bar + info_size
@@ -85,13 +87,31 @@ def toggle_hists(image_name: str) -> None:
     diff: int = HIST_WIDTH + 10
     if plots_toggled:
         diff = -diff
-        dpg.set_item_label(toggle, 'Show Histograms')
+        dpg.set_item_label(toggle, 'Histograms')
         dpg.hide_item(hists)
     else:
         dpg.set_item_label(toggle, 'Hide Histograms')
         dpg.show_item(hists)
     dpg.set_item_width(window, dpg.get_item_width(window) + diff)
     user_data['hists_toggled'] = not plots_toggled
+
+@render_error
+def toggle_history(image_name: str) -> None:
+    window = f'image_window_{image_name}'
+    toggle = f'history_toggle_{image_name}'
+    hists = f'history_group_{image_name}'
+    user_data = dpg.get_item_user_data(window)
+    plots_toggled: bool = user_data['history_toggled']
+    diff: int = HISTORY_WIDTH + 10
+    if plots_toggled:
+        diff = -diff
+        dpg.set_item_label(toggle, 'History')
+        dpg.hide_item(hists)
+    else:
+        dpg.set_item_label(toggle, 'Hide History')
+        dpg.show_item(hists)
+    dpg.set_item_width(window, dpg.get_item_width(window) + diff)
+    user_data['history_toggled'] = not plots_toggled
 
 def build_hist_themes():
     with dpg.theme(tag='red_hist_theme'):
