@@ -79,14 +79,14 @@ def gauss_channel(channel: np.ndarray, sigma: float, padding_str: PaddingStrateg
 
 def diffusion_channel(channel: np.ndarray, iterations: int, sigma: int, padding_str: PaddingStrategy, function: DiffusionStrategy) -> np.ndarray:
     new_channel = channel
-    for i in range(iterations):
+    for _ in range(iterations):
         new_channel = diffusion_step(new_channel, sigma, padding_str, function)
     return new_channel
 
 MAX_ANISOTROPIC_ITERATIONS: int = 20
 def diffusion_step(channel: np.ndarray, sigma: int, padding_str: PaddingStrategy, function: DiffusionStrategy) -> np.ndarray:
     sw = sliding_window(channel, DirectionalDerivatives.kernel_size(), padding_str)
-    new_channel = channel
+    new_channel = channel.copy()
     for kernel in DirectionalDerivatives.values():
         derivatives = np.sum(sw[:, :] * kernel, axis=(2, 3))
         new_channel += function(derivatives, sigma) * derivatives / 4
