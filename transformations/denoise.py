@@ -99,7 +99,7 @@ def bilateral_kernel(sw: np.ndarray, sigma_space: int, sigma_intensity: int, ker
 
     # A cada valor de la ventana se le resta el valor del medio de la ventana, para eso se agregan dos dimensiones
     #  al valor central de la sw para que luego se tenga que estirar contra la coleccion completa
-    intensity_kernel = -np.linalg.norm(sw - np.expand_dims(sw[:, :, kernel_size // 2, kernel_size // 2], axis=(2, 3)), axis=4) / (2 * sigma_intensity ** 2)
+    intensity_kernel = - np.linalg.norm(sw - np.expand_dims(sw[:, :, kernel_size // 2, kernel_size // 2], axis=(2, 3)), axis=4) / (2 * sigma_intensity ** 2)
 
     result_kernel = np.exp(intensity_kernel + np.expand_dims(spacial_kernel, axis=(0, 1)))
     return result_kernel

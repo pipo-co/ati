@@ -603,8 +603,8 @@ TR_DENOISE_BILATERAL: str = 'bilateral'
 def build_denoise_bilateral_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_DENOISE_BILATERAL):
         build_tr_name_input(TR_DENOISE_BILATERAL, image_name)
-        build_tr_value_int_selector('sigma_space', 0, 10, default_value=2, tag='sigma_space')
-        build_tr_value_float_selector('sigma_intensity', 0, 20, default_value=3, tag='sigma_intensity')
+        build_tr_value_int_selector('sigma_space', 0, 10, default_value=8, tag='sigma_space')
+        build_tr_value_float_selector('sigma_intensity', 0, 20, default_value=4, tag='sigma_intensity')
         build_tr_radio_buttons(PaddingStrategy.names())
         build_tr_dialog_end_buttons(TR_DENOISE_BILATERAL, image_name, tr_denoise_bilateral_filter)
 
