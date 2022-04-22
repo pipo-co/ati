@@ -25,6 +25,7 @@ class ImageFormat(Enum):
     PPM     = 'ppm'
     JPEG    = 'jpeg'
     JPG     = 'jpg'
+    PNG     = 'png'
     RAW     = 'raw'
 
     @classmethod
