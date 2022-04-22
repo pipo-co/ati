@@ -741,8 +741,8 @@ def build_border_log_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_BORDER_LOG):
         build_tr_name_input(TR_BORDER_LOG, image_name)
         build_tr_radio_buttons(PaddingStrategy.names())
-        build_tr_value_float_selector('sigma', 1, 20, default_value=5)
-        build_tr_value_int_selector('crossing threshold', 0, MAX_COLOR, default_value=100)
+        build_tr_value_float_selector('sigma', 1, 20, default_value=2)
+        build_tr_value_int_selector('crossing threshold', 0, MAX_COLOR, default_value=10)
         build_tr_dialog_end_buttons(TR_BORDER_LOG, image_name, tr_border_log_border)
 
 def tr_border_log_border(image_name: str) -> Image:
