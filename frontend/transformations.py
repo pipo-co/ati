@@ -604,7 +604,7 @@ def build_denoise_bilateral_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_DENOISE_BILATERAL):
         build_tr_name_input(TR_DENOISE_BILATERAL, image_name)
         build_tr_value_int_selector('sigma_space', 0, 10, default_value=2, tag='sigma_space')
-        build_tr_value_int_selector('sigma_intensity', 0, 20, default_value=3, tag='sigma_intensity')
+        build_tr_value_float_selector('sigma_intensity', 0, 20, default_value=3, tag='sigma_intensity')
         build_tr_radio_buttons(PaddingStrategy.names())
         build_tr_dialog_end_buttons(TR_DENOISE_BILATERAL, image_name, tr_denoise_bilateral_filter)
 
@@ -613,7 +613,7 @@ def tr_denoise_bilateral_filter(image_name: str) -> Image:
     image       = img_repo.get_image(image_name)
     new_name    = get_tr_name_value(image)
     sigma_space  = get_tr_int_value(int_input='sigma_space')
-    sigma_intensity       = get_tr_int_value(int_input='sigma_intensity')
+    sigma_intensity       = get_tr_float_value(float_input='sigma_intensity')
 
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
