@@ -1,0 +1,5 @@
+These images are encoded in the PPM format without embedded
+comments. They can be read by the bilateral filter code available at:
+http://people.csail.mit.edu/sparis/#code
+
+These pictures have been taken by Frédo Durand and Sylvain Paris.
