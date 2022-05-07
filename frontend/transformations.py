@@ -61,6 +61,7 @@ def build_transformations_menu(image_name: str) -> None:
             build_tr_menu_item(TR_BORDER_SOBEL,             build_border_sobel_dialog,              image_name)
             build_tr_menu_item(TR_BORDER_LAPLACIAN,         build_border_laplacian_dialog,          image_name)
             build_tr_menu_item(TR_BORDER_LOG,               build_border_log_dialog,                image_name)
+            build_tr_menu_item(TR_BORDER_SUSAN,             build_border_susan_dialog,              image_name)
         with dpg.menu(label='Combine'):
             build_tr_menu_item(TR_COMBINE_ADD,              build_combine_add_dialog,               image_name)
             build_tr_menu_item(TR_COMBINE_SUB,              build_combine_sub_dialog,               image_name)
@@ -756,6 +757,27 @@ def tr_border_log_border(image_name: str) -> Image:
     new_data = border.log(image, sigma, crossing_threshold, padding_str)
     new_trasformations = image.transformations.copy()
     new_trasformations.append(Transformation(TR_BORDER_LOG, sigma=round(sigma, DECIMAL_PLACES), crossing_threshold=crossing_threshold))
+    # 3. Creamos Imagen
+    return Image(new_name, image.format, new_data, transformations=new_trasformations)
+
+TR_BORDER_SUSAN: str = 'susan'
+@render_error
+def build_border_susan_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_BORDER_SUSAN):
+        build_tr_name_input(TR_BORDER_SUSAN, image_name)
+        build_tr_radio_buttons(PaddingStrategy.names())
+        build_tr_dialog_end_buttons(TR_BORDER_SUSAN, image_name, tr_border_susan)
+
+def tr_border_susan(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image       = img_repo.get_image(image_name)
+    new_name    = get_tr_name_value(image)
+    padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
+
+    # 2. Procesamos
+    new_data = border.susan(image, padding_str)
+    new_trasformations = image.transformations.copy()
+    new_trasformations.append(Transformation(TR_BORDER_SUSAN))
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data, transformations=new_trasformations)
 

@@ -1,9 +1,10 @@
 from enum import Enum
+from typing import Tuple
 
 import numpy as np
 
 from image import Image, MAX_COLOR
-from .sliding import PaddingStrategy, weighted_sum
+from .sliding import PaddingStrategy, sliding_window, weighted_sum
 
 class Direction(Enum):
     VERTICAL            = 0
@@ -61,6 +62,15 @@ class FamousKernel(Enum):
         [ 1,  1, -1],
         [ 1, -2, -1],
         [ 1,  1, -1]
+    ]
+    SUSAN = [
+        [0, 0, 1, 1, 1, 0, 0],
+        [0, 1, 1, 1, 1, 1, 0],
+        [1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1],
+        [1, 1, 1, 1, 1, 1, 1],
+        [0, 1, 1, 1, 1, 1, 0],
+        [0, 0, 1, 1, 1, 0, 0]
     ]
 
     @property
@@ -139,6 +149,21 @@ def log_channel(channel: np.ndarray, sigma: float, crossing_threshold: int, padd
     # return channel
     return zero_crossing_borders(channel, crossing_threshold)
 
+def susan_channel(channel: np.ndarray, padding_str: PaddingStrategy) -> np.ndarray:
+    kernel = FamousKernel.SUSAN.kernel
+    sw = sliding_window(channel, np.shape(kernel), padding_str)
+    #Expando dimensiones para que sea compatible con el tamaño de la sliding window
+    new_channel = np.expand_dims(channel, axis=(2,3))
+    absolute_values = np.absolute(sw[:,:]*kernel - new_channel[:,:])
+    absolute_values[absolute_values < 15] = 1
+    absolute_values[absolute_values >= 15] = 0
+    values = 1 - np.sum(absolute_values, axis=(2, 3)) / kernel.size
+    values[(values < 0.4) | (values >= 0.85)] = 0
+    values[(values >= 0.4) & (values < 0.65)] = 63
+    values[(values >= 0.65) & (values < 0.85)] = 255
+    return values
+
+
 # ******************* Export Functions ********************** #
 def directional(image: Image, kernel: FamousKernel, border_dir: Direction, padding_str: PaddingStrategy) -> np.ndarray:
     return image.apply_over_channels(directional_channel, kernel.kernel, border_dir, padding_str)
@@ -157,3 +182,6 @@ def laplace(image: Image, crossing_threshold: int, padding_str: PaddingStrategy)
 
 def log(image: Image, sigma: float, crossing_threshold: int, padding_str: PaddingStrategy) -> np.ndarray:
     return image.apply_over_channels(log_channel, sigma, crossing_threshold, padding_str)
+
+def susan(image: Image, padding_str: PaddingStrategy) -> np.ndarray:
+    return image.apply_over_channels(susan_channel, padding_str)
