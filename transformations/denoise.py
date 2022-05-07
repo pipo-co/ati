@@ -3,6 +3,8 @@ from enum import Enum
 from typing import Tuple
 
 import numpy as np
+
+from transformations.utils import index_matrix
 from .sliding import PaddingStrategy, sliding_window, sliding_window_tensor, require_valid_kernel, weighted_sum
 from image import Image
 
@@ -54,7 +56,7 @@ class DiffusionStrategy(Enum):
         if strategy_name not in DiffusionStrategy.names():
             raise ValueError(f'"{strategy_name.title()}" is not a supported anisotropic function')
         return cls[strategy_name]
-    
+
 def mean_channel(channel: np.ndarray, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
     return weighted_sum(channel, np.full((kernel_size, kernel_size), 1 / kernel_size**2), padding_str)
 
@@ -68,8 +70,7 @@ def median_channel(channel: np.ndarray, kernel_size: int, padding_str: PaddingSt
 
 def gauss_kernel(sigma: float) -> np.ndarray:
     kernel_size = int(sigma * 2 + 1)
-    indices = np.array(list(np.ndindex((kernel_size, kernel_size)))) - kernel_size//2 # noqa
-    indices = np.reshape(indices, (kernel_size, kernel_size, 2))
+    indices = index_matrix(kernel_size) - kernel_size//2 # noqa
     indices = np.sum(indices**2, axis=2)
     indices = np.exp(-indices / sigma**2)
     return indices / (2 * np.pi * sigma**2)

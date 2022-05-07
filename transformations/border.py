@@ -2,9 +2,15 @@ from enum import Enum
 from typing import Tuple
 
 import numpy as np
+from image import MAX_COLOR, Image
 
-from image import Image, MAX_COLOR
+from transformations.utils import index_matrix
+
 from .sliding import PaddingStrategy, sliding_window, weighted_sum
+
+RHO_RESOLUTION = 125
+THETA_RESOLUTION = 91
+MOST_FITTED_LINES_RATIO = 0.9
 
 class Direction(Enum):
     VERTICAL            = 0
@@ -163,6 +169,28 @@ def susan_channel(channel: np.ndarray, padding_str: PaddingStrategy) -> np.ndarr
     values[(values >= 0.65) & (values < 0.85)] = 255
     return values
 
+def hough_channel(channel: np.ndarray, t: float) -> np.ndarray:
+
+    p     = np.sqrt(2) * np.max(channel.shape)
+    theta = np.linspace(-np.pi/2, np.pi/2, THETA_RESOLUTION)
+    rho   = np.linspace(-p, p, RHO_RESOLUTION)
+
+    indices = np.insert(index_matrix(*channel.shape), 0, -1, axis=2)
+    indices = np.expand_dims(indices, axis=(0, 1))
+
+    acum = np.stack(np.meshgrid(rho, theta), -1)
+    acum = np.dstack((acum, acum[:,:,1])) 
+    acum[:,:,1] = np.sin(acum[:,:,1])
+    acum[:,:,2] = np.cos(acum[:,:,2])
+    acum = np.expand_dims(acum, axis=(2, 3))
+
+    # |rho - x*cos(theta) - y*sin(theta)|
+    lines = (np.abs(np.sum(acum * indices, axis=4))) < t
+    white_points = channel > 0
+
+    points_in_line = (white_points & lines).sum(axis=(2,3))
+    most_fitted_lines = np.argwhere(points_in_line > MOST_FITTED_LINES_RATIO * points_in_line.max())
+    print(np.take(acum, most_fitted_lines))
 
 # ******************* Export Functions ********************** #
 def directional(image: Image, kernel: FamousKernel, border_dir: Direction, padding_str: PaddingStrategy) -> np.ndarray:
@@ -185,3 +213,6 @@ def log(image: Image, sigma: float, crossing_threshold: int, padding_str: Paddin
 
 def susan(image: Image, padding_str: PaddingStrategy) -> np.ndarray:
     return image.apply_over_channels(susan_channel, padding_str)
+
+def hough(image: Image, t: float) -> np.ndarray:
+    return image.apply_over_channels(hough_channel, t)

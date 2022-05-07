@@ -62,6 +62,7 @@ def build_transformations_menu(image_name: str) -> None:
             build_tr_menu_item(TR_BORDER_LAPLACIAN,         build_border_laplacian_dialog,          image_name)
             build_tr_menu_item(TR_BORDER_LOG,               build_border_log_dialog,                image_name)
             build_tr_menu_item(TR_BORDER_SUSAN,             build_border_susan_dialog,              image_name)
+            build_tr_menu_item(TR_BORDER_HOUGH,             build_border_hough_dialog,              image_name)
         with dpg.menu(label='Combine'):
             build_tr_menu_item(TR_COMBINE_ADD,              build_combine_add_dialog,               image_name)
             build_tr_menu_item(TR_COMBINE_SUB,              build_combine_sub_dialog,               image_name)
@@ -778,6 +779,26 @@ def tr_border_susan(image_name: str) -> Image:
     new_data = border.susan(image, padding_str)
     new_trasformations = image.transformations.copy()
     new_trasformations.append(Transformation(TR_BORDER_SUSAN))
+
+
+TR_BORDER_HOUGH: str = 'HOUGH'
+@render_error
+def build_border_hough_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_BORDER_HOUGH):
+        build_tr_name_input(TR_BORDER_HOUGH, image_name)
+        build_tr_value_float_selector('t', 0, 20, default_value=1)
+        build_tr_dialog_end_buttons(TR_BORDER_HOUGH, image_name, tr_border_hough_border)
+
+def tr_border_hough_border(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image       = img_repo.get_image(image_name)
+    new_name    = get_tr_name_value(image)
+    t = get_tr_float_value()
+    # 2. Procesamos
+    border.hough(image, t)
+    new_data = image
+    new_trasformations = image.transformations.copy()
+    new_trasformations.append(Transformation(TR_BORDER_HOUGH, t=t))
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data, transformations=new_trasformations)
 
