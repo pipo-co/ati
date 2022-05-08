@@ -4,7 +4,7 @@ from typing import Tuple
 import numpy as np
 from models.image import MAX_COLOR, Image, normalize
 
-from transformations.utils import index_matrix
+from transformations.np_utils import index_matrix
 from .sliding import PaddingStrategy, sliding_window, weighted_sum
 
 RHO_RESOLUTION = 125

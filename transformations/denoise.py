@@ -4,7 +4,7 @@ from typing import Tuple
 
 import numpy as np
 
-from transformations.utils import index_matrix
+from transformations.np_utils import index_matrix
 from .sliding import PaddingStrategy, sliding_window, sliding_window_tensor, require_valid_kernel, weighted_sum
 from models.image import Image
 
@@ -70,7 +70,7 @@ def median_channel(channel: np.ndarray, kernel_size: int, padding_str: PaddingSt
 
 def gauss_kernel(sigma: float) -> np.ndarray:
     kernel_size = int(sigma * 2 + 1)
-    indices = index_matrix(kernel_size) - kernel_size//2 # noqa
+    indices = index_matrix(kernel_size, kernel_size) - kernel_size//2
     indices = np.sum(indices**2, axis=2)
     indices = np.exp(-indices / sigma**2)
     return indices / (2 * np.pi * sigma**2)
