@@ -1,4 +1,5 @@
 from enum import Enum
+from typing import Tuple
 
 import numpy as np
 from image import MAX_COLOR, Image, normalize
@@ -314,3 +315,9 @@ def hough(image: Image, t: float) -> np.ndarray:
 
 def canny(image: Image, t1: int, t2: int, padding_str: PaddingStrategy) -> np.ndarray:
     return image.apply_over_channels(canny_channel, t1, t2, padding_str)
+
+def active_outline_first_frame(image: Image, p1: Tuple[int, int], p2: Tuple[int, int]) -> np.ndarray:
+    pass
+
+def active_outline_middle_frame(image: Image, in_color: int, l_in: np.ndarray, l_out: np.ndarray) -> np.ndarray:
+    pass
