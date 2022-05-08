@@ -6,7 +6,7 @@ import numpy as np
 
 from transformations.utils import index_matrix
 from .sliding import PaddingStrategy, sliding_window, sliding_window_tensor, require_valid_kernel, weighted_sum
-from image import Image
+from models.image import Image
 
 class DirectionalDerivatives(Enum):
     NORTH = [

@@ -8,7 +8,7 @@ from transformations import basic, border, combine, denoise, noise, threshold as
 from repositories import images_repo as img_repo
 from . import interface
 import rng
-from image import Image, Transformation, strip_extension, get_extension, ImageFormat, normalize, MAX_COLOR
+from models.image import Image, Transformation, strip_extension, get_extension, ImageFormat, normalize, MAX_COLOR
 from frontend.interface_utils import render_error
 from transformations.sliding import PaddingStrategy
 

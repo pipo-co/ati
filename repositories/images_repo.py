@@ -1,5 +1,5 @@
 from typing import Dict, Iterable
-from image import Image
+from models.image import Image
 
 # In Memory Repo
 _loaded_images: Dict[str, Image] = {}  # Images by name

@@ -3,7 +3,7 @@ from typing import Callable, Tuple, Union, Dict
 import dearpygui.dearpygui as dpg
 import numpy as np
 
-from image import image_to_rgba_array, load_image, valid_image_formats, Image, save_image, get_extension, \
+from models.image import image_to_rgba_array, load_image, valid_image_formats, Image, save_image, get_extension, \
     create_square_image, create_circle_image, CIRCLE_IMAGE_NAME, SQUARE_IMAGE_NAME
 
 from repositories import images_repo as img_repo

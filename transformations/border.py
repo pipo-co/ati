@@ -2,7 +2,7 @@ from enum import Enum
 from typing import Tuple
 
 import numpy as np
-from image import MAX_COLOR, Image, normalize
+from models.image import MAX_COLOR, Image, normalize
 
 from transformations.utils import index_matrix
 from .sliding import PaddingStrategy, sliding_window, weighted_sum
@@ -190,7 +190,7 @@ def log_channel(channel: np.ndarray, sigma: float, crossing_threshold: int, padd
 def susan_channel(channel: np.ndarray, padding_str: PaddingStrategy) -> np.ndarray:
     kernel = FamousKernel.SUSAN.kernel
     sw = sliding_window(channel, np.shape(kernel), padding_str)
-    #Expando dimensiones para que sea compatible con el tamaño de la sliding window
+    # Expando dimensiones para que sea compatible con el tamaño de la sliding window
     new_channel = np.expand_dims(channel, axis=(2,3))
     absolute_values = np.absolute(sw[:,:]*kernel - new_channel[:,:])
     absolute_values[absolute_values < 15] = 1

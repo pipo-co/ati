@@ -1,6 +1,6 @@
 import numpy as np
 
-from image import Image, MAX_COLOR, channel_histogram
+from models.image import Image, MAX_COLOR, channel_histogram
 
 def channel_threshold(channel: np.ndarray, t: int) -> np.ndarray:
     ret = np.zeros(channel.shape)
