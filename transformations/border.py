@@ -82,14 +82,14 @@ class Direction(Enum):
 class FamousKernel(Enum):
     # x derivative kernel
     PREWITT = [
-        [ 1,  0, -1],
-        [ 1,  0, -1],
-        [ 1,  0, -1]
+        [-1,  0,  1],
+        [-1,  0,  1],
+        [-1,  0,  1]
     ]
     SOBEL = [
-        [ 1,  0, -1],
-        [ 2,  0, -2],
-        [ 1,  0, -1]
+        [-1,  0,  1],
+        [-2,  0,  2],
+        [-1,  0,  1]
     ]
     LAPLACE = [
         [ 0, -1,  0],
@@ -126,9 +126,9 @@ def high_pass_channel(channel: np.ndarray, kernel_size: int, padding_str: Paddin
     return weighted_sum(channel, kernel, padding_str)
 
 def gradient_modulus(img: np.ndarray, kernel: np.ndarray, padding_str: PaddingStrategy) -> np.ndarray:
-    y_channel = weighted_sum(img, kernel, padding_str)
-    kernel = np.rot90(kernel)
     x_channel = weighted_sum(img, kernel, padding_str)
+    kernel = np.rot90(kernel, k=-1)
+    y_channel = weighted_sum(img, kernel, padding_str)
     return np.sqrt(y_channel ** 2 + x_channel ** 2)
 
 def prewitt_channel(channel: np.ndarray, padding_str: PaddingStrategy) -> np.ndarray:
