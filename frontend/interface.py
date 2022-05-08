@@ -1,4 +1,4 @@
-from typing import Callable, Tuple, Union
+from typing import Callable, Tuple, Union, Dict
 
 import dearpygui.dearpygui as dpg
 import numpy as np
@@ -151,15 +151,20 @@ def register_image(image: Image) -> None:
 
 @render_error
 def load_image_handler(app_data):
-    path = app_data['file_path_name']
-    image_name = Image.name_from_path(path)
+    selections: Dict[str, str] = app_data['selections']
+    selection_count = len(selections)
+    if selection_count == 0:
+        raise ValueError('No image selected')
+    elif selection_count == 1:
+        image_name, path = next(iter(selections.items()))
+        if not img_repo.contains_image(image_name):
+            image = load_image(path)
+            img_repo.persist_image(image)
+            register_image(image)
 
-    if not img_repo.contains_image(image_name):
-        image = load_image(path)
-        img_repo.persist_image(image)
-        register_image(image)
-
-    render_image_window(image_name)
+        render_image_window(image_name)
+    else:
+        raise ValueError('Videos are not yet supported')
 
 @render_error
 def save_image_handler(app_data, image_name: str) -> None:
