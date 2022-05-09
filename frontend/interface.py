@@ -156,7 +156,8 @@ def load_image_handler(app_data):
     if selection_count == 0:
         raise ValueError('No image selected')
     elif selection_count == 1:
-        image_name, path = next(iter(selections.items()))
+        _, path = next(iter(selections.items()))
+        image_name = Image.name_from_path(path)
         if not img_repo.contains_image(image_name):
             image = load_image(path)
             img_repo.persist_image(image)
