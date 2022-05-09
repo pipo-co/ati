@@ -59,9 +59,9 @@ def render_image_window(image_name: str, movie: Optional[Movie] = None, pos: Uni
                     if movie:
                         with dpg.group(horizontal=True):
                             if not movie.on_first_frame():
-                                dpg.add_button(label='Prev frame', width=image.width//2 - 1, user_data=(movie.name, movie.current_frame - 1), callback=lambda s, ad, ud: render_movie_frame(*ud))
+                                dpg.add_button(label='<- Prev frame', width=image.width//2 - 1, user_data=(movie.name, movie.current_frame - 1), callback=lambda s, ad, ud: render_movie_frame(*ud))
                             if not movie.on_last_frame():
-                                dpg.add_button(label='Next frame', indent=image.width//2 + 1, width=image.width//2 - 1, user_data=(movie.name, movie.current_frame + 1), callback=lambda s, ad, ud: render_movie_frame(*ud))
+                                dpg.add_button(label='Next frame ->', indent=image.width//2 + 1, width=image.width//2 - 1, user_data=(movie.name, movie.current_frame + 1), callback=lambda s, ad, ud: render_movie_frame(*ud))
                     with dpg.group(horizontal=True, width=image.width):
                         dpg.add_text(f'Height {image.height}')
                         dpg.add_separator()
