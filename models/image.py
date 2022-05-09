@@ -2,8 +2,10 @@ import itertools
 import os
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, Iterable, List, Tuple, Callable, Union, Any
+from typing import Iterable, List, Tuple, Callable, Union, Any, Optional
 
+from .path_utils import get_extension, strip_extension, lower_extension
+from .transformation import Transformation
 from repositories import metadata_repo
 
 import numpy as np
@@ -46,18 +48,6 @@ class ImageFormat(Enum):
         return '.' + self.value
 
 @dataclass
-class Transformation:
-    name: str
-    properties: Dict[str, Any]
-
-    def __init__(self, name: str, **kwargs):
-        self.name = name
-        self.properties = kwargs
-
-    def __str__(self) -> str:
-        return '[{0}] {1}'.format(self.name, ", ".join([f'{k}={v}' for k,v in self.properties.items()]))
-
-@dataclass
 class Image:
     name:   str
     format: ImageFormat
@@ -68,7 +58,7 @@ class Image:
     GREEN_CHANNEL:  int = 1
     BLUE_CHANNEL:   int = 2
 
-    def __init__(self, name: str, fmt: ImageFormat, data: np.ndarray, allow_reserved: bool = False, transformations: List[Transformation] = None):
+    def __init__(self, name: str, fmt: ImageFormat, data: np.ndarray, allow_reserved: bool = False, transformations: Optional[List[Transformation]] = None):
         if not allow_reserved and name in RESERVED_IMAGE_NAMES:
             raise ValueError(f'name cannot be any of this names: {RESERVED_IMAGE_NAMES}')
         self.name = name
@@ -131,8 +121,7 @@ class Image:
 
     @staticmethod
     def name_from_path(path: str) -> str:
-        split_name = os.path.splitext(os.path.basename(path))
-        return split_name[0] + split_name[1].lower()
+        return lower_extension(path)
 
 
 def valid_image_formats() -> Iterable[str]:
@@ -153,16 +142,6 @@ def image_to_rgba_array(image: Image) -> np.ndarray:
         return _grayscale_to_rgba(normalized_data)
     elif image.channels == 3:
         return _color_to_rgba(normalized_data)
-
-def get_extension(path: str) -> str:
-    return os.path.splitext(path)[1]
-
-def strip_extension(path: str) -> str:
-    return os.path.splitext(path)[0]
-
-def append_to_filename(filename: str, s: str) -> str:
-    split = os.path.splitext(filename)
-    return split[0] + s + split[1]
 
 # height x width x channel
 def load_image(path: str) -> Image:
