@@ -59,9 +59,9 @@ def render_image_window(image_name: str, movie: Optional[Movie] = None, pos: Uni
                     if movie:
                         with dpg.group(horizontal=True):
                             if not movie.on_first_frame():
-                                dpg.add_button(label='Prev frame', width=image.width//2 - 1, user_data=(movie.name, window, movie.current_frame - 1), callback=lambda s, ad, ud: load_movie_frame_handler(*ud))
+                                dpg.add_button(label='Prev frame', width=image.width//2 - 1, user_data=(movie.name, movie.current_frame - 1), callback=lambda s, ad, ud: render_movie_frame(*ud))
                             if not movie.on_last_frame():
-                                dpg.add_button(label='Next frame', indent=image.width//2 + 1, width=image.width//2 - 1, user_data=(movie.name, window, movie.current_frame + 1), callback=lambda s, ad, ud: load_movie_frame_handler(*ud))
+                                dpg.add_button(label='Next frame', indent=image.width//2 + 1, width=image.width//2 - 1, user_data=(movie.name, movie.current_frame + 1), callback=lambda s, ad, ud: render_movie_frame(*ud))
                     with dpg.group(horizontal=True, width=image.width):
                         dpg.add_text(f'Height {image.height}')
                         dpg.add_separator()
@@ -168,23 +168,30 @@ def build_expanded_histogram_plot(image_name: str, theme: str, hist: np.ndarray,
 def register_image(image: Image) -> None:
     image_vector = image_to_rgba_array(image)
     dpg.add_static_texture(image.width, image.height, image_vector, tag=image.name, parent=TEXTURE_REGISTRY) # noqa
-    dpg.add_menu_item(label=image.name, parent=IMAGES_MENU, user_data=image.name, callback=lambda s, ad, ud: render_image_window(ud))
+    if not image.movie_frame:
+        dpg.add_menu_item(label=image.name, parent=IMAGES_MENU, user_data=image.name, callback=lambda s, ad, ud: render_image_window(ud))
+
+def register_movie(movie_name: str):
+    dpg.add_menu_item(label=movie_name, parent=IMAGES_MENU, user_data=(movie_name, 0), callback=lambda s, ad, ud: render_movie_frame(*ud))
 
 @render_error
-def load_movie_frame_handler(movie_name: str, frame_window: Union[str, int], frame: int):
-    frame_window_pos = dpg.get_item_pos(frame_window)
+def render_movie_frame(movie_name: str, frame: int):
     movie = mov_repo.get_movie(movie_name)
+    frame_window = f'image_window_{movie.current_frame_name}'
+    frame_is_rendered = dpg.does_item_exist(frame_window)
+    frame_window_pos = dpg.get_item_pos(frame_window) if frame_is_rendered else []
     movie.current_frame = frame
     frame_name = movie.current_frame_name
 
     if not img_repo.contains_image(frame_name):
         image = load_image(movie.current_frame_path)
-        image.movie_frame = True
+        image.movie = movie_name
         img_repo.persist_image(image)
         register_image(image)
 
     render_image_window(frame_name, movie, pos=frame_window_pos)
-    dpg.delete_item(frame_window)
+    if frame_is_rendered:
+        dpg.delete_item(frame_window)
 
 @render_error
 def load_image_handler(app_data):
@@ -216,13 +223,15 @@ def load_image_handler(app_data):
             frames.sort()  # WARNING: Las frames tienen que estar ordenadas alfabeticamente!!
             movie = Movie(movie_name, movie_base_path, frames)
             mov_repo.persist_movie(movie)
+            register_movie(movie_name)
 
         image_path = movie.current_frame_path
 
     image_name = Image.name_from_path(image_path)
     if not img_repo.contains_image(image_name):
         image = load_image(image_path)
-        image.movie_frame = movie is not None
+        if movie is not None:
+            image.movie = movie.name
         img_repo.persist_image(image)
         register_image(image)
 

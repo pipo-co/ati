@@ -52,7 +52,7 @@ class Image:
     name:   str
     format: ImageFormat
     data:   np.ndarray
-    movie_frame: bool = False
+    movie: Optional[str] = None
     transformations: List[Transformation] = field(default_factory=list)
 
     RED_CHANNEL:    int = 0
@@ -119,6 +119,10 @@ class Image:
     def channels(self) -> int:
         shape = self.data.shape
         return 1 if len(shape) == 2 else shape[2]
+
+    @property
+    def movie_frame(self) -> bool:
+        return self.movie is not None
 
     @staticmethod
     def name_from_path(path: str) -> str:
