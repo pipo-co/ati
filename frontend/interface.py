@@ -94,6 +94,8 @@ def toggle_hists(image_name: str) -> None:
         dpg.show_item(hists)
     dpg.set_item_width(window, dpg.get_item_width(window) + diff)
     user_data['hists_toggled'] = not plots_toggled
+    if not plots_toggled and user_data['history_toggled']:
+        toggle_history(image_name)
 
 @render_error
 def toggle_history(image_name: str) -> None:
@@ -101,9 +103,9 @@ def toggle_history(image_name: str) -> None:
     toggle = f'history_toggle_{image_name}'
     hists = f'history_group_{image_name}'
     user_data = dpg.get_item_user_data(window)
-    plots_toggled: bool = user_data['history_toggled']
+    history_toggled: bool = user_data['history_toggled']
     diff: int = HISTORY_WIDTH + 10
-    if plots_toggled:
+    if history_toggled:
         diff = -diff
         dpg.set_item_label(toggle, 'History')
         dpg.hide_item(hists)
@@ -111,7 +113,9 @@ def toggle_history(image_name: str) -> None:
         dpg.set_item_label(toggle, 'Hide History')
         dpg.show_item(hists)
     dpg.set_item_width(window, dpg.get_item_width(window) + diff)
-    user_data['history_toggled'] = not plots_toggled
+    user_data['history_toggled'] = not history_toggled
+    if not history_toggled and user_data['hists_toggled']:
+        toggle_hists(image_name)
 
 def build_hist_themes():
     with dpg.theme(tag='red_hist_theme'):
