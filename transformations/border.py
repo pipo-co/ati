@@ -315,6 +315,67 @@ def canny_channel(channel: np.ndarray, t1: int, t2: int, padding_str: PaddingStr
 
     return gradient_mod, ImageChannelTransformation()
 
+def get_rectangular_boundrie(x: Tuple[int, int], y: Tuple[int, int]) -> np.ndarray:
+    upper_line = np.array([(y[0], x) for x in range(x[0], x[1] + 1)])
+    bottom_line = np.array([(y[1], x) for x in range(x[0], x[1] + 1)])
+    left_line = np.array([(y, x[0]) for y in range(y[0], y[1] +1)])
+    right_line = np.array([(y, x[1]) for y in range(y[0], y[1] +1)])
+
+    return np.concatenate((upper_line, right_line, left_line, bottom_line), axis=0)
+
+
+def get_initial_boundries(x: Tuple[int, int], y: Tuple[int, int], phi_size: int) -> np.ndarray:
+    lout = get_rectangular_boundrie(x, y)
+    lin = get_rectangular_boundrie((x[0] + 1, x[1] - 1), (y[0] + 1, y[1] - 1))
+    phi = np.full((phi_size, phi_size), 3)
+    phi[y[0]:y[1], x[0]:x[1]] = 1
+    phi[y[0] + 1:y[1] - 1, x[0] + 1:x[1] - 1] = -1
+    phi[y[0] + 2:y[1] + 2, x[0] + 2:x[1] - 2] = -3
+    return lout, lin, phi
+
+def get_indexes() -> np.ndarray:
+    return np.reshape(np.array(list(np.ndindex((3, 3)))) - 3//2, (9, 2))
+    
+def inBounds(x: int, y: int, shape: Tuple[int, int]) -> Boolean:
+    return x >= 0 and x < shape[1] and y >=0 and y < shape[0]
+
+def new_values(phi: np.ndarray, indices:np.ndarray, point: Tuple[int, int], target: int, new_value: int) -> List[Tuple[int, int]]:
+    value_list = []
+    for index in indices:
+        phi_y = point[0] + index[0]
+        phi_x = point[1] + index[1]
+        if inBounds(phi_x, phi_y, phi.shape) and phi[phi_y, phi_x] == target:
+            value_list.append((phi_y, phi_x))
+            phi[phi_y, phi_x] = new_value
+    return value_list
+
+def active_outline(image: Image, sigma, lout: np.ndarray, lin: np.ndarray, phi: np.ndarray) -> np.ndarray:
+    flag = True
+    indices = np.array(list(np.ndindex((3, 3)))) - 3//2 
+    indices = np.reshape(indices, (9, 2))
+    while flag:
+        flag = False
+        new_lout = []
+        new_lin = []
+        for point in lout:
+            norm = np.linalg.norm(sigma - image[point[0], point[1]])
+            if (norm > 0):
+                new_lin.append(point)
+                new_lout.extend(new_values(phi, indices, point, 3, 1))
+                flag = True
+        for point in lin:
+            norm = np.linalg.norm(sigma - image[point[0], point[1]])
+            if (norm < 0):
+                new_lout.append(point)
+                new_lin.extend(new_values(phi, indices, point, -3, -1))
+                flag = True
+        lout = np.ndarray(new_lout)
+        lin = np.ndarray(new_lin)
+
+    return lout, lin, phi
+
+    
+
 # ******************* Export Functions ********************** #
 def directional(image: Image, kernel: FamousKernel, border_dir: Direction, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageTransformation]:
     return image.apply_over_channels('directional', directional_channel, vertical_kernel=kernel.kernel, border_dir=border_dir, padding_str=padding_str)
@@ -343,8 +404,25 @@ def hough(image: Image, t0: float, tf: float, t_count: int, r0: float, rf: float
 def canny(image: Image, t1: int, t2: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageTransformation]:
     return image.apply_over_channels('canny', canny_channel, t1=t1, t2=t2, padding_str=padding_str)
 
+def make_dimension_point(p1: Tuple[int, int], p2: Tuple[int, int], dim: int):
+    if p1[dim] > p2[dim]:
+        return (p2[dim], p1[dim])
+    else:
+        return (p1[dim], p2[dim])
+
 def active_outline_first_frame(image: Image, p1: Tuple[int, int], p2: Tuple[int, int]) -> np.ndarray:
-    pass
+    
+    x = make_dimension_point(p1, p2, 0)
+    y = make_dimension_point(p1, p2, 1)
+
+    if image.channels > 1:
+        sigma = np.mean(np.array(image.data[y[0]:y[1], x[0]:x[1]]).reshape((-1, 3)), axis=0)
+    else:
+        sigma = np.mean(image.data[y[0]:y[1], x[0]:x[1]])
+
+    lout, lin, phi = get_initial_boundries(image, x, y)  
+
+    return active_outline(image, sigma, lout, lin, phi)
 
 def active_outline_middle_frame(image: Image, in_color: int, l_in: np.ndarray, l_out: np.ndarray) -> np.ndarray:
     pass
