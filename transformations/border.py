@@ -349,29 +349,32 @@ def new_values(phi: np.ndarray, indices:np.ndarray, point: Tuple[int, int], targ
             phi[phi_y, phi_x] = new_value
     return value_list
 
-def active_outline(image: Image, sigma, lout: np.ndarray, lin: np.ndarray, phi: np.ndarray) -> np.ndarray:
+def active_outline(image: np.ndarray, sigma, lout: np.ndarray, lin: np.ndarray, phi: np.ndarray) -> np.ndarray:
     flag = True
-    indices = np.array(list(np.ndindex((3, 3)))) - 3//2 
-    indices = np.reshape(indices, (9, 2))
+    indices = get_indexes()
     while flag:
         flag = False
         new_lout = []
         new_lin = []
         for point in lout:
-            norm = np.linalg.norm(sigma - image[point[0], point[1]])
-            if (norm > 0):
+            norm_lout = np.linalg.norm(sigma - image[point[0], point[1]])
+            if (norm_lout <= 10):
                 new_lin.append(point)
                 new_lout.extend(new_values(phi, indices, point, 3, 1))
                 flag = True
+            else:
+                new_lout.append(point)
         for point in lin:
-            norm = np.linalg.norm(sigma - image[point[0], point[1]])
-            if (norm < 0):
+            norm_lin = np.linalg.norm(sigma - image[point[0], point[1]])
+            if (norm_lin >= 10):
                 new_lout.append(point)
                 new_lin.extend(new_values(phi, indices, point, -3, -1))
                 flag = True
-        lout = np.ndarray(new_lout)
-        lin = np.ndarray(new_lin)
-
+            else:
+                new_lin.append(point)
+        lout = new_lout
+        lin = new_lin
+        
     return lout, lin, phi
 
     
