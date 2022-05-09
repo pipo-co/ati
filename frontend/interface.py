@@ -1,12 +1,15 @@
-from typing import Callable, Tuple, Union, Dict
+import os
+from typing import Callable, Tuple, Union, Dict, Optional, List
 
 import dearpygui.dearpygui as dpg
 import numpy as np
 
 from models.image import image_to_rgba_array, load_image, valid_image_formats, Image, save_image, get_extension, \
     create_square_image, create_circle_image, CIRCLE_IMAGE_NAME, SQUARE_IMAGE_NAME
+from models.movie import Movie
+from models.path_utils import movie_dir_selections
 
-from repositories import images_repo as img_repo
+from repositories import images_repo as img_repo, movies_repo as mov_repo
 from .interface_utils import render_error
 from repositories.metadata_repo import set_metadata_file
 from .transformations import build_transformations_menu
@@ -32,7 +35,7 @@ HISTORY_WIDTH: int = 400
 
 # Creates window only if it doesn't exist
 @render_error
-def render_image_window(image_name: str):
+def render_image_window(image_name: str, movie: Optional[Movie] = None, pos: Union[List[int], Tuple[int, ...]] = ()):
     if dpg.does_item_exist(f'image_{image_name}'):
         dpg.focus_item(f'image_{image_name}')
     else:
@@ -42,7 +45,8 @@ def render_image_window(image_name: str):
         width, height = calculate_image_window_size(image)
         hists = image.get_histograms()
 
-        with dpg.window(label=image_name, tag=f'image_window_{image_name}', width=width, height=height, no_scrollbar=True, no_resize=True, user_data={'image_name': image_name, 'hists_toggled': False, 'history_toggled': False}, on_close=lambda: dpg.delete_item(window)) as window:
+        window_label = f'Movie: {movie.name} - Frame: {image_name}' if movie else image_name
+        with dpg.window(label=window_label, tag=f'image_window_{image_name}', width=width, height=height, pos=pos, no_scrollbar=False, no_resize=True, user_data={'image_name': image_name, 'hists_toggled': False, 'history_toggled': False}, on_close=lambda: dpg.delete_item(window)) as window:
             with dpg.menu_bar():
                 dpg.add_menu_item(label='Save', user_data=image_name, callback=lambda s, ad, ud: trigger_save_image_dialog(ud))
                 build_transformations_menu(image_name)
@@ -50,9 +54,15 @@ def render_image_window(image_name: str):
                 dpg.add_menu_item(label='History', tag=f'history_toggle_{image_name}', user_data=image_name, callback=lambda s, ad, ud: toggle_history(ud))
 
             with dpg.group(horizontal=True):
-                with dpg.group(width=image.width):
+                with dpg.group():
                     dpg.add_image(image_name, tag=f'image_{image_name}', width=image.width, height=image.height)
-                    with dpg.group(horizontal=True):
+                    if movie:
+                        with dpg.group(horizontal=True):
+                            if not movie.on_first_frame():
+                                dpg.add_button(label='Prev frame', width=image.width//2 - 1, user_data=(movie.name, window, movie.current_frame - 1), callback=lambda s, ad, ud: load_movie_frame_handler(*ud))
+                            if not movie.on_last_frame():
+                                dpg.add_button(label='Next frame', indent=image.width//2 + 1, width=image.width//2 - 1, user_data=(movie.name, window, movie.current_frame + 1), callback=lambda s, ad, ud: load_movie_frame_handler(*ud))
+                    with dpg.group(horizontal=True, width=image.width):
                         dpg.add_text(f'Height {image.height}')
                         dpg.add_separator()
                         dpg.add_text(f'Width {image.width}')
@@ -74,8 +84,15 @@ def render_image_window(image_name: str):
                         dpg.add_text(f'{i}. {tr}', tag=f'image_{image_name}_transformations_{i}')
 
 def calculate_image_window_size(image: Image) -> Tuple[int, int]:
-    # 15 = padding, 120 = menu_bar + info_size
-    return max(image.width, MIN_IMAGE_WIDTH) + 15, max(image.height, MIN_IMAGE_HEIGHT) + 120
+    # 120 = menu_bar + info_size, 10 = padding
+    height = max(image.height, MIN_IMAGE_HEIGHT) + 120 + 10
+    if image.movie_frame:
+        height += 20  # Control buttons
+
+    # 15 = padding
+    width = max(image.width, MIN_IMAGE_WIDTH) + 15
+
+    return width, height
 
 @render_error
 def toggle_hists(image_name: str) -> None:
@@ -154,22 +171,62 @@ def register_image(image: Image) -> None:
     dpg.add_menu_item(label=image.name, parent=IMAGES_MENU, user_data=image.name, callback=lambda s, ad, ud: render_image_window(ud))
 
 @render_error
+def load_movie_frame_handler(movie_name: str, frame_window: Union[str, int], frame: int):
+    frame_window_pos = dpg.get_item_pos(frame_window)
+    movie = mov_repo.get_movie(movie_name)
+    movie.current_frame = frame
+    frame_name = movie.current_frame_name
+
+    if not img_repo.contains_image(frame_name):
+        image = load_image(movie.current_frame_path)
+        image.movie_frame = True
+        img_repo.persist_image(image)
+        register_image(image)
+
+    render_image_window(frame_name, movie, pos=frame_window_pos)
+    dpg.delete_item(frame_window)
+
+@render_error
 def load_image_handler(app_data):
-    selections: Dict[str, str] = app_data['selections']
+    movie_dir_checkbox = 'load_image_movie_dir_check'
+    movie_dir: bool = dpg.get_value(movie_dir_checkbox)
+    dpg.set_value(movie_dir_checkbox, False)
+
+    current_path = app_data['current_path']
+    selections: Dict[str, str] = movie_dir_selections(current_path) if movie_dir else app_data['selections']
     selection_count = len(selections)
     if selection_count == 0:
         raise ValueError('No image selected')
-    elif selection_count == 1:
-        _, path = next(iter(selections.items()))
-        image_name = Image.name_from_path(path)
-        if not img_repo.contains_image(image_name):
-            image = load_image(path)
-            img_repo.persist_image(image)
-            register_image(image)
 
-        render_image_window(image_name)
+    image_path: str
+    movie: Optional[Movie]
+    if selection_count == 1:
+        image_path = next(iter(selections.values()))
+        movie = None
     else:
-        raise ValueError('Videos are not yet supported')
+        # Creamos movie si no esta creada aun
+        # WARNING: Identificamos a las peliculas por su directorio -> No pueden haber 2 peliculas en el mismo dir (sensato para nuestro caso de uso)
+        movie_name = os.path.basename(current_path)
+
+        if mov_repo.contains_movie(movie_name):
+            movie = mov_repo.get_movie(movie_name)
+        else:
+            movie_base_path = os.path.dirname(app_data['file_path_name'])
+            frames = list(selections.keys())
+            frames.sort()  # WARNING: Las frames tienen que estar ordenadas alfabeticamente!!
+            movie = Movie(movie_name, movie_base_path, frames)
+            mov_repo.persist_movie(movie)
+
+        image_path = movie.current_frame_path
+
+    image_name = Image.name_from_path(image_path)
+    if not img_repo.contains_image(image_name):
+        image = load_image(image_path)
+        image.movie_frame = movie is not None
+        img_repo.persist_image(image)
+        register_image(image)
+
+    render_image_window(image_name, movie)
 
 @render_error
 def save_image_handler(app_data, image_name: str) -> None:
@@ -210,6 +267,9 @@ def build_save_image_dialog() -> None:
 def build_load_image_dialog(default_path: str) -> None:
     with dpg.file_dialog(label='Choose file to load...', tag=LOAD_IMAGE_DIALOG, default_path=default_path, directory_selector=False, show=False, modal=True, width=1024, height=512, callback=lambda s, ad: load_image_handler(ad)):
         dpg.add_file_extension(f'Image{{{",".join(valid_image_formats())}}}')
+        with dpg.group(horizontal=True):
+            dpg.add_text('Select Movie Directory')
+            dpg.add_checkbox(default_value=False, tag='load_image_movie_dir_check')
 
 def build_load_metadata_dialog() -> None:
     with dpg.file_dialog(label='Choose metadata file to load...', tag=LOAD_METADATA_DIALOG, default_path='../images', directory_selector=False, show=False, modal=True, width=1024, height=512, callback=lambda s, ad: load_metadata_handler(ad)):

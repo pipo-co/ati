@@ -1,6 +1,6 @@
 import itertools
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from typing import Iterable, List, Tuple, Callable, Union, Any, Optional
 
@@ -52,7 +52,8 @@ class Image:
     name:   str
     format: ImageFormat
     data:   np.ndarray
-    transformations: List[Transformation]
+    movie_frame: bool = False
+    transformations: List[Transformation] = field(default_factory=list)
 
     RED_CHANNEL:    int = 0
     GREEN_CHANNEL:  int = 1
