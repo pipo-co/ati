@@ -226,38 +226,28 @@ def hough_channel(channel: np.ndarray, t: float) -> np.ndarray:
 
 def canny_drag_borders(gradient_mod: np.ndarray, t1: int, t2: int, max_col: int, max_row: int, row: int, col: int) -> None:
     if t1 < gradient_mod[row, col] < t2:
-        # Conectado por un borde de manera 4-conexo
-        touches_border = False
-        if not touches_border and row - 1 >= 0:
-            touches_border = gradient_mod[row - 1, col] == MAX_COLOR
-        if not touches_border and col - 1 >= 0:
-            touches_border = gradient_mod[row, col - 1] == MAX_COLOR
-        if not touches_border and row + 1 < max_row:
-            touches_border = gradient_mod[row + 1, col] == MAX_COLOR
-        if not touches_border and col + 1 < max_col:
-            touches_border = gradient_mod[row, col + 1] == MAX_COLOR
-
-        gradient_mod[row, col] = MAX_COLOR if touches_border else 0
+        # Conectado por un borde de manera 8-conexo
+        neighbour = gradient_mod[max(row - 1, 0):min(row + 2, max_row), max(col - 1, 0):min(col + 2, max_col)]
+        gradient_mod[row, col] = MAX_COLOR if np.amax(neighbour) == MAX_COLOR else 0
 
 # Asume que ya fue paso por un filtro gaussiano
 def canny_channel(channel: np.ndarray, t1: int, t2: int, padding_str: PaddingStrategy) -> np.ndarray:
     # Usamos prewitt para derivar
     kernel = FamousKernel.PREWITT.kernel
-    dy = weighted_sum(channel, kernel, padding_str)
-    kernel = np.rot90(kernel)
     dx = weighted_sum(channel, kernel, padding_str)
-    # TODO(tobi): modulo o abs?
-    # gradient_mod = np.sqrt(dy ** 2 + dx ** 2)
-    gradient_mod = np.abs(dy) + np.abs(dx)
+    kernel = np.rot90(kernel, k=-1)
+    dy = weighted_sum(channel, kernel, padding_str)
+    gradient_mod = np.sqrt(dy ** 2 + dx ** 2)
 
     # Calculamos el angulo de la derivada en grados
     d_angle = np.arctan2(dy, dx)
     d_angle[d_angle < 0] += np.pi
+    d_angle = np.pi - d_angle
     d_angle = np.rad2deg(d_angle)
 
     # Discretizamos dicho angulo
     dir_sw = np.empty((*d_angle.shape, *kernel.shape))
-    dir_sw[((0 <= d_angle) & (d_angle < 22.5)) | ((157.5 <= d_angle) & (d_angle <= 180))]    = Direction.from_angle(0).kernel
+    dir_sw[((0 <= d_angle) & (d_angle < 22.5)) | ((157.5 <= d_angle) & (d_angle <= 180))]   = Direction.from_angle(0).kernel
     dir_sw[(22.5 <= d_angle) & (d_angle < 67.5)]                                            = Direction.from_angle(45).kernel
     dir_sw[(67.5 <= d_angle) & (d_angle < 112.5)]                                           = Direction.from_angle(90).kernel
     dir_sw[(112.5 <= d_angle) & (d_angle < 157.5)]                                          = Direction.from_angle(135).kernel
@@ -267,8 +257,9 @@ def canny_channel(channel: np.ndarray, t1: int, t2: int, padding_str: PaddingStr
     max_suppression_sw = np.max(max_suppression_sw, axis=(2, 3))
     gradient_mod[max_suppression_sw != gradient_mod] = 0
 
+    # TODO(tobi): Normalizamos?? Dudoso. Plis preguntar
     # Normalizamos la imagen antes del thresholding
-    gradient_mod = normalize(gradient_mod, np.uint64)
+    gradient_mod = normalize(gradient_mod, np.float64)
 
     # Thresholding con histéresis
     gradient_mod[gradient_mod >= t2] = MAX_COLOR

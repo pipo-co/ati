@@ -810,8 +810,8 @@ def build_border_canny_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_BORDER_LOG):
         build_tr_name_input(TR_BORDER_CANNY, image_name)
         build_tr_radio_buttons(PaddingStrategy.names())
-        build_tr_value_int_selector('lower threshold', 0, MAX_COLOR, default_value=100, tag='t1')
-        build_tr_value_int_selector('upper threshold', 0, MAX_COLOR, default_value=200, tag='t2')
+        build_tr_value_int_selector('lower threshold', 0, MAX_COLOR, default_value=10, tag='t1')
+        build_tr_value_int_selector('upper threshold', 0, MAX_COLOR, default_value=70, tag='t2')
         build_tr_dialog_end_buttons(TR_BORDER_CANNY, image_name, tr_border_canny_border)
 
 def tr_border_canny_border(image_name: str) -> Image:
