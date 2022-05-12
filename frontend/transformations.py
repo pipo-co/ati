@@ -4,7 +4,7 @@ from typing import Callable, List, Optional
 import dearpygui.dearpygui as dpg
 import numpy as np
 
-from models.movie import Movie
+from models.movie import Movie, TransformedMovie, MovieTransformation
 from transformations import basic, border, combine, denoise, noise, threshold as thresh
 from repositories import images_repo as img_repo
 from repositories import movies_repo as mov_repo
@@ -87,17 +87,30 @@ def execute_image_transformation(image_name: str, handler: TrHandler) -> None:
     interface.render_image_window(new_image.name)
 
 @render_error
-def execute_movie_transformation(movie_name: str, base_handle: TrHandler, inductive_handle: Callable[[Image], Image]) -> None:
-    movie = mov_repo.get_movie(movie_name)
+def execute_movie_transformation(base_movie_name: str, base_handle: TrHandler, inductive_handle: Callable[[str, Image], Image]) -> None:
+    base_movie = mov_repo.get_movie(base_movie_name)
+    base_image = interface.load_movie_frame(base_movie, 0)
 
     try:
-        new_image = handler(image_name)
+        new_image = base_handle(base_image.name)
     finally:
         dpg.delete_item(TR_DIALOG)
 
+    movie_name = strip_extension(new_image.name)
+    image_tr = new_image.transformations[-1]
+
+    new_movie = TransformedMovie(movie_name, base_movie, MovieTransformation.from_img_tr(image_tr, inductive_handle))
+
+    mov_repo.persist_movie(new_movie)
+    interface.register_movie(new_movie.name)
+
+    new_image.name = new_movie.get_frame_name(0)
+    new_image.movie = movie_name
+
     img_repo.persist_image(new_image)
     interface.register_image(new_image)
-    interface.render_image_window(new_image.name)
+
+    interface.render_image_window(new_image.name, new_movie)
 
 def build_tr_dialog(tr_id: str) -> int:
     return dpg.window(label=f'Apply {tr_id.title()} Transformation', tag=TR_DIALOG, modal=True, no_close=True, pos=interface.CENTER_POS)
@@ -108,10 +121,15 @@ def build_tr_dialog_end_buttons(tr_id: str, image_name: str, handle: TrHandler) 
         dpg.add_button(label='Cancel', user_data=tr_id, callback=lambda: dpg.delete_item(TR_DIALOG))
 
 # Also allows to transform a movie
-def build_movie_tr_dialog_end_buttons(tr_id: str, movie: Movie, base_handle: TrHandler, inductive_handle: Callable[[ImageTransformation], Image]) -> None:
-    with dpg.group(horizontal=True):
-        dpg.add_button(label='Transform', user_data=(image_name, handle), callback=lambda s, ap, ud: execute_image_transformation(*ud))
-        dpg.add_button(label='Cancel', user_data=tr_id, callback=lambda: dpg.delete_item(TR_DIALOG))
+def build_movie_tr_dialog_end_buttons(tr_id: str, image_name: str, handle: TrHandler, inductive_handle: Callable[[str, Image], Image]) -> None:
+    image = img_repo.get_image(image_name)
+    if image.movie:
+        with dpg.group(horizontal=True):
+            dpg.add_button(label='Transform Image', user_data=(image_name, handle),                     callback=lambda s, ap, ud: execute_image_transformation(*ud))
+            dpg.add_button(label='Transform Movie', user_data=(image.movie, handle, inductive_handle),  callback=lambda s, ap, ud: execute_movie_transformation(*ud))
+            dpg.add_button(label='Cancel', user_data=tr_id, callback=lambda: dpg.delete_item(TR_DIALOG))
+    else:
+        build_tr_dialog_end_buttons(tr_id, image_name, handle)
 
 # ******************** Input Builders ********************* #
 
@@ -295,7 +313,7 @@ TR_NEG: str = 'neg'
 def build_neg_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_NEG):
         build_tr_name_input(TR_NEG, image_name)
-        build_tr_dialog_end_buttons(TR_NEG, image_name, tr_neg)
+        build_movie_tr_dialog_end_buttons(TR_NEG, image_name, tr_neg, tr_neg_inductive)
 
 def tr_neg(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -307,6 +325,10 @@ def tr_neg(image_name: str) -> Image:
     new_trasformations.append(ImageTransformation(TR_NEG))
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data, transformations=new_trasformations)
+
+def tr_neg_inductive(new_name: str, prev_image: Image) -> Image:
+    new_data = basic.negate(prev_image)
+    return Image(new_name, prev_image.format, new_data, transformations=prev_image.transformations + [ImageTransformation(TR_NEG)])
 
 TR_POW: str = 'pow'
 @render_error

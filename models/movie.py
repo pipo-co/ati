@@ -4,16 +4,20 @@ from dataclasses import dataclass
 from typing import List, Callable
 
 from .image import Image, ImageTransformation
+from .path_utils import get_extension
 
 
 @dataclass
 class MovieTransformation(ImageTransformation):
-    inductive_handle: Callable[[Image], Image]
+    inductive_handle: Callable[[str, Image], Image]
 
-    def __init__(self, name: str, inductive_handle: Callable[[Image], Image], **kwargs):
+    @classmethod
+    def from_img_tr(cls, image_transformation: ImageTransformation, inductive_handle: Callable[[str, Image], Image]) -> 'MovieTransformation':
+        return cls(image_transformation.name, inductive_handle, **image_transformation.properties)
+
+    def __init__(self, name: str, inductive_handle: Callable[[str, Image], Image], **kwargs):
         super().__init__(name, **kwargs)
         self.inductive_handle = inductive_handle
-
 
 @dataclass
 class Movie(abc.ABC):
@@ -78,7 +82,8 @@ class TransformedMovie(Movie):
     transformations:    List[MovieTransformation]
 
     def __init__(self, new_name: str, base_movie: Movie, transformation: MovieTransformation) -> None:
-        new_frames = [f'{new_name}_{i}' for i in range(len(self.frames))]
+        ext = get_extension(base_movie.get_frame_name(0))
+        new_frames = [f'{new_name}_{i}{ext}' for i in range(len(base_movie.frames))]
         super().__init__(new_name, new_frames)
 
         self.base_movie         = base_movie.name
@@ -87,3 +92,7 @@ class TransformedMovie(Movie):
     # Override
     def get_frame_name(self, frame: int) -> str:
         return self.frames[frame]
+
+    # Override
+    def transformations(self) -> List[MovieTransformation]:
+        return self.transformations
