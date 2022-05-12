@@ -2,10 +2,9 @@ import itertools
 import os
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Iterable, List, Tuple, Callable, Union, Any, Optional
+from typing import Iterable, List, Tuple, Callable, Union, Any, Optional, Dict
 
 from .path_utils import get_extension, strip_extension, lower_extension
-from .transformation import Transformation
 from repositories import metadata_repo
 
 import numpy as np
@@ -48,24 +47,38 @@ class ImageFormat(Enum):
         return '.' + self.value
 
 @dataclass
+class ImageTransformation:
+    name: str
+    properties: Dict[str, Any]
+
+    def __init__(self, name: str, **kwargs):
+        self.name = name
+        self.properties = kwargs
+
+    def __str__(self) -> str:
+        return '[{0}] {1}'.format(self.name, ", ".join([f'{k}={v}' for k,v in self.properties.items()]))
+
+@dataclass
 class Image:
     name:   str
     format: ImageFormat
     data:   np.ndarray
     movie: Optional[str] = None
-    transformations: List[Transformation] = field(default_factory=list)
+    transformations: List[ImageTransformation] = field(default_factory=list)
 
     RED_CHANNEL:    int = 0
     GREEN_CHANNEL:  int = 1
     BLUE_CHANNEL:   int = 2
 
-    def __init__(self, name: str, fmt: ImageFormat, data: np.ndarray, allow_reserved: bool = False, transformations: Optional[List[Transformation]] = None):
+    def __init__(self, name: str, fmt: ImageFormat, data: np.ndarray, allow_reserved: bool = False, movie: Optional[str] = None, transformations: Optional[List[ImageTransformation]] = None):
         if not allow_reserved and name in RESERVED_IMAGE_NAMES:
             raise ValueError(f'name cannot be any of this names: {RESERVED_IMAGE_NAMES}')
-        self.name = name
-        self.format = fmt
-        self.data = data
-        self.transformations = transformations if transformations else []
+
+        self.name               = name
+        self.format             = fmt
+        self.data               = data
+        self.movie              = movie
+        self.transformations    = transformations if transformations else []
 
     def valid_pixel(self, pixel: Tuple[int, int]) -> bool:
         x, y = pixel
@@ -149,7 +162,7 @@ def image_to_rgba_array(image: Image) -> np.ndarray:
         return _color_to_rgba(normalized_data)
 
 # height x width x channel
-def load_image(path: str) -> Image:
+def load_image(path: str, movie: Optional[str] = None) -> Image:
     name = Image.name_from_path(path)
     fmt = ImageFormat.from_extension(get_extension(name))
     data: np.ndarray
@@ -160,7 +173,7 @@ def load_image(path: str) -> Image:
     else:
         data = np.asarray(PImage.open(path), dtype=np.uint8) # noqa
 
-    return Image(name, fmt, data.astype(np.float64))
+    return Image(name, fmt, data.astype(np.float64), movie=movie)
 
 def save_image(image: Image, dir_path: str) -> None:
     normalized_data = normalize(image.data)

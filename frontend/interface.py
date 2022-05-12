@@ -181,20 +181,40 @@ def render_movie_frame(movie_name: str, frame: int):
     frame_is_rendered = dpg.does_item_exist(frame_window)
     frame_window_pos = dpg.get_item_pos(frame_window) if frame_is_rendered else []
     movie.current_frame = frame
-    frame_name = movie.current_frame_name
 
-    if not img_repo.contains_image(frame_name):
-        image = load_image(movie.current_frame_path)
-        image.movie = movie_name
-        img_repo.persist_image(image)
-        register_image(image)
+    frame_image = load_current_movie_frame(movie)
 
-    render_image_window(frame_name, movie, pos=frame_window_pos)
+    render_image_window(frame_image.name, movie, pos=frame_window_pos)
     if frame_is_rendered:
         dpg.delete_item(frame_window)
 
+def load_current_movie_frame(movie: Movie) -> Image:
+    return load_movie_frame(movie, movie.current_frame)
+
+def load_movie_frame(movie: Movie, frame: int) -> Image:
+    from models.movie import RootMovie, TransformedMovie
+
+    frame_name = movie.get_frame_name(frame)
+    if img_repo.contains_image(frame_name):
+        return img_repo.get_image(frame_name)
+    else:
+        image: Image
+        if isinstance(movie, RootMovie):
+            image = load_image(movie.current_frame_path, movie.name)
+        elif isinstance(movie, TransformedMovie):
+            image = load_movie_frame(mov_repo.get_movie(movie.base_movie), frame)
+            # TODO(tobi): apply movie transformation
+        else:
+            raise NotImplementedError()
+
+        img_repo.persist_image(image)
+        register_image(image)
+        return image
+
 @render_error
 def load_image_handler(app_data):
+    from models.movie import RootMovie
+
     movie_dir_checkbox = 'load_image_movie_dir_check'
     movie_dir: bool = dpg.get_value(movie_dir_checkbox)
     dpg.set_value(movie_dir_checkbox, False)
@@ -205,13 +225,23 @@ def load_image_handler(app_data):
     if selection_count == 0:
         raise ValueError('No image selected')
 
-    image_path: str
+    image: Image
     movie: Optional[Movie]
     if selection_count == 1:
+        # Caso Image
         image_path = next(iter(selections.values()))
+        image_name = Image.name_from_path(image_path)
+
+        if img_repo.contains_image(image_name):
+            image = img_repo.get_image(image_name)
+        else:
+            image = load_image(image_path)
+            img_repo.persist_image(image)
+            register_image(image)
+
         movie = None
     else:
-        # Creamos movie si no esta creada aun
+        # Caso Movie
         # WARNING: Identificamos a las peliculas por su directorio -> No pueden haber 2 peliculas en el mismo dir (sensato para nuestro caso de uso)
         movie_name = os.path.basename(current_path)
 
@@ -221,21 +251,13 @@ def load_image_handler(app_data):
             movie_base_path = os.path.dirname(app_data['file_path_name'])
             frames = list(selections.keys())
             frames.sort()  # WARNING: Las frames tienen que estar ordenadas alfabeticamente!!
-            movie = Movie(movie_name, movie_base_path, frames)
+            movie = RootMovie(movie_name, frames, movie_base_path)
             mov_repo.persist_movie(movie)
             register_movie(movie_name)
 
-        image_path = movie.current_frame_path
+        image = load_current_movie_frame(movie)
 
-    image_name = Image.name_from_path(image_path)
-    if not img_repo.contains_image(image_name):
-        image = load_image(image_path)
-        if movie is not None:
-            image.movie = movie.name
-        img_repo.persist_image(image)
-        register_image(image)
-
-    render_image_window(image_name, movie)
+    render_image_window(image.name, movie)
 
 @render_error
 def save_image_handler(app_data, image_name: str) -> None:
