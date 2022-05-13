@@ -62,7 +62,6 @@ def render_image_window(image_name: str, movie: Optional[Movie] = None, pos: Uni
                         for tr_channel in tr.channel_transformations:
                             if tr_channel.overlay:
                                 for cmd in tr_channel.overlay:
-                                    print((cmd.p1_x, cmd.p1_y), (cmd.p2_x, cmd.p2_y))
                                     if isinstance(cmd, LineDrawCmd):
                                         dpg.draw_line((cmd.p1_x, cmd.p1_y), (cmd.p2_x, cmd.p2_y), color=(0,255,0), parent=window)
                                     elif isinstance(cmd, CircleDrawCmd):
