@@ -346,6 +346,25 @@ def close_all_windows() -> None:
         if is_image_window(win):
             dpg.delete_item(win)
 
+# Retorna los puntos ya normalizados
+# Formato: (y, x); (up_left, down_right); Acordarse: left < right, up < down
+def get_image_window_rect_selection(window: Union[str, int]) -> Optional[Tuple[Tuple[int, int], Tuple[int, int]]]:
+    usr_data = dpg.get_item_user_data(window)
+    if 'init_draw' not in usr_data or 'end_draw' not in usr_data:
+        return None
+
+    p1, p2 = usr_data['init_draw'], usr_data['end_draw']
+
+    p1_ret = int(min(p2[1], p1[1])), int(min(p2[0], p1[0]))
+    p2_ret = int(max(p2[1], p1[1])), int(max(p2[0], p1[0]))
+
+    if p1_ret[0] == p2_ret[0] or p1_ret[1] == p2_ret[1]:
+        # Son colineares => No hay rectangulo
+        return None
+
+    return p1_ret, p2_ret
+
+
 def build_image_handler_registry() -> None:
     @render_error
     def mouse_move_handler() -> None:
@@ -358,12 +377,7 @@ def build_image_handler_registry() -> None:
                 user_data = dpg.get_item_user_data(win)
                 win_img_name = user_data['image_name']
                 pointer = f'image_{win_img_name}_pointer'
-                selection = f'image_{win_img_name}_selection'
-
                 dpg.set_value(pointer, '')
-                user_data.pop('init_draw', None)
-                if dpg.does_item_exist(selection):
-                    dpg.delete_item(selection)
 
         if window == 0:
             return  # No hay ninguna imagen seleccionada
@@ -380,7 +394,7 @@ def build_image_handler_registry() -> None:
             if image.valid_pixel(pixel):
                 # Estamos en la imagen! -> Dibujamos
                 usr_data = dpg.get_item_user_data(window)
-                if 'init_draw' in usr_data:
+                if 'init_draw' in usr_data and 'end_draw' not in usr_data:
                     if dpg.does_item_exist(selection):
                         dpg.delete_item(selection)
 
@@ -390,35 +404,26 @@ def build_image_handler_registry() -> None:
                 dpg.set_value(pointer, f"Pixel: {get_pixel_pos_in_image(window, image_name)}  Value: {np.around(image.get_pixel(pixel), 2)}")
                 return  # Terminamos de dibujar
 
-        # No estamos en la imagen -> Borramos lo dibujado
-        user_data.pop('init_draw', None)
+        # No estamos en la imagen -> Borramos el puntero. El rectangulo lo dejamos
         dpg.set_value(pointer, '')
-        if dpg.does_item_exist(selection):
-            dpg.delete_item(selection)
 
     @render_error
     def mouse_down_handler():
         window = get_focused_hovered_image_window()
 
         # Cleanup de las otras image windows
-        for win_id in dpg.get_windows():
-            win = dpg.get_item_alias(win_id)
-            if window != win and is_image_window(win):
-                user_data = dpg.get_item_user_data(win)
-                win_img_name = user_data['image_name']
-                region = f'image_{win_img_name}_region'
-                selection = f'image_{win_img_name}_selection'
-
-                dpg.set_value(region, '')
-                if dpg.does_item_exist(selection):
-                    dpg.delete_item(selection)
+        # for win_id in dpg.get_windows():
+        #     win = dpg.get_item_alias(win_id)
+        #     if window != win and is_image_window(win):
+        #       No cleanupeamos nada. Queremos que el rectangulo sea persistente
 
         if window == 0:
             return  # No hay ninguna imagen seleccionada
 
         usr_data = dpg.get_item_user_data(window)
         image_name: str = usr_data['image_name']
-        usr_data['init_draw'] = usr_data.get('init_draw', get_pixel_pos_in_image(window, image_name))
+        usr_data['init_draw'] = get_pixel_pos_in_image(window, image_name) if ('init_draw' not in usr_data or 'end_draw' in usr_data) else usr_data['init_draw']
+        usr_data.pop('end_draw', None)
         dpg.set_item_user_data(window, usr_data)
 
     @render_error
@@ -434,15 +439,15 @@ def build_image_handler_registry() -> None:
         region = f'image_{image_name}_region'
         selection = f'image_{image_name}_selection'
 
-        if 'init_draw' not in usr_data:
-            return  # No se detecto el inicio del click. Probablemente se este arrastrando la ventana.
+        if 'init_draw' not in usr_data or 'end_draw' in usr_data:
+            return  # No se detecto el inicio del click (probablemente se este arrastrando la ventana), o ya procesamos el rectangulo
 
-        pixel_pos = get_pixel_pos_in_image(window, image_name)
+        usr_data['end_draw'] = get_pixel_pos_in_image(window, image_name)
         init_draw = usr_data['init_draw']
-        region_size = (pixel_pos[0] - init_draw[0] + 1, pixel_pos[1] - init_draw[1] + 1)
+        end_draw = usr_data['end_draw']
 
-        x = (int(min(pixel_pos[0], init_draw[0])), int(max(pixel_pos[0], init_draw[0])))
-        y = (int(min(pixel_pos[1], init_draw[1])), int(max(pixel_pos[1], init_draw[1])))
+        x = (int(min(end_draw[0], init_draw[0])), int(max(end_draw[0], init_draw[0])))
+        y = (int(min(end_draw[1], init_draw[1])), int(max(end_draw[1], init_draw[1])))
 
         if x[1] > x[0] and y[1] > y[0]:
             if image.channels > 1:
@@ -451,14 +456,12 @@ def build_image_handler_registry() -> None:
             else:
                 mean = np.mean(image.data[y[0]:y[1], x[0]:x[1]])
 
-            dpg.set_value(region, f"#Pixel: {np.prod(np.abs(region_size))}  Avg: {np.around(mean, 2)}")
+            dpg.set_value(region, f"#Pixel: {np.prod((y[1] - y[0] + 1, x[1] - x[0] + 1))}  Avg: {np.around(mean, 2)}")
             dpg.show_item(region)
         else:
             dpg.set_value(region, '')
             if dpg.does_item_exist(selection):
                 dpg.delete_item(selection)
-
-        usr_data.pop('init_draw', None)
 
     with dpg.handler_registry():
         dpg.add_mouse_move_handler(callback=mouse_move_handler)

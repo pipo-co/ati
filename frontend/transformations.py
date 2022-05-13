@@ -866,6 +866,11 @@ def tr_border_active_outline(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image       = img_repo.get_image(image_name)
     new_name    = get_tr_name_value(image)
+    # TODO(tobi): Hacer que se pueda ejecutar la transformacion desde la frame n
+    rect_selection = interface.get_image_window_rect_selection(f'image_window_{image_name}')
+    if rect_selection is None:
+        raise ValueError('An initial bounding box on first frame is required in Active Outline')
+
     # 2. Procesamos
     new_data = image.data  # Por ahora nop
     transformation = ImageTransformation(TR_BORDER_ACTIVE_OUTLINE)

@@ -257,7 +257,6 @@ def canny_channel(channel: np.ndarray, t1: int, t2: int, padding_str: PaddingStr
     max_suppression_sw = np.max(max_suppression_sw, axis=(2, 3))
     gradient_mod[max_suppression_sw != gradient_mod] = 0
 
-    # TODO(tobi): Normalizamos?? Dudoso. Plis preguntar
     # Normalizamos la imagen antes del thresholding
     gradient_mod = normalize(gradient_mod, np.float64)
 
