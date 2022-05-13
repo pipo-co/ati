@@ -56,21 +56,19 @@ def render_image_window(image_name: str, movie: Optional[Movie] = None, pos: Uni
 
             with dpg.group(horizontal=True):
                 with dpg.group():
-                    with dpg.drawlist(width=image.width, height=image.height):
-                        
-                        dpg.draw_image(image_name, tag=f'image_{image_name}', pmin=(0, 0), pmax=(image.width, image.height))
-                        
-                        for tr in image.transformations:
-                            for tr_channel in tr.channel_transformations:
-                                if tr_channel.overlay:
-                                    for cmd in tr_channel.overlay:
-                                        print((cmd.p1_x, cmd.p1_y), (cmd.p2_x, cmd.p2_y))
-                                        if isinstance(cmd, LineDrawCmd):
-                                            dpg.draw_line((cmd.p1_x, cmd.p1_y), (cmd.p2_x, cmd.p2_y), color=(0,255,0))
-                                        elif isinstance(cmd, CircleDrawCmd):
-                                            dpg.draw_circle((cmd.c_x, cmd.c_y))
-                                        elif isinstance(cmd, ScatterDrawCmd):
-                                            dpg.draw_polygon(cmd.points)
+                    dpg.add_image(image_name, tag=f'image_{image_name}', width=image.width, height=image.height)
+    
+                    for tr in image.transformations:
+                        for tr_channel in tr.channel_transformations:
+                            if tr_channel.overlay:
+                                for cmd in tr_channel.overlay:
+                                    print((cmd.p1_x, cmd.p1_y), (cmd.p2_x, cmd.p2_y))
+                                    if isinstance(cmd, LineDrawCmd):
+                                        dpg.draw_line((cmd.p1_x, cmd.p1_y), (cmd.p2_x, cmd.p2_y), color=(0,255,0), parent=window)
+                                    elif isinstance(cmd, CircleDrawCmd):
+                                        dpg.draw_circle((cmd.c_x, cmd.c_y), parent=window)
+                                    elif isinstance(cmd, ScatterDrawCmd):
+                                        dpg.draw_polygon(cmd.points, parent=window)
                     
                     if movie:
                         with dpg.group(horizontal=True):
