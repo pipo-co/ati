@@ -3,6 +3,7 @@ from typing import Callable, Tuple, Union, Dict, Optional, List
 
 import dearpygui.dearpygui as dpg
 import numpy as np
+from models.draw_cmd import CircleDrawCmd, LineDrawCmd, ScatterDrawCmd
 
 from models.image import image_to_rgba_array, load_image, valid_image_formats, Image, save_image, get_extension, \
     create_square_image, create_circle_image, CIRCLE_IMAGE_NAME, SQUARE_IMAGE_NAME
@@ -55,7 +56,22 @@ def render_image_window(image_name: str, movie: Optional[Movie] = None, pos: Uni
 
             with dpg.group(horizontal=True):
                 with dpg.group():
-                    dpg.add_image(image_name, tag=f'image_{image_name}', width=image.width, height=image.height)
+                    with dpg.drawlist(width=image.width, height=image.height):
+                        
+                        dpg.draw_image(image_name, tag=f'image_{image_name}', pmin=(0, 0), pmax=(image.width, image.height))
+                        
+                        for tr in image.transformations:
+                            for tr_channel in tr.channel_transformations:
+                                if tr_channel.overlay:
+                                    for cmd in tr_channel.overlay:
+                                        print((cmd.p1_x, cmd.p1_y), (cmd.p2_x, cmd.p2_y))
+                                        if isinstance(cmd, LineDrawCmd):
+                                            dpg.draw_line((cmd.p1_x, cmd.p1_y), (cmd.p2_x, cmd.p2_y), color=(0,255,0))
+                                        elif isinstance(cmd, CircleDrawCmd):
+                                            dpg.draw_circle((cmd.c_x, cmd.c_y))
+                                        elif isinstance(cmd, ScatterDrawCmd):
+                                            dpg.draw_polygon(cmd.points)
+                    
                     if movie:
                         with dpg.group(horizontal=True):
                             if not movie.on_first_frame():
