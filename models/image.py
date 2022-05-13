@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Iterable, List, Tuple, Callable, Union, Any, Optional, Dict
 
+from models.draw_cmd import DrawCmd
+
 from .path_utils import get_extension, strip_extension, lower_extension
 from repositories import metadata_repo
 
@@ -47,13 +49,25 @@ class ImageFormat(Enum):
         return '.' + self.value
 
 @dataclass
+class ImageChannelTransformation:
+    results: Dict[str, Any]
+    overlay: Optional[List[DrawCmd]]
+
+    def __init__(self, overlay: Optional[List[DrawCmd]] = None, **kwargs):
+        self.overlay = overlay
+        self.results = kwargs
+
+
+@dataclass
 class ImageTransformation:
     name: str
     properties: Dict[str, Any]
+    channel_transformations: List[ImageChannelTransformation]
 
     def __init__(self, name: str, **kwargs):
         self.name = name
         self.properties = kwargs
+        self.channel_transformations = []
 
     def __str__(self) -> str:
         return '[{0}] {1}'.format(self.name, ", ".join([f'{k}={v}' for k,v in self.properties.items()]))
@@ -91,16 +105,20 @@ class Image:
     def get_channel(self, channel: int) -> np.ndarray:
         return self.data[:, :, channel] if self.channels > 1 else self.data
 
-    def apply_over_channels(self, fn: Callable[[np.ndarray, Any], np.ndarray], *args, **kwargs) -> np.ndarray:
+    def apply_over_channels(self, tr_name: str, fn: Callable[[np.ndarray, Any], np.ndarray], *args, **kwargs) -> Tuple[np.ndarray, ImageTransformation]:
         new_data: np.ndarray
+        transformation: ImageTransformation = ImageTransformation(tr_name, **kwargs)
+        channel_tr: ImageChannelTransformation
         if self.channels == 1:
-            new_data = fn(self.data, *args, **kwargs)
+            new_data, channel_tr = fn(self.data, *args, **kwargs)
+            transformation.channel_transformations.append(channel_tr)
         else:
             new_data = np.empty(self.shape)
             for channel in range(self.channels):
-                new_data[:, :, channel] = fn(self.get_channel(channel), *args, **kwargs)
+                new_data[:, :, channel], channel_tr = fn(self.get_channel(channel), *args, **kwargs)
+                transformation.channel_transformations.append(channel_tr)
 
-        return new_data
+        return new_data, transformation
 
     def get_histograms(self) -> Union[Tuple[Hist], Tuple[Hist, Hist, Hist]]:
         if self.channels == 1:

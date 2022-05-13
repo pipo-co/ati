@@ -328,8 +328,7 @@ def tr_neg(image_name: str) -> Image:
     image    = img_repo.get_image(image_name)
     new_name = get_tr_name_value(image)
     # 2. Procesamos
-    new_data = basic.negate(image)
-    transformation = ImageTransformation(TR_NEG)
+    new_data, transformation = basic.negate(image)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
 
@@ -352,8 +351,7 @@ def tr_pow(image_name: str) -> Image:
     new_name = get_tr_name_value(image)
     gamma    = get_tr_float_value()
     # 2. Procesamos
-    new_data = basic.power(image, gamma)
-    transformation = ImageTransformation(TR_POW, gamma=round(gamma, TR_DECIMAL_PLACES))
+    new_data, transformation = basic.power(image, gamma)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
 
@@ -369,8 +367,7 @@ def tr_equalize(image_name: str) -> Image:
     image    = img_repo.get_image(image_name)
     new_name = get_tr_name_value(image)
     # 2. Procesamos
-    new_data = basic.equalize(image)
-    transformation = ImageTransformation(TR_EQUALIZE)
+    new_data, transformation = basic.equalize(image)
     # 3. Creamos Imagen y finalizamos
     return image.transform(new_name, new_data, transformation)
 
@@ -392,8 +389,7 @@ def tr_thresh_manual(image_name: str) -> Image:
     new_name    = get_tr_name_value(image)
     threshold   = get_tr_int_value()
     # 2. Procesamos
-    new_data = thresh.manual(image, threshold)
-    transformation = ImageTransformation(TR_THRESH_MANUAL, threshold=threshold)
+    new_data, transformation = thresh.manual(image, threshold)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
 
@@ -411,8 +407,7 @@ def tr_global_umbral(image_name: str) -> Image:
     new_name    = get_tr_name_value(image)
     umb         = get_tr_int_value()
     # 2. Procesamos
-    new_data = thresh.global_(image, umb)
-    transformation = ImageTransformation(TR_THRESH_GLOBAL, umb=umb)
+    new_data, transformation = thresh.global_(image, umb)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
 
@@ -428,8 +423,7 @@ def tr_otsu_threshold(image_name: str) -> Image:
     image       = img_repo.get_image(image_name)
     new_name    = get_tr_name_value(image)
     # 2. Procesamos
-    new_data = thresh.otsu(image)
-    transformation = ImageTransformation(TR_THRESH_OTSU)
+    new_data, transformation = thresh.otsu(image)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
 
@@ -455,8 +449,7 @@ def tr_noise_gauss(image_name: str) -> Image:
     percentage  = get_tr_percentage_value('percentage')
     noise_type  = noise.Type.from_name(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data = noise.pollute(image, lambda size: rng.gaussian(0, sigma, size), noise_type, percentage)
-    transformation = ImageTransformation(TR_NOISE_GAUSS, sigma=round(sigma, TR_DECIMAL_PLACES), percentage=percentage)
+    new_data, transformation = noise.gaus(image, sigma, noise_type, percentage)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
 
@@ -478,8 +471,7 @@ def tr_noise_exp(image_name: str) -> Image:
     percentage  = get_tr_percentage_value('percentage')
     noise_type  = noise.Type.from_name(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data = noise.pollute(image, lambda size: rng.exponential(lam, size), noise_type, percentage)
-    transformation = ImageTransformation(TR_NOISE_EXP, lam=round(lam, TR_DECIMAL_PLACES), percentage=percentage)
+    new_data, transformation = noise.exponential(image, lam, noise_type, percentage)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
 
@@ -501,8 +493,7 @@ def tr_noise_rayleigh(image_name: str) -> Image:
     percentage  = dpg.get_value('percentage')
     noise_type  = noise.Type.from_name(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data = noise.pollute(image, lambda size: rng.rayleigh(epsilon, size), noise_type, percentage)
-    transformation = ImageTransformation(TR_NOISE_RAYLEIGH, epsilon=epsilon, percentage=percentage)
+    new_data, transformation = noise.rayleigh(image, epsilon, noise_type, percentage)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
 
@@ -520,8 +511,7 @@ def tr_noise_salt(image_name: str) -> Image:
     new_name    = get_tr_name_value(image)
     percentage  = get_tr_percentage_value('percentage')
     # 2. Procesamos
-    new_data = noise.salt(image, percentage)
-    transformation = ImageTransformation(TR_NOISE_SALT, percentage=percentage)
+    new_data, transformation = noise.salt(image, percentage)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
 
@@ -545,8 +535,7 @@ def tr_denoise_mean(image_name: str) -> Image:
     kernel_size = require_odd(get_tr_int_value(), 'Kernel size must be odd')
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data = denoise.mean(image, kernel_size, padding_str)
-    transformation = ImageTransformation(TR_DENOISE_MEAN, kernel_size=kernel_size)
+    new_data, transformation = denoise.mean(image, kernel_size, padding_str)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
 
@@ -566,8 +555,7 @@ def tr_denoise_median(image_name: str) -> Image:
     kernel_size = require_odd(get_tr_int_value(), 'Kernel size must be odd')
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data = denoise.median(image, kernel_size, padding_str)
-    transformation = ImageTransformation(TR_DENOISE_MEDIAN, kernel_size=kernel_size)
+    new_data, transformation = denoise.median(image, kernel_size, padding_str)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
 
@@ -587,8 +575,7 @@ def tr_denoise_weighted_median(image_name: str) -> Image:
     kernel      = np.array(get_tr_input_table_values())
     padding     = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos - Puede ser async
-    new_data = denoise.weighted_median(image, kernel, padding)
-    transformation = ImageTransformation(TR_DENOISE_WEIGHTED_MEDIAN)
+    new_data, transformation = denoise.weighted_median(image, kernel, padding)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
 
@@ -608,8 +595,7 @@ def tr_denoise_gauss(image_name: str) -> Image:
     sigma       = get_tr_float_value()
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data = denoise.gauss(image, sigma, padding_str)
-    transformation = ImageTransformation(TR_DENOISE_GAUSS, sigma=round(sigma, TR_DECIMAL_PLACES))
+    new_data, transformation = denoise.gauss(image, sigma, padding_str)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
 
@@ -633,8 +619,7 @@ def tr_denoise_diffusion(image_name: str) -> Image:
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     function = denoise.DiffusionStrategy.from_str(get_tr_radio_buttons_value(radio_buttons='function'))
     # 2. Procesamos
-    new_data = denoise.diffusion(image, iterations, sigma, padding_str, function)
-    transformation = ImageTransformation(TR_DENOISE_DIFFUSION, iterations=iterations, sigma=sigma, fn=function.name)
+    new_data, transformation = denoise.diffusion(image, iterations, sigma, padding_str, function)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
 
@@ -657,8 +642,7 @@ def tr_denoise_bilateral_filter(image_name: str) -> Image:
 
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data = denoise.bilateral_filter(image, sigma_space, sigma_intensity, padding_str)
-    transformation = ImageTransformation(TR_DENOISE_BILATERAL, sigma_space=sigma_space, sigma_intensity=sigma_intensity)
+    new_data, transformation = denoise.bilateral_filter(image, sigma_space, sigma_intensity, padding_str)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
 
@@ -682,7 +666,7 @@ def tr_border_high_pass(image_name: str) -> Image:
     kernel_size = require_odd(get_tr_int_value(), 'Kernel size must be odd')
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data = border.high_pass(image, kernel_size, padding_str)
+    new_data, transformation = border.high_pass(image, kernel_size, padding_str)
     transformation = ImageTransformation(TR_BORDER_HIGH_PASS, kernel_size=kernel_size)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
@@ -705,8 +689,7 @@ def tr_border_directional(image_name: str) -> Image:
     border_dir = border.Direction.from_str(get_tr_radio_buttons_value(radio_buttons="direction"))
     kernel = border.FamousKernel.JULIANA if get_tr_checkbox_value() else border.FamousKernel.PREWITT
     # 2. Procesamos
-    new_data = border.directional(image, kernel, border_dir, padding_str)
-    transformation = ImageTransformation(TR_BORDER_DIRECTIONAL, kernel=kernel.name, sigma=border_dir.name)
+    new_data, transformation = border.directional(image, kernel, border_dir, padding_str)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
 
@@ -724,8 +707,7 @@ def tr_border_prewitt(image_name: str) -> Image:
     new_name    = get_tr_name_value(image)
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data = border.prewitt(image, padding_str)
-    transformation = ImageTransformation(TR_BORDER_PREWITT)
+    new_data, transformation = border.prewitt(image, padding_str)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
 
@@ -743,8 +725,7 @@ def tr_border_sobel(image_name: str) -> Image:
     new_name    = get_tr_name_value(image)
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data = border.sobel(image, padding_str)
-    transformation = ImageTransformation(TR_BORDER_SOBEL)
+    new_data, transformation = border.sobel(image, padding_str)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
 
@@ -764,8 +745,7 @@ def tr_border_laplacian(image_name: str) -> Image:
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     crossing_threshold = get_tr_int_value()
     # 2. Procesamos
-    new_data = border.laplace(image, crossing_threshold, padding_str)
-    transformation = ImageTransformation(TR_BORDER_LAPLACIAN, crossing_threshold=crossing_threshold)
+    new_data, transformation = border.laplace(image, crossing_threshold, padding_str)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
 
@@ -787,8 +767,7 @@ def tr_border_log(image_name: str) -> Image:
     sigma = get_tr_float_value()
     crossing_threshold = get_tr_int_value()
     # 2. Procesamos
-    new_data = border.log(image, sigma, crossing_threshold, padding_str)
-    transformation = ImageTransformation(TR_BORDER_LOG, sigma=round(sigma, TR_DECIMAL_PLACES), crossing_threshold=crossing_threshold)
+    new_data, transformation = border.log(image, sigma, crossing_threshold, padding_str)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
 
@@ -806,8 +785,7 @@ def tr_border_susan(image_name: str) -> Image:
     new_name    = get_tr_name_value(image)
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data = border.susan(image, padding_str)
-    transformation = ImageTransformation(TR_BORDER_SUSAN)
+    new_data, transformation = border.susan(image, padding_str)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
 
@@ -826,9 +804,7 @@ def tr_border_hough(image_name: str) -> Image:
     t = get_tr_float_value()
     # 2. Procesamos
     # TODO(nacho): Cablear bien la data
-    border.hough(image, t)
-    new_data = image.data
-    transformation = ImageTransformation(TR_BORDER_HOUGH, t=t)
+    new_data, transformation = border.hough(image, t)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
 
@@ -850,8 +826,7 @@ def tr_border_canny(image_name: str) -> Image:
     t1 = get_tr_int_value('t1')
     t2 = get_tr_int_value('t2')
     # 2. Procesamos
-    new_data = border.canny(image, t1, t2, padding_str)
-    transformation = ImageTransformation(TR_BORDER_CANNY, lower_threshold=t1, upper_threshold=t2)
+    new_data, transformation = border.canny(image, t1, t2, padding_str)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
 
@@ -901,8 +876,7 @@ def tr_combine_add(image_name: str) -> Image:
     sec_image   = get_tr_img_value()
     require_same_shape(image, sec_image, 'You can only sum images with the same shape')
     # 2. Procesamos
-    new_data = combine.add(image, sec_image)
-    transformation = ImageTransformation(TR_COMBINE_ADD)
+    new_data, transformation = combine.add(image, sec_image)
     # 3. Creamos Imagen y finalizamos
     return image.transform(new_name, new_data, transformation)
 
@@ -921,8 +895,7 @@ def tr_combine_sub(image_name: str) -> Image:
     sec_image   = get_tr_img_value()
     require_same_shape(image, sec_image, 'You can only sub images with the same shape')
     # 2. Procesamos
-    new_data = combine.sub(image, sec_image)
-    transformation = ImageTransformation(TR_COMBINE_SUB)
+    new_data, transformation = combine.sub(image, sec_image)
     # 3. Creamos Imagen y finalizamos
     return image.transform(new_name, new_data, transformation)
 
@@ -941,7 +914,7 @@ def tr_combine_mult(image_name: str) -> Image:
     sec_image   = get_tr_img_value()
     require_same_shape(image, sec_image, 'You can only multiply images with the same shape')
     # 2. Procesamos
-    new_data = combine.multiply(image, sec_image)
+    new_data, transformation = combine.multiply(image, sec_image)
     transformation = ImageTransformation(TR_COMBINE_MULT)
     # 3. Creamos Imagen y finalizamos
     return image.transform(new_name, new_data, transformation)
