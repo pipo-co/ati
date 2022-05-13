@@ -42,6 +42,9 @@ class Movie(abc.ABC):
     def on_last_frame(self) -> bool:
         return self.current_frame == len(self.frames) - 1
 
+    def inc_frame(self) -> None:
+        self.current_frame += 1
+
     @property
     @abc.abstractmethod
     def transformations(self) -> List[MovieTransformation]:

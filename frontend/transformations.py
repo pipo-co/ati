@@ -87,6 +87,7 @@ def execute_image_transformation(image_name: str, handler: TrHandler) -> None:
     interface.register_image(new_image)
     interface.render_image_window(new_image.name)
 
+# TODO(tobi): implementar todas las transformaciones para imagenes
 @render_error
 def execute_movie_transformation(base_movie_name: str, base_handle: TrHandler, inductive_handle: Callable[[str, Image, Image], Image]) -> None:
     base_movie = mov_repo.get_movie(base_movie_name)

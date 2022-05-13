@@ -58,11 +58,12 @@ def render_image_window(image_name: str, movie: Optional[Movie] = None, pos: Uni
                     dpg.add_image(image_name, tag=f'image_{image_name}', width=image.width, height=image.height)
                     if movie:
                         with dpg.group(horizontal=True):
-                            # TODO(tobi): Que se pueda avanzar de a 10 frames
                             if not movie.on_first_frame():
-                                dpg.add_button(label='<- Prev frame', width=image.width//2 - 1, user_data=(movie.name, movie.current_frame - 1), callback=lambda s, ad, ud: render_movie_frame(*ud))
+                                dpg.add_button(label='<<- 10',                            width=image.width // 4 - 1, user_data=(movie.name, movie.current_frame - 10), callback=lambda s, ad, ud: render_movie_frame(*ud))
+                                dpg.add_button(label='<- Step', indent=image.width // 4 + 1, width=image.width // 4 - 1, user_data=(movie.name, movie.current_frame - 1),  callback=lambda s, ad, ud: render_movie_frame(*ud))
                             if not movie.on_last_frame():
-                                dpg.add_button(label='Next frame ->', indent=image.width//2 + 1, width=image.width//2 - 1, user_data=(movie.name, movie.current_frame + 1), callback=lambda s, ad, ud: render_movie_frame(*ud))
+                                dpg.add_button(label='Step ->',   indent=image.width // 2 + 1,     width=image.width // 4 - 1, user_data=(movie.name, movie.current_frame + 1),  callback=lambda s, ad, ud: render_movie_frame(*ud))
+                                dpg.add_button(label='10 ->>', indent=image.width * 3 // 4 + 1, width=image.width // 4 - 1, user_data=(movie.name, movie.current_frame + 10), callback=lambda s, ad, ud: render_movie_frame(*ud))
                     with dpg.group(horizontal=True, width=image.width):
                         dpg.add_text(f'Height {image.height}')
                         dpg.add_separator()
@@ -181,9 +182,22 @@ def render_movie_frame(movie_name: str, frame: int):
     frame_window = f'image_window_{movie.current_frame_name}'
     frame_is_rendered = dpg.does_item_exist(frame_window)
     frame_window_pos = dpg.get_item_pos(frame_window) if frame_is_rendered else []
-    movie.current_frame = frame
 
-    frame_image = load_current_movie_frame(movie)
+    # Actualizamos la current frame de la movie
+    frame_image: Image
+    if movie.current_frame == frame:
+        # Si ya estamos parados bien, solo tenemos que cargarla
+        frame_image = load_current_movie_frame(movie)
+    elif movie.current_frame > frame:
+        # Si vamos para atras podemos saltar de una
+        movie.current_frame = max(0, frame)
+        frame_image = load_current_movie_frame(movie)
+    else:
+        # Cuando vamos para adelante estamos obligados a ir uno a uno para ir calculando el frame a partir del anterior
+        frame_image = load_current_movie_frame(movie)
+        for _ in range(movie.current_frame + 1, min(frame + 1, len(movie))):
+            movie.inc_frame()
+            frame_image = load_current_movie_frame(movie)
 
     render_image_window(frame_image.name, movie, pos=frame_window_pos)
     if frame_is_rendered:
