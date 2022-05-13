@@ -8,9 +8,13 @@ def contains_image(image_name: str) -> bool:
     return image_name in _loaded_images
 
 def get_image(image_name: str) -> Image:
+    if image_name not in _loaded_images:
+        raise ValueError(f'{image_name} is not in repository')
     return _loaded_images[image_name]
 
 def persist_image(image: Image) -> None:
+    if image.name in _loaded_images:
+        raise ValueError(f'{image.name} already has mapped {_loaded_images[image.name]}')
     _loaded_images[image.name] = image
 
 def get_same_shape_images(image_name: str) -> Iterable[Image]:
