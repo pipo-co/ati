@@ -848,8 +848,7 @@ def tr_border_active_outline(image_name: str) -> Image:
         raise ValueError('An initial bounding box on first frame is required in Active Outline')
 
     # 2. Procesamos
-    new_data = image.data  # Por ahora nop
-    transformation = ImageTransformation(TR_BORDER_ACTIVE_OUTLINE)
+    new_data, transformation  = border.active_outline_first_frame(image, rect_selection[0], rect_selection[1])
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
 

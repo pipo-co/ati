@@ -67,7 +67,7 @@ def render_image_window(image_name: str, movie: Optional[Movie] = None, pos: Uni
                                     elif isinstance(cmd, CircleDrawCmd):
                                         dpg.draw_circle((cmd.c_x, cmd.c_y), parent=window)
                                     elif isinstance(cmd, ScatterDrawCmd):
-                                        dpg.draw_polygon(cmd.points, parent=window)
+                                        dpg.draw_polygon(cmd.points, color=(0,255,0), parent=window)
                     
                     if movie:
                         with dpg.group(horizontal=True):

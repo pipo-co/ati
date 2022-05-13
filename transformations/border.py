@@ -2,7 +2,7 @@ from enum import Enum
 from typing import List, Optional, Tuple
 
 import numpy as np
-from models.draw_cmd import LineDrawCmd
+from models.draw_cmd import LineDrawCmd, ScatterDrawCmd
 from models.image import MAX_COLOR, Image, ImageChannelTransformation, ImageTransformation, normalize
 
 from transformations.np_utils import index_matrix
@@ -315,66 +315,79 @@ def canny_channel(channel: np.ndarray, t1: int, t2: int, padding_str: PaddingStr
 
     return gradient_mod, ImageChannelTransformation()
 
-def get_rectangular_boundrie(x: Tuple[int, int], y: Tuple[int, int]) -> np.ndarray:
-    upper_line = np.array([(y[0], x) for x in range(x[0], x[1] + 1)])
-    bottom_line = np.array([(y[1], x) for x in range(x[0], x[1] + 1)])
-    left_line = np.array([(y, x[0]) for y in range(y[0], y[1] +1)])
-    right_line = np.array([(y, x[1]) for y in range(y[0], y[1] +1)])
+def get_rectangular_boundrie(x: Tuple[int, int], y: Tuple[int, int]) -> List[Tuple[int, int]]:
+    rectangular_boundrie = []
+    rectangular_boundrie.extend([(y[0], x) for x in range(x[0], x[1] + 1)])
+    rectangular_boundrie.extend([(y[1], x) for x in range(x[0], x[1] + 1)])
+    rectangular_boundrie.extend([(y, x[0]) for y in range(y[0], y[1] + 1)])
+    rectangular_boundrie.extend([(y, x[1]) for y in range(y[0], y[1] + 1)])
 
-    return np.concatenate((upper_line, right_line, left_line, bottom_line), axis=0)
+    return rectangular_boundrie
 
 
-def get_initial_boundries(x: Tuple[int, int], y: Tuple[int, int], phi_size: int) -> np.ndarray:
+def get_initial_boundries(x: Tuple[int, int], y: Tuple[int, int], phi_size: int):
     lout = get_rectangular_boundrie(x, y)
     lin = get_rectangular_boundrie((x[0] + 1, x[1] - 1), (y[0] + 1, y[1] - 1))
     phi = np.full((phi_size, phi_size), 3)
-    phi[y[0]:y[1], x[0]:x[1]] = 1
-    phi[y[0] + 1:y[1] - 1, x[0] + 1:x[1] - 1] = -1
-    phi[y[0] + 2:y[1] + 2, x[0] + 2:x[1] - 2] = -3
+    phi[y[0]:y[1]+1, x[0]:x[1]+1] = 1
+    phi[y[0] + 1:y[1], x[0] + 1:x[1]] = -1
+    phi[y[0] + 2:y[1] - 1, x[0] + 2:x[1] - 1] = -3
     return lout, lin, phi
 
 def get_indexes() -> np.ndarray:
     return np.reshape(np.array(list(np.ndindex((3, 3)))) - 3//2, (9, 2))
     
-def inBounds(x: int, y: int, shape: Tuple[int, int]) -> Boolean:
-    return x >= 0 and x < shape[1] and y >=0 and y < shape[0]
+def inBounds(x: int, y: int, shape: Tuple[int, int]):
+    return x >= 0 and x < shape[1] and y >= 0 and y < shape[0]
 
-def new_values(phi: np.ndarray, indices:np.ndarray, point: Tuple[int, int], target: int, new_value: int) -> List[Tuple[int, int]]:
+
+def new_phi_values(previous_phi: np.ndarray, new_phi: np.ndarray, indices: np.ndarray, point: Tuple[int, int], target: int, new_value: int) -> List[
+    Tuple[int, int]]:
     value_list = []
     for index in indices:
         phi_y = point[0] + index[0]
         phi_x = point[1] + index[1]
-        if inBounds(phi_x, phi_y, phi.shape) and phi[phi_y, phi_x] == target:
-            value_list.append((phi_y, phi_x))
-            phi[phi_y, phi_x] = new_value
+        if inBounds(phi_x, phi_y, previous_phi.shape):
+            if previous_phi[phi_y, phi_x] == target:
+                value_list.append((phi_y, phi_x))
+                new_phi[phi_y, phi_x] = new_value
+            elif previous_phi[phi_y, phi_x] == new_value:
+                new_phi[phi_y, phi_x] = -new_value
+            elif previous_phi[phi_y, phi_x] == -new_value:
+                new_phi[phi_y, phi_x] = -target
     return value_list
 
-def active_outline(image: np.ndarray, sigma, lout: np.ndarray, lin: np.ndarray, phi: np.ndarray) -> np.ndarray:
+def active_outline(image: np.ndarray, sigma, lout: np.ndarray, lin: np.ndarray, phi: np.ndarray):
     flag = True
     indices = get_indexes()
     while flag:
         flag = False
         new_lout = []
         new_lin = []
+        new_phi = np.copy(phi)
         for point in lout:
             norm_lout = np.linalg.norm(sigma - image[point[0], point[1]])
-            if (norm_lout <= 10):
+            if norm_lout <= 10:
                 new_lin.append(point)
-                new_lout.extend(new_values(phi, indices, point, 3, 1))
+                new_lout.extend(new_phi_values(phi, new_phi, indices, point, 3, 1))
                 flag = True
             else:
                 new_lout.append(point)
         for point in lin:
             norm_lin = np.linalg.norm(sigma - image[point[0], point[1]])
-            if (norm_lin >= 10):
+            if norm_lin >= 10:
                 new_lout.append(point)
-                new_lin.extend(new_values(phi, indices, point, -3, -1))
+                new_lin.extend(new_phi_values(phi, new_phi, indices, point, -3, -1))
                 flag = True
             else:
                 new_lin.append(point)
-        lout = new_lout
-        lin = new_lin
-        
+        lout = set(new_lout)
+        lin = set(new_lin)
+        phi = new_phi
+
+    lout = sorted(list(lout), key=lambda tup: tup[0])
+    lin = sorted(list(lin), key=lambda tup: tup[0])
+    
     return lout, lin, phi
 
     
@@ -413,7 +426,7 @@ def make_dimension_point(p1: Tuple[int, int], p2: Tuple[int, int], dim: int):
     else:
         return (p1[dim], p2[dim])
 
-def active_outline_first_frame(image: Image, p1: Tuple[int, int], p2: Tuple[int, int]) -> np.ndarray:
+def active_outline_first_frame(image: Image, p1: Tuple[int, int], p2: Tuple[int, int]) -> Tuple[np.ndarray, ImageTransformation]:
     
     x = make_dimension_point(p1, p2, 0)
     y = make_dimension_point(p1, p2, 1)
@@ -423,9 +436,13 @@ def active_outline_first_frame(image: Image, p1: Tuple[int, int], p2: Tuple[int,
     else:
         sigma = np.mean(image.data[y[0]:y[1], x[0]:x[1]])
 
-    lout, lin, phi = get_initial_boundries(image, x, y)  
+    lout, lin, phi = get_initial_boundries(x, y, image.data[:, 1].size)
 
-    return active_outline(image, sigma, lout, lin, phi)
+    lout, lin, phi = active_outline(image.data, sigma, lout, lin, phi)
+
+    img_transformation = ImageTransformation('active_outline')
+    img_transformation.channel_transformations.append(ImageChannelTransformation([ScatterDrawCmd(lout), ScatterDrawCmd(lin)]))
+    return image.data, img_transformation
 
 def active_outline_middle_frame(image: Image, in_color: int, l_in: np.ndarray, l_out: np.ndarray) -> np.ndarray:
     pass
