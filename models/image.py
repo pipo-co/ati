@@ -112,6 +112,9 @@ class Image:
                 channel_histogram(self.get_channel(Image.BLUE_CHANNEL))
             )
 
+    def transform(self, new_name: str, new_data: np.ndarray, transformation: ImageTransformation):
+        return Image(new_name, self.format, new_data, movie=self.movie, transformations=self.transformations + [transformation])
+
     @property
     def shape(self) -> Tuple[int]:
         return self.data.shape
