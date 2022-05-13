@@ -4,7 +4,7 @@ from typing import Callable, List, Optional
 import dearpygui.dearpygui as dpg
 import numpy as np
 
-from models.movie import Movie, TransformedMovie, MovieTransformation
+from models.movie import TransformedMovie, MovieTransformation
 from transformations import basic, border, combine, denoise, noise, threshold as thresh
 from repositories import images_repo as img_repo
 from repositories import movies_repo as mov_repo
@@ -66,6 +66,7 @@ def build_transformations_menu(image_name: str) -> None:
             build_tr_menu_item(TR_BORDER_SUSAN,             build_border_susan_dialog,              image_name)
             build_tr_menu_item(TR_BORDER_HOUGH,             build_border_hough_dialog,              image_name)
             build_tr_menu_item(TR_BORDER_CANNY,             build_border_canny_dialog,              image_name)
+            build_tr_menu_item(TR_BORDER_ACTIVE_OUTLINE,    build_border_active_outline_dialog,     image_name)
         with dpg.menu(label='Combine'):
             build_tr_menu_item(TR_COMBINE_ADD,              build_combine_add_dialog,               image_name)
             build_tr_menu_item(TR_COMBINE_SUB,              build_combine_sub_dialog,               image_name)
@@ -73,7 +74,7 @@ def build_transformations_menu(image_name: str) -> None:
 
 
 def build_tr_menu_item(tr_id: str, tr_dialog_builder: Callable[[str], None], image_name: str) -> None:
-    dpg.add_menu_item(label=tr_id.title(), user_data=(tr_dialog_builder, image_name), callback=lambda s, ad, ud: ud[0](ud[1]))
+    dpg.add_menu_item(label=tr_id.title().replace('_', ' '), user_data=(tr_dialog_builder, image_name), callback=lambda s, ad, ud: ud[0](ud[1]))
 
 @render_error
 def execute_image_transformation(image_name: str, handler: TrHandler) -> None:
@@ -87,7 +88,7 @@ def execute_image_transformation(image_name: str, handler: TrHandler) -> None:
     interface.render_image_window(new_image.name)
 
 @render_error
-def execute_movie_transformation(base_movie_name: str, base_handle: TrHandler, inductive_handle: Callable[[str, Image], Image]) -> None:
+def execute_movie_transformation(base_movie_name: str, base_handle: TrHandler, inductive_handle: Callable[[str, Image, Image], Image]) -> None:
     base_movie = mov_repo.get_movie(base_movie_name)
     base_image = interface.load_movie_frame(base_movie, 0)
 
@@ -97,7 +98,7 @@ def execute_movie_transformation(base_movie_name: str, base_handle: TrHandler, i
         dpg.delete_item(TR_DIALOG)
 
     movie_name = strip_extension(new_image.name)
-    image_tr = new_image.transformations[-1]
+    image_tr = new_image.last_transformation
 
     new_movie = TransformedMovie(movie_name, base_movie, MovieTransformation.from_img_tr(image_tr, inductive_handle))
 
@@ -113,7 +114,7 @@ def execute_movie_transformation(base_movie_name: str, base_handle: TrHandler, i
     interface.render_image_window(new_image.name, new_movie)
 
 def build_tr_dialog(tr_id: str) -> int:
-    return dpg.window(label=f'Apply {tr_id.title()} Transformation', tag=TR_DIALOG, modal=True, no_close=True, pos=interface.CENTER_POS)
+    return dpg.window(label=f'Apply {tr_id.title().replace("_", " ")} Transformation', tag=TR_DIALOG, modal=True, no_close=True, pos=interface.CENTER_POS)
 
 def build_tr_dialog_end_buttons(tr_id: str, image_name: str, handle: TrHandler) -> None:
     with dpg.group(horizontal=True):
@@ -133,18 +134,23 @@ def build_movie_tr_dialog_end_buttons(tr_id: str, image_name: str, handle: TrHan
 
 # ******************** Input Builders ********************* #
 
-def unique_image_name(base_name: str, ext: str) -> str:
-    if not img_repo.contains_image(base_name + ext):
+def unique_name(base_name: str, ext: str = '') -> str:
+    if not img_repo.contains_image(base_name + ext) and not mov_repo.contains_movie(base_name):
         return base_name
     for i in itertools.count(start=2):
         name = f'{base_name}_{i}'
-        if not img_repo.contains_image(name + ext):
+        if not img_repo.contains_image(name + ext) and not mov_repo.contains_movie(base_name):
             return name
 
 # Solo puede haber un name input, que (casi) siempre debe estar
 def build_tr_name_input(tr_id: str, image_name: str) -> None:
-    dpg.add_text('Select New Image Name (no extension)')
-    dpg.add_input_text(default_value=unique_image_name(strip_extension(image_name) + f'_{tr_id}', get_extension(image_name)), tag=TR_NAME_INPUT)
+    image = img_repo.get_image(image_name)
+    default_value = unique_name(image.movie + f'_{tr_id}') \
+        if image.movie_frame \
+        else unique_name(strip_extension(image_name) + f'_{tr_id}', get_extension(image_name))
+
+    dpg.add_text('Select New Image or Movie Name (no extension)')
+    dpg.add_input_text(default_value=default_value, tag=TR_NAME_INPUT)
 
 def build_tr_value_int_selector(name: str, min_val: int, max_val: int, default_value: int = None, suffix: str = None, step: int = 1, tag: str = TR_INT_VALUE_SELECTOR) -> None:
     dpg.add_text(f'Select \'{name}\' between {min_val} and {max_val}')
@@ -194,10 +200,12 @@ def get_table_field_name(tag: str, row: int, col: int) -> str:
 def get_tr_name_value(image: Image) -> str:
     base_name = dpg.get_value(TR_NAME_INPUT)
     if not base_name:
-        raise ValueError('A name for the new image must be provided')
+        raise ValueError('A name for the new image/movie must be provided')
     ret = base_name + image.format.to_extension()
     if img_repo.contains_image(ret):
         raise ValueError(f'Another image with name "{ret}" already exists')
+    if mov_repo.contains_movie(base_name):
+        raise ValueError(f'Another movie with name "{base_name}" already exists')
     return ret
 
 def get_tr_img_value(img_input: str = TR_IMG_INPUT) -> Image:
@@ -326,9 +334,9 @@ def tr_neg(image_name: str) -> Image:
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data, transformations=new_trasformations)
 
-def tr_neg_inductive(new_name: str, prev_image: Image) -> Image:
-    new_data = basic.negate(prev_image)
-    return Image(new_name, prev_image.format, new_data, transformations=prev_image.transformations + [ImageTransformation(TR_NEG)])
+def tr_neg_inductive(new_name: str, _: Image, current: Image) -> Image:
+    new_data = basic.negate(current)
+    return Image(new_name, current.format, new_data, transformations=current.transformations + [ImageTransformation(TR_NEG)])
 
 TR_POW: str = 'pow'
 @render_error
@@ -766,9 +774,9 @@ def build_border_laplacian_dialog(image_name: str) -> None:
         build_tr_name_input(TR_BORDER_LAPLACIAN, image_name)
         build_tr_radio_buttons(PaddingStrategy.names())
         build_tr_value_int_selector('crossing threshold', 0, MAX_COLOR, default_value=100)
-        build_tr_dialog_end_buttons(TR_BORDER_LAPLACIAN, image_name, tr_border_laplacian_border)
+        build_tr_dialog_end_buttons(TR_BORDER_LAPLACIAN, image_name, tr_border_laplacian)
 
-def tr_border_laplacian_border(image_name: str) -> Image:
+def tr_border_laplacian(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image       = img_repo.get_image(image_name)
     new_name    = get_tr_name_value(image)
@@ -789,9 +797,9 @@ def build_border_log_dialog(image_name: str) -> None:
         build_tr_radio_buttons(PaddingStrategy.names())
         build_tr_value_float_selector('sigma', 1, 20, default_value=2)
         build_tr_value_int_selector('crossing threshold', 0, MAX_COLOR, default_value=10)
-        build_tr_dialog_end_buttons(TR_BORDER_LOG, image_name, tr_border_log_border)
+        build_tr_dialog_end_buttons(TR_BORDER_LOG, image_name, tr_border_log)
 
-def tr_border_log_border(image_name: str) -> Image:
+def tr_border_log(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image       = img_repo.get_image(image_name)
     new_name    = get_tr_name_value(image)
@@ -831,9 +839,9 @@ def build_border_hough_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_BORDER_HOUGH):
         build_tr_name_input(TR_BORDER_HOUGH, image_name)
         build_tr_value_float_selector('t', 0, 20, default_value=1)
-        build_tr_dialog_end_buttons(TR_BORDER_HOUGH, image_name, tr_border_hough_border)
+        build_tr_dialog_end_buttons(TR_BORDER_HOUGH, image_name, tr_border_hough)
 
-def tr_border_hough_border(image_name: str) -> Image:
+def tr_border_hough(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image       = img_repo.get_image(image_name)
     new_name    = get_tr_name_value(image)
@@ -855,9 +863,9 @@ def build_border_canny_dialog(image_name: str) -> None:
         build_tr_radio_buttons(PaddingStrategy.names())
         build_tr_value_int_selector('lower threshold', 0, MAX_COLOR, default_value=10, tag='t1')
         build_tr_value_int_selector('upper threshold', 0, MAX_COLOR, default_value=70, tag='t2')
-        build_tr_dialog_end_buttons(TR_BORDER_CANNY, image_name, tr_border_canny_border)
+        build_tr_dialog_end_buttons(TR_BORDER_CANNY, image_name, tr_border_canny)
 
-def tr_border_canny_border(image_name: str) -> Image:
+def tr_border_canny(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image       = img_repo.get_image(image_name)
     new_name    = get_tr_name_value(image)
@@ -870,6 +878,28 @@ def tr_border_canny_border(image_name: str) -> Image:
     new_transformations.append(ImageTransformation(TR_BORDER_CANNY, lower_threshold=t1, upper_threshold=t2))
     # 3. Creamos Imagen
     return Image(new_name, image.format, new_data, transformations=new_transformations)
+
+TR_BORDER_ACTIVE_OUTLINE: str = 'active_outline'
+@render_error
+def build_border_active_outline_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_BORDER_ACTIVE_OUTLINE):
+        build_tr_name_input(TR_BORDER_ACTIVE_OUTLINE, image_name)
+        build_movie_tr_dialog_end_buttons(TR_BORDER_ACTIVE_OUTLINE, image_name, tr_border_active_outline, tr_border_active_outline_inductive)
+
+def tr_border_active_outline(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image       = img_repo.get_image(image_name)
+    new_name    = get_tr_name_value(image)
+    # 2. Procesamos
+    new_data = image.data  # Por ahora nop
+    new_transformations = image.transformations.copy()
+    new_transformations.append(ImageTransformation(TR_BORDER_ACTIVE_OUTLINE))
+    # 3. Creamos Imagen
+    return Image(new_name, image.format, new_data, transformations=new_transformations)
+
+def tr_border_active_outline_inductive(image_name: str, prev: Image, current: Image) -> Image:
+    new_data = current.data  # Por ahora nop
+    return Image(image_name, current.format, new_data, transformations=current.transformations + [ImageTransformation(TR_BORDER_ACTIVE_OUTLINE)])
 
 ########################################################
 # ********************* Combine ********************** #

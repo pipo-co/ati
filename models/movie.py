@@ -9,13 +9,13 @@ from .path_utils import get_extension
 
 @dataclass
 class MovieTransformation(ImageTransformation):
-    inductive_handle: Callable[[str, Image], Image]
+    inductive_handle: Callable[[str, Image, Image], Image]
 
     @classmethod
-    def from_img_tr(cls, image_transformation: ImageTransformation, inductive_handle: Callable[[str, Image], Image]) -> 'MovieTransformation':
+    def from_img_tr(cls, image_transformation: ImageTransformation, inductive_handle: Callable[[str, Image, Image], Image]) -> 'MovieTransformation':
         return cls(image_transformation.name, inductive_handle, **image_transformation.properties)
 
-    def __init__(self, name: str, inductive_handle: Callable[[str, Image], Image], **kwargs):
+    def __init__(self, name: str, inductive_handle: Callable[[str, Image, Image], Image], **kwargs):
         super().__init__(name, **kwargs)
         self.inductive_handle = inductive_handle
 
@@ -72,9 +72,8 @@ class RootMovie(Movie):
     def get_frame_name(self, frame: int) -> str:
         return Image.name_from_path(self.frames[frame])
 
-    @property
-    def current_frame_path(self) -> str:
-        return os.path.join(self.base_path, self.frames[self.current_frame])
+    def get_frame_path(self, frame: int) -> str:
+        return os.path.join(self.base_path, self.frames[frame])
 
 @dataclass
 class TransformedMovie(Movie):
@@ -88,6 +87,10 @@ class TransformedMovie(Movie):
 
         self.base_movie         = base_movie.name
         self.transformations    = base_movie.transformations + [transformation]
+
+    @property
+    def last_transformation(self) -> MovieTransformation:
+        return self.transformations[-1]
 
     # Override
     def get_frame_name(self, frame: int) -> str:

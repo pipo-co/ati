@@ -58,6 +58,7 @@ def render_image_window(image_name: str, movie: Optional[Movie] = None, pos: Uni
                     dpg.add_image(image_name, tag=f'image_{image_name}', width=image.width, height=image.height)
                     if movie:
                         with dpg.group(horizontal=True):
+                            # TODO(tobi): Que se pueda avanzar de a 10 frames
                             if not movie.on_first_frame():
                                 dpg.add_button(label='<- Prev frame', width=image.width//2 - 1, user_data=(movie.name, movie.current_frame - 1), callback=lambda s, ad, ud: render_movie_frame(*ud))
                             if not movie.on_last_frame():
@@ -191,6 +192,7 @@ def render_movie_frame(movie_name: str, frame: int):
 def load_current_movie_frame(movie: Movie) -> Image:
     return load_movie_frame(movie, movie.current_frame)
 
+# Recursively load image transformation chain
 def load_movie_frame(movie: Movie, frame: int) -> Image:
     from models.movie import RootMovie, TransformedMovie
 
@@ -200,10 +202,11 @@ def load_movie_frame(movie: Movie, frame: int) -> Image:
     else:
         image: Image
         if isinstance(movie, RootMovie):
-            image = load_image(movie.current_frame_path, movie.name)
+            image = load_image(movie.get_frame_path(frame), movie.name)
         elif isinstance(movie, TransformedMovie):
-            image = load_movie_frame(mov_repo.get_movie(movie.base_movie), frame)
-            # TODO(tobi): apply movie transformation
+            prev_image = load_movie_frame(mov_repo.get_movie(movie.base_movie), frame)
+            image = movie.last_transformation.inductive_handle(frame_name, img_repo.get_image(movie.get_frame_name(frame - 1)), prev_image)
+            image.movie = movie.name
         else:
             raise NotImplementedError()
 

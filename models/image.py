@@ -137,6 +137,12 @@ class Image:
     def movie_frame(self) -> bool:
         return self.movie is not None
 
+    @property
+    def last_transformation(self) -> ImageTransformation:
+        if not self.transformations:
+            raise ValueError('Image has no transformations')
+        return self.transformations[-1]
+
     @staticmethod
     def name_from_path(path: str) -> str:
         return lower_extension(path)
