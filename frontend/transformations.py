@@ -383,7 +383,7 @@ TR_THRESH_MANUAL: str = 'manual'
 def build_thresh_manual_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_THRESH_MANUAL):
         build_tr_name_input(TR_THRESH_MANUAL, image_name)
-        build_tr_value_int_selector('threshold', 0, MAX_COLOR)
+        build_tr_value_int_selector('threshold', 0, MAX_COLOR, default_value=15)
         build_tr_dialog_end_buttons(TR_THRESH_MANUAL, image_name, tr_thresh_manual)
 
 def tr_thresh_manual(image_name: str) -> Image:
