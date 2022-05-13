@@ -201,28 +201,65 @@ def susan_channel(channel: np.ndarray, padding_str: PaddingStrategy) -> Tuple[np
     values[(values >= 0.65) & (values < 0.85)] = 255
     return values, ImageChannelTransformation()
 
-def hough_channel(channel: np.ndarray, t: float) -> np.ndarray:
-    p     = np.sqrt(2) * np.max(channel.shape)
-    theta = np.linspace(-np.pi/2, np.pi/2, THETA_RESOLUTION)
-    rho   = np.linspace(-p, p, RHO_RESOLUTION)
+def hough_channel(channel: np.ndarray, t0: float, tf: float, t_count: int, r0: float, rf: float, r_count: int, threshold: float, most_fitted_ratio: float) -> Tuple[np.ndarray, np.ndarray]:
+    p = np.sqrt(2) * np.max(channel.shape)
+    
+    if (r0 < -p):       r0 = -p
+    if (rf > p):        rf = p
+    if (t0 < -np.pi):   t0 = -np.pi
+    if (tf > np.pi):    tf = np.pi
+    
+    rho   = np.linspace(r0, rf, r_count)
+    theta = np.linspace(t0, tf, t_count)
 
     indices = np.insert(index_matrix(*channel.shape), 0, -1, axis=2)
-    indices = np.expand_dims(indices, axis=(0, 1))
 
-    acum = np.stack(np.meshgrid(rho, theta), -1)
-    acum = np.dstack((acum, acum[:,:,1]))
-    acum[:,:,1] = np.sin(acum[:,:,1])
-    acum[:,:,2] = np.cos(acum[:,:,2])
-    acum = np.expand_dims(acum, axis=(2, 3))
+    acum = np.empty((r_count, t_count))
 
-    # |rho - x*cos(theta) - y*sin(theta)|
-    lines = (np.abs(np.sum(acum * indices, axis=4))) < t
     white_points = channel > 0
 
-    points_in_line = (white_points & lines).sum(axis=(2,3))
-    most_fitted_lines = np.argwhere(points_in_line > MOST_FITTED_LINES_RATIO * points_in_line.max())
-    print(np.take(acum, most_fitted_lines))
-    # TODO(nacho): Dibujar linea
+    for i in range(len(rho)):
+        for j in range(len(theta)):
+            params = np.hstack((rho[i], np.sin(theta[j]),  np.cos(theta[j])))
+            # |rho - y*sin(theta) - x*cos(theta)|
+            line = np.abs(np.sum(params * indices, axis=2)) < threshold
+            acum[i, j] = np.sum(white_points & line)
+
+    most_fitted_lines = np.argwhere(acum > most_fitted_ratio * acum.max())
+    Y = np.transpose(most_fitted_lines)[0]
+    X = np.transpose(most_fitted_lines)[1]
+
+    best = np.hstack((rho[Y, None], theta[X, None]))
+
+    lines = list(filter(lambda l: l, (get_border_points(rho, theta, channel.shape) for rho, theta in best)))
+    
+    return channel, ImageChannelTransformation(lines)  
+
+def get_border_points(rho: float, theta: float, img_shape) -> Optional[LineDrawCmd]:
+    if np.isclose(theta, 0):
+        return LineDrawCmd(0, rho, img_shape[0]-1, rho)
+
+    max_y = img_shape[0] - 1
+    max_x = img_shape[1] - 1
+
+    x_0 = rho / np.cos(theta)
+    x_f = (rho - max_y * np.sin(theta)) / np.cos(theta)
+    y_0 = rho / np.sin(theta)
+    y_f = (rho - max_x * np.cos(theta)) / np.sin(theta)
+    
+    ans = []
+
+    if x_0 > 0 and x_0 < max_x: ans.append((0, x_0))
+    if x_f > 0 and x_f < max_x: ans.append((max_y, x_f))
+    if y_0 > 0 and y_0 < max_y: ans.append((y_0, 0))
+    if y_f > 0 and y_f < max_y: ans.append((y_f, max_x))
+
+    if len(ans) != 2:
+        print(f'Cantidad incorrecta de puntos {len(ans)} para rho:{rho} y theta:{theta}')
+        return None
+        
+    return LineDrawCmd(*ans[0], *ans[1])
+    
 
 def canny_drag_borders(gradient_mod: np.ndarray, t1: int, t2: int, max_col: int, max_row: int, row: int, col: int) -> None:
     if t1 < gradient_mod[row, col] < t2:

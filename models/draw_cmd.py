@@ -1,3 +1,4 @@
+from ast import Tuple
 from dataclasses import dataclass
 from typing import Union
 
@@ -6,10 +7,10 @@ import numpy as np
 
 @dataclass
 class LineDrawCmd:
-    p1_x: int
     p1_y: int
-    p2_x: int
+    p1_x: int
     p2_y: int
+    p2_x: int
 
 
 @dataclass

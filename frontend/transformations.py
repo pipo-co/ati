@@ -794,17 +794,18 @@ TR_BORDER_HOUGH: str = 'hough'
 def build_border_hough_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_BORDER_HOUGH):
         build_tr_name_input(TR_BORDER_HOUGH, image_name)
-        build_tr_value_float_selector('t', 0, 20, default_value=1)
+        build_tr_value_float_selector('t', 0, 20, default_value=1, tag='threshold')
+        build_tr_value_float_selector('ratio', 0, 1, default_value=0.7, tag='ratio')
         build_tr_dialog_end_buttons(TR_BORDER_HOUGH, image_name, tr_border_hough)
 
 def tr_border_hough(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image       = img_repo.get_image(image_name)
     new_name    = get_tr_name_value(image)
-    t = get_tr_float_value()
+    t = get_tr_float_value('threshold')
+    ratio = get_tr_float_value('ratio')
     # 2. Procesamos
-    # TODO(nacho): Cablear bien la data
-    new_data, transformation = border.hough(image, t)
+    new_data, transformation = border.hough(image, t0=-np.pi/2, tf=np.pi/2, t_count=181, r0=-180, rf=180, r_count=255, threshold=t, most_fitted_ratio=ratio)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
 
