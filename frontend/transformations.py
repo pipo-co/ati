@@ -22,6 +22,8 @@ TR_NAME_INPUT: str              = 'tr_name_input'
 TR_IMG_INPUT: str               = 'tr_img_input'
 TR_INT_VALUE_SELECTOR: str      = 'tr_int_value_input'
 TR_FLOAT_VALUE_SELECTOR: str    = 'tr_float_value_input'
+TR_INT_LIST_VALUE_SELECTOR: str = 'tr_int_list_value_input'
+TR_RANGE_VALUE_SELECTOR: str    = 'tr_range_value_input'
 TR_RADIO_BUTTONS: str           = 'tr_radio_buttons'
 TR_CHECKBOX: str                = 'tr_checkbox'
 TR_INT_TABLE: str               = 'tr_int_table'
@@ -161,6 +163,23 @@ def build_tr_value_float_selector(name: str, min_val: float, max_val: float, def
     dpg.add_text(f'Select \'{name}\' between {min_val} and {max_val}')
     dpg.add_input_float(min_value=min_val, max_value=max_val, default_value=min_val if default_value is None else default_value, label=suffix, tag=tag)
     
+def build_tr_value_int_list_selector(name: str, min_val: float, max_val: float, default_value: int = None, tag: str = TR_INT_LIST_VALUE_SELECTOR) -> None:
+    dpg.add_text(f'Select one or more  \'{name}\' between {min_val} and {max_val} separated by ,')
+    dpg.add_input_text(default_value=default_value, tag=tag)
+  
+def build_tr_value_range_selector(name: str, min_val: float, max_val: float, max_count: int, tag: str = TR_RANGE_VALUE_SELECTOR) -> None:
+    dpg.add_text(f'Select a range for \'{name}\' between {min_val} and {max_val}. Max count: {max_count}')
+    
+    with dpg.table(header_row=False, resizable=False, policy=dpg.mvTable_SizingStretchProp):
+        dpg.add_table_column()
+        dpg.add_table_column()
+        dpg.add_table_column()
+
+        with dpg.table_row():
+            dpg.add_input_int(min_value=min_val, max_value=max_val,   default_value=min_val,    step=0, label='min', tag=f'{tag}_min_val')
+            dpg.add_input_int(min_value=min_val, max_value=max_val,   default_value=max_val,    step=0, label='max', tag=f'{tag}_max_val')
+            dpg.add_input_int(min_value=0,       max_value=max_count, default_value=max_count,  step=0, label='n', tag=f'{tag}_count')
+  
 def build_tr_percentage_selector(name: str, default_value: int = 20, tag: str = TR_INT_VALUE_SELECTOR) -> None:
     build_tr_value_int_selector(name, 0, 100, default_value=default_value, suffix='%', tag=tag)
 
@@ -226,6 +245,15 @@ def get_tr_int_value(int_input: str = TR_INT_VALUE_SELECTOR) -> int:
 
 def get_tr_float_value(float_input: str = TR_FLOAT_VALUE_SELECTOR) -> float:
     return dpg.get_value(float_input)
+
+def get_tr_int_list_value(list_input: str = TR_INT_LIST_VALUE_SELECTOR) -> List[int]:
+    return list(map(lambda n: int(n), dpg.get_value(list_input).split(',')))
+
+def get_tr_range_value(range_input: str = TR_RANGE_VALUE_SELECTOR) -> np.ndarray:
+    min_v = dpg.get_value(f'{range_input}_min_val')
+    max_v = dpg.get_value(f'{range_input}_max_val')
+    count = dpg.get_value(f'{range_input}_count')
+    return np.linspace(min_v, max_v, count)
 
 def get_tr_percentage_value(percentage_input: str = TR_FLOAT_VALUE_SELECTOR) -> int:
     percentage = get_tr_int_value(percentage_input)
