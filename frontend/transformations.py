@@ -824,16 +824,20 @@ def build_border_hough_dialog(image_name: str) -> None:
         build_tr_name_input(TR_BORDER_HOUGH, image_name)
         build_tr_value_float_selector('t', 0, 20, default_value=1, tag='threshold')
         build_tr_value_float_selector('ratio', 0, 1, default_value=0.7, tag='ratio')
+        build_tr_value_int_list_selector('theta', -90, 90, default_value=0, tag='theta')
+        build_tr_value_range_selector('rho', min_val=-200, max_val=200, max_count=401, tag='rho') #TODO(nacho): mejores defaults
         build_tr_dialog_end_buttons(TR_BORDER_HOUGH, image_name, tr_border_hough)
 
 def tr_border_hough(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image       = img_repo.get_image(image_name)
     new_name    = get_tr_name_value(image)
-    t = get_tr_float_value('threshold')
-    ratio = get_tr_float_value('ratio')
+    threshold   = get_tr_float_value('threshold')
+    ratio       = get_tr_float_value('ratio')
+    theta       = get_tr_int_list_value('theta')
+    rho         = get_tr_range_value('rho')
     # 2. Procesamos
-    new_data, transformation = border.hough(image, t0=-np.pi/2, tf=np.pi/2, t_count=181, r0=-180, rf=180, r_count=255, threshold=t, most_fitted_ratio=ratio)
+    new_data, transformation = border.hough(image, theta, rho, threshold, ratio)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, transformation)
 

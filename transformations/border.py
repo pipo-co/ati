@@ -201,21 +201,9 @@ def susan_channel(channel: np.ndarray, padding_str: PaddingStrategy) -> Tuple[np
     values[(values >= 0.65) & (values < 0.85)] = 255
     return values, ImageChannelTransformation()
 
-def hough_channel(channel: np.ndarray, t0: float, tf: float, t_count: int, r0: float, rf: float, r_count: int, threshold: float, most_fitted_ratio: float) -> Tuple[np.ndarray, np.ndarray]:
-    p = np.sqrt(2) * np.max(channel.shape)
-    
-    if (r0 < -p):       r0 = -p
-    if (rf > p):        rf = p
-    if (t0 < -np.pi):   t0 = -np.pi
-    if (tf > np.pi):    tf = np.pi
-    
-    rho   = np.linspace(r0, rf, r_count)
-    theta = np.linspace(t0, tf, t_count)
-
+def hough_channel(channel: np.ndarray, theta: np.ndarray, rho: np.ndarray, threshold: float, most_fitted_ratio: float) -> Tuple[np.ndarray, np.ndarray]:
     indices = np.insert(index_matrix(*channel.shape), 0, -1, axis=2)
-
-    acum = np.empty((r_count, t_count))
-
+    acum = np.empty((rho.size, theta.size))
     white_points = channel > 0
 
     for i in range(len(rho)):
@@ -233,7 +221,7 @@ def hough_channel(channel: np.ndarray, t0: float, tf: float, t_count: int, r0: f
 
     lines = list(filter(lambda l: l, (get_border_points(rho, theta, channel.shape) for rho, theta in best)))
     
-    return channel, ImageChannelTransformation(lines)  
+    return channel, ImageChannelTransformation(lines, best=best)  
 
 def get_border_points(rho: float, theta: float, img_shape) -> Optional[LineDrawCmd]:
     if np.isclose(theta, 0):
@@ -421,8 +409,9 @@ def log(image: Image, sigma: float, crossing_threshold: int, padding_str: Paddin
 def susan(image: Image, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageTransformation]:
     return image.apply_over_channels('susan', susan_channel, padding_str=padding_str)
 
-def hough(image: Image, t0: float, tf: float, t_count: int, r0: float, rf: float, r_count: int, threshold: float, most_fitted_ratio: float) -> Tuple[np.ndarray, ImageTransformation]:    
-    return image.apply_over_channels('hough', hough_channel, t0=t0, tf=tf, t_count=t_count, r0=r0, rf=rf, r_count=r_count, threshold=threshold, most_fitted_ratio=most_fitted_ratio)
+def hough(image: Image, theta: List[int], rho: np.ndarray, threshold: float, most_fitted_ratio: float) -> Tuple[np.ndarray, ImageTransformation]:    
+    theta = np.asarray(theta) * np.pi / 180
+    return image.apply_over_channels('hough', hough_channel, theta=theta, rho=rho, threshold=threshold, most_fitted_ratio=most_fitted_ratio)
     
 def canny(image: Image, t1: int, t2: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageTransformation]:
     return image.apply_over_channels('canny', canny_channel, t1=t1, t2=t2, padding_str=padding_str)
