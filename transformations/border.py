@@ -249,10 +249,10 @@ def get_border_points(rho: float, theta: float, img_shape) -> Optional[LineDrawC
     
     ans = []
 
-    if x_0 > 0 and x_0 < max_x: ans.append((0, x_0))
-    if x_f > 0 and x_f < max_x: ans.append((max_y, x_f))
-    if y_0 > 0 and y_0 < max_y: ans.append((y_0, 0))
-    if y_f > 0 and y_f < max_y: ans.append((y_f, max_x))
+    if 0 < x_0 < max_x: ans.append((0, x_0))
+    if 0 < x_f < max_x: ans.append((max_y, x_f))
+    if 0 < y_0 < max_y: ans.append((y_0, 0))
+    if 0 < y_f < max_y: ans.append((y_f, max_x))
 
     if len(ans) != 2:
         print(f'Cantidad incorrecta de puntos {len(ans)} para rho:{rho} y theta:{theta}')
@@ -337,25 +337,26 @@ def get_initial_boundries(x: Tuple[int, int], y: Tuple[int, int], phi_size: int)
 def get_indexes() -> np.ndarray:
     return np.reshape(np.array(list(np.ndindex((3, 3)))) - 3//2, (9, 2))
     
-def inBounds(x: int, y: int, shape: Tuple[int, int]):
-    return x >= 0 and x < shape[1] and y >= 0 and y < shape[0]
+def in_bounds(x: int, y: int, shape: Tuple[int, int]):
+    return 0 <= x < shape[1] and 0 <= y < shape[0]
 
 
-def new_phi_values(previous_phi: np.ndarray, new_phi: np.ndarray, indices: np.ndarray, point: Tuple[int, int], target: int, new_value: int) -> List[
-    Tuple[int, int]]:
+def new_phi_values(previous_phi: np.ndarray, new_phi: np.ndarray, indices: np.ndarray, point: Tuple[int, int], target: int, new_value: int):
     value_list = []
+    remove_values = []
     for index in indices:
         phi_y = point[0] + index[0]
         phi_x = point[1] + index[1]
-        if inBounds(phi_x, phi_y, previous_phi.shape):
+        if in_bounds(phi_x, phi_y, previous_phi.shape):
             if previous_phi[phi_y, phi_x] == target:
                 value_list.append((phi_y, phi_x))
                 new_phi[phi_y, phi_x] = new_value
             elif previous_phi[phi_y, phi_x] == new_value:
                 new_phi[phi_y, phi_x] = -new_value
             elif previous_phi[phi_y, phi_x] == -new_value:
+                remove_values.append((phi_y, phi_x))
                 new_phi[phi_y, phi_x] = -target
-    return value_list
+    return value_list, remove_values
 
 def active_outline(image: np.ndarray, sigma, lout: np.ndarray, lin: np.ndarray, phi: np.ndarray):
     flag = True
@@ -364,12 +365,16 @@ def active_outline(image: np.ndarray, sigma, lout: np.ndarray, lin: np.ndarray, 
         flag = False
         new_lout = []
         new_lin = []
+        remove_lin_val = []
+        remove_lout_val = []
         new_phi = np.copy(phi)
         for point in lout:
             norm_lout = np.linalg.norm(sigma - image[point[0], point[1]])
             if norm_lout <= 10:
                 new_lin.append(point)
-                new_lout.extend(new_phi_values(phi, new_phi, indices, point, 3, 1))
+                new_val, remove_val = new_phi_values(phi, new_phi, indices, point, 3, 1)
+                new_lout.extend(new_val)
+                remove_lin_val.extend(remove_val)
                 flag = True
             else:
                 new_lout.append(point)
@@ -377,17 +382,19 @@ def active_outline(image: np.ndarray, sigma, lout: np.ndarray, lin: np.ndarray, 
             norm_lin = np.linalg.norm(sigma - image[point[0], point[1]])
             if norm_lin >= 10:
                 new_lout.append(point)
-                new_lin.extend(new_phi_values(phi, new_phi, indices, point, -3, -1))
+                new_val, remove_val = new_phi_values(phi, new_phi, indices, point, -3, -1)
+                new_lin.extend(new_val)
+                remove_lout_val.extend(remove_val)
                 flag = True
             else:
                 new_lin.append(point)
-        lout = set(new_lout)
-        lin = set(new_lin)
+        lout = set(new_lout) - set(remove_lout_val)
+        lin = set(new_lin) - set(remove_lin_val)
         phi = new_phi
 
-    lout = sorted(list(lout), key=lambda tup: tup[0])
-    lin = sorted(list(lin), key=lambda tup: tup[0])
-    
+    lout = np.asarray(list(lout))
+    lin = np.asarray(list(lin))
+
     return lout, lin, phi
 
     
@@ -422,14 +429,14 @@ def canny(image: Image, t1: int, t2: int, padding_str: PaddingStrategy) -> Tuple
 
 def make_dimension_point(p1: Tuple[int, int], p2: Tuple[int, int], dim: int):
     if p1[dim] > p2[dim]:
-        return (p2[dim], p1[dim])
+        return p2[dim], p1[dim]
     else:
-        return (p1[dim], p2[dim])
+        return p1[dim], p2[dim]
 
 def active_outline_first_frame(image: Image, p1: Tuple[int, int], p2: Tuple[int, int]) -> Tuple[np.ndarray, ImageTransformation]:
     
-    x = make_dimension_point(p1, p2, 0)
-    y = make_dimension_point(p1, p2, 1)
+    x = make_dimension_point(p1, p2, 1)
+    y = make_dimension_point(p1, p2, 0)
 
     if image.channels > 1:
         sigma = np.mean(np.array(image.data[y[0]:y[1], x[0]:x[1]]).reshape((-1, 3)), axis=0)
@@ -441,8 +448,10 @@ def active_outline_first_frame(image: Image, p1: Tuple[int, int], p2: Tuple[int,
     lout, lin, phi = active_outline(image.data, sigma, lout, lin, phi)
 
     img_transformation = ImageTransformation('active_outline')
+
+    # img_transformation.channel_transformations.append(ImageChannelTransformation([ScatterDrawCmd(lin),ScatterDrawCmd(lout)]))
     img_transformation.channel_transformations.append(ImageChannelTransformation([ScatterDrawCmd(lout), ScatterDrawCmd(lin)]))
     return image.data, img_transformation
 
-def active_outline_middle_frame(image: Image, in_color: int, l_in: np.ndarray, l_out: np.ndarray) -> np.ndarray:
+def active_outline_middle_frame(prev: Image, current: Image, in_color: int, l_in: np.ndarray, l_out: np.ndarray) -> np.ndarray:
     pass
