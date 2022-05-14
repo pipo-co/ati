@@ -58,21 +58,8 @@ def render_image_window(image_name: str, movie: Optional[Movie] = None, pos: Uni
                 with dpg.group():
                     rendered_img = dpg.add_image(image_name, tag=f'image_{image_name}', width=image.width, height=image.height)
                     dpg.split_frame()
-
-                    for tr in image.transformations:
-                        for tr_channel in tr.channel_transformations:
-                            if tr_channel.overlay:
-                                for i, cmd in enumerate(tr_channel.overlay):
-                                    if isinstance(cmd, LineDrawCmd):
-                                        dpg.draw_line((cmd.p1_x, cmd.p1_y), (cmd.p2_x, cmd.p2_y), color=cmd.color, parent=window)
-                                    elif isinstance(cmd, CircleDrawCmd):
-                                        dpg.draw_circle((cmd.c_x, cmd.c_y), color=cmd.color, parent=window)
-                                    elif isinstance(cmd, ScatterDrawCmd):
-                                        mask = np.zeros((image.height, image.width, 4))
-                                        mask[cmd.points[:,0], cmd.points[:,1]] = np.array([*cmd.color, 255]) / 255
-                                        mask_tag = dpg.add_static_texture(image.width, image.height, mask.flatten(), parent=TEXTURE_REGISTRY) # noqa
-                                        dpg.add_image(mask_tag, width=image.width, height=image.height, pos=dpg.get_item_pos(rendered_img), parent=window)
-
+                    render_overlay(image, pos=dpg.get_item_pos(rendered_img), parent=window)
+                    
                     if movie:
                         with dpg.group(horizontal=True):
                             if not movie.on_first_frame():
@@ -81,6 +68,7 @@ def render_image_window(image_name: str, movie: Optional[Movie] = None, pos: Uni
                             if not movie.on_last_frame():
                                 dpg.add_button(label='Step ->',   indent=image.width // 2 + 1,     width=image.width // 4 - 1, user_data=(movie.name, movie.current_frame + 1),  callback=lambda s, ad, ud: render_movie_frame(*ud))
                                 dpg.add_button(label='10 ->>', indent=image.width * 3 // 4 + 1, width=image.width // 4 - 1, user_data=(movie.name, movie.current_frame + 10), callback=lambda s, ad, ud: render_movie_frame(*ud))
+                    
                     with dpg.group(horizontal=True, width=image.width):
                         dpg.add_text(f'Height {image.height}')
                         dpg.add_separator()
@@ -101,6 +89,22 @@ def render_image_window(image_name: str, movie: Optional[Movie] = None, pos: Uni
                 with dpg.group(tag=f'history_group_{image.name}', width=HISTORY_WIDTH, show=False):
                     for i, tr in enumerate(image.transformations):
                         dpg.add_text(f'{i}. {tr}', tag=f'image_{image_name}_transformations_{i}')
+
+def render_overlay(image: Image, pos: Union[List[int], Tuple[int, ...]], parent: str):
+    for tr in image.transformations:
+        for tr_channel in tr.channel_transformations:
+            if tr_channel.overlay:
+                for cmd in tr_channel.overlay:
+                    if isinstance(cmd, LineDrawCmd):
+                        dpg.draw_line((cmd.p1_x, cmd.p1_y), (cmd.p2_x, cmd.p2_y), color=cmd.color, parent=parent)
+                    elif isinstance(cmd, CircleDrawCmd):
+                        dpg.draw_circle((cmd.c_x, cmd.c_y), color=cmd.color, parent=parent)
+                    elif isinstance(cmd, ScatterDrawCmd):
+                        mask = np.zeros((image.height, image.width, 4))
+                        mask[cmd.points[:,0], cmd.points[:,1]] = np.array([*cmd.color, 255]) / 255
+                        mask_tag = dpg.add_static_texture(image.width, image.height, mask.flatten(), parent=TEXTURE_REGISTRY) # noqa
+                        dpg.add_image(mask_tag, width=image.width, height=image.height, pos=pos, parent=parent)
+
 
 def calculate_image_window_size(image: Image) -> Tuple[int, int]:
     # 120 = menu_bar + info_size, 10 = padding
