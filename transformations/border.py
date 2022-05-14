@@ -305,14 +305,13 @@ def canny_channel(channel: np.ndarray, t1: int, t2: int, padding_str: PaddingStr
 
     return gradient_mod
 
-def get_rectangular_boundrie(x: Tuple[int, int], y: Tuple[int, int]) -> List[Tuple[int, int]]:
-    rectangular_boundrie = []
-    rectangular_boundrie.extend([(y[0], x) for x in range(x[0], x[1] + 1)])
-    rectangular_boundrie.extend([(y[1], x) for x in range(x[0], x[1] + 1)])
-    rectangular_boundrie.extend([(y, x[0]) for y in range(y[0], y[1] + 1)])
-    rectangular_boundrie.extend([(y, x[1]) for y in range(y[0], y[1] + 1)])
+def get_rectangular_boundary(x: Tuple[int, int], y: Tuple[int, int]) -> np.ndarray:
+    upper_line = np.asarray([(y[0], x) for x in range(x[0], x[1] + 1)])
+    bottom_line = np.asarray([(y[1], x) for x in range(x[0], x[1] + 1)])
+    left_line = np.asarray([(y, x[0]) for y in range(y[0], y[1] + 1)])
+    right_line = np.asarray([(y, x[1]) for y in range(y[0], y[1] + 1)])
 
-    return rectangular_boundrie
+    return np.concatenate([upper_line, right_line, bottom_line, left_line])
 
 def calculate_sigma(image: Image, x: Tuple[int, int], y: Tuple[int, int]) -> Union[float, np.ndarray]:
     if image.channels > 1:
@@ -320,17 +319,14 @@ def calculate_sigma(image: Image, x: Tuple[int, int], y: Tuple[int, int]) -> Uni
     else:
         return np.mean(image.data[y[0]:y[1], x[0]:x[1]])
 
-def get_initial_boundries(x: Tuple[int, int], y: Tuple[int, int], phi_size: int):
-    lout = get_rectangular_boundrie(x, y)
-    lin = get_rectangular_boundrie((x[0] + 1, x[1] - 1), (y[0] + 1, y[1] - 1))
+def get_initial_boundaries(x: Tuple[int, int], y: Tuple[int, int], phi_size: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    lout = get_rectangular_boundary(x, y)
+    lin = get_rectangular_boundary((x[0] + 1, x[1] - 1), (y[0] + 1, y[1] - 1))
     phi = np.full((phi_size, phi_size), 3)
     phi[y[0]:y[1]+1, x[0]:x[1]+1] = 1
     phi[y[0] + 1:y[1], x[0] + 1:x[1]] = -1
     phi[y[0] + 2:y[1] - 1, x[0] + 2:x[1] - 1] = -3
     return lout, lin, phi
-
-def get_indexes() -> np.ndarray:
-    return np.reshape(np.array(list(np.ndindex(3, 3))) - 3//2, (9, 2))
     
 def in_bounds(x: int, y: int, shape: Tuple[int, int]):
     return 0 <= x < shape[1] and 0 <= y < shape[0]
@@ -354,7 +350,7 @@ def new_phi_values(previous_phi: np.ndarray, new_phi: np.ndarray, indices: np.nd
 
 def active_outline_all_channels(image: np.ndarray, sigma: Union[float, np.ndarray], lout: np.ndarray, lin: np.ndarray, phi: np.ndarray) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
     flag = True
-    indices = get_indexes()
+    indices = np.reshape(np.array(list(np.ndindex(3, 3))) - 3//2, (9, 2))
     while flag:
         flag = False
         new_lout = []
@@ -390,7 +386,7 @@ def active_outline_all_channels(image: np.ndarray, sigma: Union[float, np.ndarra
     lin = np.asarray(list(lin))
 
     overlay = [ScatterDrawCmd(lout, (255, 0, 0)), ScatterDrawCmd(lin, (255, 0, 255))]
-    return image.data, [ImageChannelTransformation({'sigma': sigma}, {'phi': phi, 'lout': lout, 'lin': lin}, overlay)]
+    return image, [ImageChannelTransformation({'sigma': sigma}, {'phi': phi, 'lout': lout, 'lin': lin}, overlay)]
 
 
 # ******************* Export Functions ********************** #
@@ -427,8 +423,7 @@ def active_outline_base(image: Image, p1: Tuple[int, int], p2: Tuple[int, int]) 
     x = p1[1], p2[1]
     y = p1[0], p2[0]
     sigma = calculate_sigma(image, x, y)
-    lout, lin, phi = get_initial_boundries(x, y, image.data[:, 1].size)
-    # TODO(faus): Aca hay un problema de tipos
+    lout, lin, phi = get_initial_boundaries(x, y, image.data[:, 1].size)
     return active_outline_all_channels(image.data, sigma, lout, lin, phi)
 
 def active_outline_inductive(prev: Image, current: Image) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
