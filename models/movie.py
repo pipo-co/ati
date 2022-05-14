@@ -1,7 +1,7 @@
 import os
 import abc
 from dataclasses import dataclass
-from typing import List, Callable
+from typing import List, Callable, Dict, Any
 
 from .image import Image, ImageTransformation
 from .path_utils import get_extension
@@ -13,10 +13,10 @@ class MovieTransformation(ImageTransformation):
 
     @classmethod
     def from_img_tr(cls, image_transformation: ImageTransformation, inductive_handle: Callable[[str, Image, Image], Image]) -> 'MovieTransformation':
-        return cls(image_transformation.name, inductive_handle, **image_transformation.properties)
+        return cls(image_transformation.name, inductive_handle, image_transformation.major_inputs, image_transformation.minor_inputs)
 
-    def __init__(self, name: str, inductive_handle: Callable[[str, Image, Image], Image], **kwargs):
-        super().__init__(name, **kwargs)
+    def __init__(self, name: str, inductive_handle: Callable[[str, Image, Image], Image], major_inputs: Dict[str, Any], minor_inputs: Dict[str, Any]):
+        super().__init__(name, major_inputs, minor_inputs, [])
         self.inductive_handle = inductive_handle
 
 @dataclass

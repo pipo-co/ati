@@ -1,5 +1,5 @@
 import itertools
-from typing import Callable, List, Optional
+from typing import Callable, List, Optional, Any, Tuple
 
 import dearpygui.dearpygui as dpg
 import numpy as np
@@ -9,8 +9,8 @@ from transformations import basic, border, combine, denoise, noise, threshold as
 from repositories import images_repo as img_repo
 from repositories import movies_repo as mov_repo
 from . import interface
-import rng
-from models.image import Image, ImageTransformation, strip_extension, get_extension, ImageFormat, normalize, MAX_COLOR
+from models.image import Image, ImageTransformation, strip_extension, get_extension, ImageFormat, normalize, MAX_COLOR, \
+    ImageChannelTransformation
 from frontend.interface_utils import render_error
 from transformations.sliding import PaddingStrategy
 
@@ -119,21 +119,22 @@ def execute_movie_transformation(base_movie_name: str, base_handle: TrHandler, i
 def build_tr_dialog(tr_id: str) -> int:
     return dpg.window(label=f'Apply {tr_id.title().replace("_", " ")} Transformation', tag=TR_DIALOG, modal=True, no_close=True, pos=interface.CENTER_POS)
 
-def build_tr_dialog_end_buttons(tr_id: str, image_name: str, handle: TrHandler) -> None:
-    with dpg.group(horizontal=True):
-        dpg.add_button(label='Transform', user_data=(image_name, handle), callback=lambda s, ap, ud: execute_image_transformation(*ud))
-        dpg.add_button(label='Cancel', user_data=tr_id, callback=lambda: dpg.delete_item(TR_DIALOG))
+# Generic inductive handler that takes all inputs from previous movie frame
+def generic_tr_inductive_handle(fn: Callable[[Image, Any], Tuple[np.ndarray, List[ImageChannelTransformation]]]) -> Callable[[str, Image], Image]:
+    def ret(new_name: str, prev: Image, image: Image) -> Image:
+        new_data, channels_tr = fn(image, **prev.all_inputs())
+        return image.transform(new_name, new_data, ImageTransformation(prev.last_transformation.name, prev.major_inputs, prev.minor_inputs, channels_tr))
+    return ret
 
 # Also allows to transform a movie
-def build_movie_tr_dialog_end_buttons(tr_id: str, image_name: str, handle: TrHandler, inductive_handle: Callable[[str, Image], Image]) -> None:
+def build_tr_dialog_end_buttons(tr_id: str, image_name: str, handle: TrHandler, inductive_handle: Optional[Callable[[str, Image], Image]]) -> None:
     image = img_repo.get_image(image_name)
-    if image.movie:
-        with dpg.group(horizontal=True):
-            dpg.add_button(label='Transform Image', user_data=(image_name, handle),                     callback=lambda s, ap, ud: execute_image_transformation(*ud))
-            dpg.add_button(label='Transform Movie', user_data=(image.movie, handle, inductive_handle),  callback=lambda s, ap, ud: execute_movie_transformation(*ud))
-            dpg.add_button(label='Cancel', user_data=tr_id, callback=lambda: dpg.delete_item(TR_DIALOG))
-    else:
-        build_tr_dialog_end_buttons(tr_id, image_name, handle)
+
+    with dpg.group(horizontal=True):
+        dpg.add_button(label='Transform Image', user_data=(image_name, handle), callback=lambda s, ap, ud: execute_image_transformation(*ud))
+        if image.movie and inductive_handle is not None:
+            dpg.add_button(label='Transform Movie', user_data=(image.movie, handle, inductive_handle), callback=lambda s, ap, ud: execute_movie_transformation(*ud))
+        dpg.add_button(label='Cancel', user_data=tr_id, callback=lambda: dpg.delete_item(TR_DIALOG))
 
 # ******************** Input Builders ********************* #
 
@@ -166,10 +167,10 @@ def build_tr_value_float_selector(name: str, min_val: float, max_val: float, def
 def build_tr_value_int_list_selector(name: str, min_val: float, max_val: float, default_value: int = None, tag: str = TR_INT_LIST_VALUE_SELECTOR) -> None:
     dpg.add_text(f'Select one or more  \'{name}\' between {min_val} and {max_val} separated by ,')
     dpg.add_input_text(default_value=default_value, tag=tag)
-  
+
 def build_tr_value_range_selector(name: str, min_val: float, max_val: float, max_count: int, tag: str = TR_RANGE_VALUE_SELECTOR) -> None:
     dpg.add_text(f'Select a range for \'{name}\' between {min_val} and {max_val}. Max count: {max_count}')
-    
+
     with dpg.table(header_row=False, resizable=False, policy=dpg.mvTable_SizingStretchProp):
         dpg.add_table_column()
         dpg.add_table_column()
@@ -179,7 +180,7 @@ def build_tr_value_range_selector(name: str, min_val: float, max_val: float, max
             dpg.add_input_int(min_value=min_val, max_value=max_val,   default_value=min_val,    step=0, label='min', tag=f'{tag}_min_val')
             dpg.add_input_int(min_value=min_val, max_value=max_val,   default_value=max_val,    step=0, label='max', tag=f'{tag}_max_val')
             dpg.add_input_int(min_value=0,       max_value=max_count, default_value=max_count,  step=0, label='n', tag=f'{tag}_count')
-  
+
 def build_tr_percentage_selector(name: str, default_value: int = 20, tag: str = TR_INT_VALUE_SELECTOR) -> None:
     build_tr_value_int_selector(name, 0, 100, default_value=default_value, suffix='%', tag=tag)
 
@@ -290,7 +291,7 @@ def build_copy_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_COPY):
         build_tr_name_input(TR_COPY, image_name)
         # Aca declaramos inputs necesarios para el handle. Este caso no tiene.
-        build_tr_dialog_end_buttons(TR_COPY, image_name, tr_copy)
+        build_tr_dialog_end_buttons(TR_COPY, image_name, tr_copy, generic_tr_inductive_handle(lambda img: (img.data, [])))
 
 def tr_copy(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -311,7 +312,7 @@ def build_reformat_dialog(image_name: str) -> None:
             # Raw solo funciona para imagenes de un solo canal
             fmts.remove(ImageFormat.RAW.value)
         build_tr_radio_buttons(fmts)
-        build_tr_dialog_end_buttons(TR_REFORMAT, image_name, tr_reformat)
+        build_tr_dialog_end_buttons(TR_REFORMAT, image_name, tr_reformat, None)
 
 def tr_reformat(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -326,9 +327,9 @@ def tr_reformat(image_name: str) -> Image:
 TR_NORMALIZE: str = 'normalize'
 @render_error
 def build_normalize_dialog(image_name: str) -> None:
-    with build_tr_dialog(TR_COPY):
+    with build_tr_dialog(TR_NORMALIZE):
         build_tr_name_input(TR_NORMALIZE, image_name)
-        build_tr_dialog_end_buttons(TR_NORMALIZE, image_name, tr_normalize)
+        build_tr_dialog_end_buttons(TR_NORMALIZE, image_name, tr_normalize, generic_tr_inductive_handle(lambda img: (normalize(img.data, np.float64), [])))
 
 def tr_normalize(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -336,9 +337,8 @@ def tr_normalize(image_name: str) -> Image:
     new_name = get_tr_name_value(image)
     # 2. Procesamos
     new_data = normalize(image.data, np.float64)
-    transformation = ImageTransformation(TR_NORMALIZE)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_NORMALIZE, {}, {}))
 
 ########################################################
 # ********************** Basic *********************** #
@@ -349,21 +349,16 @@ TR_NEG: str = 'neg'
 def build_neg_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_NEG):
         build_tr_name_input(TR_NEG, image_name)
-        build_movie_tr_dialog_end_buttons(TR_NEG, image_name, tr_neg, tr_neg_inductive)
+        build_tr_dialog_end_buttons(TR_NEG, image_name, tr_neg, generic_tr_inductive_handle(basic.negate))
 
 def tr_neg(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image    = img_repo.get_image(image_name)
     new_name = get_tr_name_value(image)
     # 2. Procesamos
-    new_data, transformation = basic.negate(image)
+    new_data, channels_tr = basic.negate(image)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, transformation)
-
-def tr_neg_inductive(new_name: str, _: Image, current: Image) -> Image:
-    new_data = basic.negate(current)
-    transformation = ImageTransformation(TR_NEG)
-    return current.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_NEG, {}, {}, channels_tr))
 
 TR_POW: str = 'pow'
 @render_error
@@ -371,7 +366,7 @@ def build_pow_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_POW):
         build_tr_name_input(TR_POW, image_name)
         build_tr_value_float_selector('gamma', 0, 2)
-        build_tr_dialog_end_buttons(TR_POW, image_name, tr_pow)
+        build_tr_dialog_end_buttons(TR_POW, image_name, tr_pow, generic_tr_inductive_handle(basic.power))
 
 def tr_pow(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -379,25 +374,25 @@ def tr_pow(image_name: str) -> Image:
     new_name = get_tr_name_value(image)
     gamma    = get_tr_float_value()
     # 2. Procesamos
-    new_data, transformation = basic.power(image, gamma)
+    new_data, channels_tr = basic.power(image, gamma)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_POW, {'gamma': gamma}, {}, channels_tr))
 
 TR_EQUALIZE: str = 'equalize'
 @render_error
 def build_equalize_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_EQUALIZE):
         build_tr_name_input(TR_EQUALIZE, image_name)
-        build_tr_dialog_end_buttons(TR_EQUALIZE, image_name, tr_equalize)
+        build_tr_dialog_end_buttons(TR_EQUALIZE, image_name, tr_equalize, generic_tr_inductive_handle(basic.equalize))
 
 def tr_equalize(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image    = img_repo.get_image(image_name)
     new_name = get_tr_name_value(image)
     # 2. Procesamos
-    new_data, transformation = basic.equalize(image)
-    # 3. Creamos Imagen y finalizamos
-    return image.transform(new_name, new_data, transformation)
+    new_data, channels_tr = basic.equalize(image)
+    # 3. Creamos Imagen
+    return image.transform(new_name, new_data, ImageTransformation(TR_EQUALIZE, {}, {}, channels_tr))
 
 ########################################################
 # ******************** Threshold ********************* #
@@ -409,7 +404,7 @@ def build_thresh_manual_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_THRESH_MANUAL):
         build_tr_name_input(TR_THRESH_MANUAL, image_name)
         build_tr_value_int_selector('threshold', 0, MAX_COLOR, default_value=15)
-        build_tr_dialog_end_buttons(TR_THRESH_MANUAL, image_name, tr_thresh_manual)
+        build_tr_dialog_end_buttons(TR_THRESH_MANUAL, image_name, tr_thresh_manual, generic_tr_inductive_handle(thresh.manual))
 
 def tr_thresh_manual(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -417,9 +412,9 @@ def tr_thresh_manual(image_name: str) -> Image:
     new_name    = get_tr_name_value(image)
     threshold   = get_tr_int_value()
     # 2. Procesamos
-    new_data, transformation = thresh.manual(image, threshold)
+    new_data, channels_tr = thresh.manual(image, threshold)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_THRESH_MANUAL, {'threshold': threshold}, {}, channels_tr))
 
 TR_THRESH_GLOBAL: str = 'global'
 @render_error
@@ -427,33 +422,33 @@ def build_thresh_global_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_THRESH_GLOBAL):
         build_tr_name_input(TR_THRESH_GLOBAL, image_name)
         build_tr_value_int_selector('starting threshold', 0, MAX_COLOR, default_value=MAX_COLOR//2)
-        build_tr_dialog_end_buttons(TR_THRESH_GLOBAL, image_name, tr_global_umbral)
+        build_tr_dialog_end_buttons(TR_THRESH_GLOBAL, image_name, tr_global_umbral, generic_tr_inductive_handle(thresh.global_))
 
 def tr_global_umbral(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image       = img_repo.get_image(image_name)
     new_name    = get_tr_name_value(image)
-    umb         = get_tr_int_value()
+    threshold   = get_tr_int_value()
     # 2. Procesamos
-    new_data, transformation = thresh.global_(image, umb)
+    new_data, channels_tr = thresh.global_(image, threshold)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_THRESH_MANUAL, {'threshold': threshold}, {}, channels_tr))
 
 TR_THRESH_OTSU: str = 'otsu'
 @render_error
 def build_thresh_otsu_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_THRESH_OTSU):
         build_tr_name_input(TR_THRESH_OTSU, image_name)
-        build_tr_dialog_end_buttons(TR_THRESH_OTSU, image_name, tr_otsu_threshold)
+        build_tr_dialog_end_buttons(TR_THRESH_OTSU, image_name, tr_otsu_threshold, generic_tr_inductive_handle(thresh.otsu))
 
 def tr_otsu_threshold(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image       = img_repo.get_image(image_name)
     new_name    = get_tr_name_value(image)
     # 2. Procesamos
-    new_data, transformation = thresh.otsu(image)
+    new_data, channels_tr = thresh.otsu(image)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_THRESH_OTSU, {}, {}, channels_tr))
 
 ########################################################
 # ********************** Noise *********************** #
@@ -467,7 +462,7 @@ def build_noise_gauss_dialog(image_name: str) -> None:
         build_tr_radio_buttons(noise.Type.names(), default_value=noise.Type.ADDITIVE.name)
         build_tr_value_float_selector('sigma', 0, 1, default_value=0.1, tag='sigma')
         build_tr_percentage_selector('noise percentage', tag='percentage')
-        build_tr_dialog_end_buttons(TR_NOISE_GAUSS, image_name, tr_noise_gauss)
+        build_tr_dialog_end_buttons(TR_NOISE_GAUSS, image_name, tr_noise_gauss, generic_tr_inductive_handle(noise.gauss))
 
 def tr_noise_gauss(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -477,9 +472,9 @@ def tr_noise_gauss(image_name: str) -> Image:
     percentage  = get_tr_percentage_value('percentage')
     noise_type  = noise.Type.from_name(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data, transformation = noise.gaus(image, sigma, noise_type, percentage)
+    new_data, channels_tr = noise.gauss(image, sigma, noise_type, percentage)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_NOISE_GAUSS, {'sigma': sigma, 'noise_type': noise_type, 'percentage': percentage}, {}, channels_tr))
 
 TR_NOISE_EXP: str = 'exp'
 @render_error
@@ -489,7 +484,7 @@ def build_noise_exp_dialog(image_name: str) -> None:
         build_tr_radio_buttons(noise.Type.names(), default_value=noise.Type.MULTIPLICATIVE.name)
         build_tr_value_float_selector('lambda', 1, 5, default_value=3, tag='lambda')
         build_tr_percentage_selector('noise percentage', tag='percentage')
-        build_tr_dialog_end_buttons(TR_NOISE_EXP, image_name, tr_noise_exp)
+        build_tr_dialog_end_buttons(TR_NOISE_EXP, image_name, tr_noise_exp, generic_tr_inductive_handle(noise.exponential))
 
 def tr_noise_exp(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -499,9 +494,9 @@ def tr_noise_exp(image_name: str) -> Image:
     percentage  = get_tr_percentage_value('percentage')
     noise_type  = noise.Type.from_name(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data, transformation = noise.exponential(image, lam, noise_type, percentage)
+    new_data, channels_tr = noise.exponential(image, lam, noise_type, percentage)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_NOISE_EXP, {'lam': lam, 'noise_type': noise_type, 'percentage': percentage}, {}, channels_tr))
 
 TR_NOISE_RAYLEIGH: str = 'rayleigh'
 @render_error
@@ -511,7 +506,7 @@ def build_noise_rayleigh_dialog(image_name: str) -> None:
         build_tr_radio_buttons(noise.Type.names(), default_value=noise.Type.MULTIPLICATIVE.name)
         build_tr_value_float_selector('epsilon', 0, 1, default_value=0.6, tag='epsilon')
         build_tr_percentage_selector('noise percentage', tag='percentage')
-        build_tr_dialog_end_buttons(TR_NOISE_RAYLEIGH, image_name, tr_noise_rayleigh)
+        build_tr_dialog_end_buttons(TR_NOISE_RAYLEIGH, image_name, tr_noise_rayleigh, generic_tr_inductive_handle(noise.rayleigh))
 
 def tr_noise_rayleigh(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -521,9 +516,9 @@ def tr_noise_rayleigh(image_name: str) -> Image:
     percentage  = dpg.get_value('percentage')
     noise_type  = noise.Type.from_name(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data, transformation = noise.rayleigh(image, epsilon, noise_type, percentage)
+    new_data, channels_tr = noise.rayleigh(image, epsilon, noise_type, percentage)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_NOISE_RAYLEIGH, {'epsilon': epsilon, 'noise_type': noise_type, 'percentage': percentage}, {}, channels_tr))
 
 TR_NOISE_SALT: str = 'salt'
 @render_error
@@ -531,7 +526,7 @@ def build_noise_salt_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_NOISE_SALT):
         build_tr_name_input(TR_NOISE_SALT, image_name)
         build_tr_percentage_selector('salt percentage', default_value=5, tag='percentage')
-        build_tr_dialog_end_buttons(TR_NOISE_SALT, image_name, tr_noise_salt)
+        build_tr_dialog_end_buttons(TR_NOISE_SALT, image_name, tr_noise_salt, generic_tr_inductive_handle(noise.salt))
 
 def tr_noise_salt(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -539,9 +534,9 @@ def tr_noise_salt(image_name: str) -> Image:
     new_name    = get_tr_name_value(image)
     percentage  = get_tr_percentage_value('percentage')
     # 2. Procesamos
-    new_data, transformation = noise.salt(image, percentage)
+    new_data, channels_tr = noise.salt(image, percentage)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_NOISE_SALT, {'percentage': percentage}, {}, channels_tr))
 
 ########################################################
 # ********************* Denoise ********************** #
@@ -554,7 +549,7 @@ def build_denoise_mean_dialog(image_name: str) -> None:
         build_tr_name_input(TR_DENOISE_MEAN, image_name)
         build_tr_value_int_selector('kernel size', 3, 23, step=2)
         build_tr_radio_buttons(PaddingStrategy.names())
-        build_tr_dialog_end_buttons(TR_DENOISE_MEAN, image_name, tr_denoise_mean)
+        build_tr_dialog_end_buttons(TR_DENOISE_MEAN, image_name, tr_denoise_mean, generic_tr_inductive_handle(denoise.mean))
 
 def tr_denoise_mean(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -563,9 +558,9 @@ def tr_denoise_mean(image_name: str) -> Image:
     kernel_size = require_odd(get_tr_int_value(), 'Kernel size must be odd')
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data, transformation = denoise.mean(image, kernel_size, padding_str)
+    new_data, channels_tr = denoise.mean(image, kernel_size, padding_str)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_DENOISE_MEAN, {'kernel_size': kernel_size}, {'padding_str': padding_str}, channels_tr))
 
 TR_DENOISE_MEDIAN: str = 'median'
 @render_error
@@ -574,7 +569,7 @@ def build_denoise_median_dialog(image_name: str) -> None:
         build_tr_name_input(TR_DENOISE_MEDIAN, image_name)
         build_tr_value_int_selector('kernel size', 3, 23, step=2)
         build_tr_radio_buttons(denoise.PaddingStrategy.names())
-        build_tr_dialog_end_buttons(TR_DENOISE_MEDIAN, image_name, tr_denoise_median)
+        build_tr_dialog_end_buttons(TR_DENOISE_MEDIAN, image_name, tr_denoise_median, generic_tr_inductive_handle(denoise.median))
 
 def tr_denoise_median(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -583,9 +578,9 @@ def tr_denoise_median(image_name: str) -> Image:
     kernel_size = require_odd(get_tr_int_value(), 'Kernel size must be odd')
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data, transformation = denoise.median(image, kernel_size, padding_str)
+    new_data, channels_tr = denoise.median(image, kernel_size, padding_str)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_DENOISE_MEDIAN, {'kernel_size': kernel_size}, {'padding_str': padding_str}, channels_tr))
 
 TR_DENOISE_WEIGHTED_MEDIAN: str = 'weighted median'
 @render_error
@@ -594,18 +589,18 @@ def build_denoise_weighted_median_dialog(image_name: str) -> None:
         build_tr_name_input(TR_DENOISE_WEIGHTED_MEDIAN, image_name)
         build_tr_radio_buttons(denoise.PaddingStrategy.names())
         build_tr_input_table()
-        build_tr_dialog_end_buttons(TR_DENOISE_WEIGHTED_MEDIAN, image_name, tr_denoise_weighted_median)
+        build_tr_dialog_end_buttons(TR_DENOISE_WEIGHTED_MEDIAN, image_name, tr_denoise_weighted_median, generic_tr_inductive_handle(denoise.weighted_median))
 
 def tr_denoise_weighted_median(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image       = img_repo.get_image(image_name)
     new_name    = get_tr_name_value(image)
     kernel      = np.array(get_tr_input_table_values())
-    padding     = PaddingStrategy.from_str(get_tr_radio_buttons_value())
+    padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos - Puede ser async
-    new_data, transformation = denoise.weighted_median(image, kernel, padding)
+    new_data, channels_tr = denoise.weighted_median(image, kernel, padding_str)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_DENOISE_WEIGHTED_MEDIAN, {}, {'kernel': kernel, 'padding_str': padding_str}, channels_tr))
 
 TR_DENOISE_GAUSS: str = 'gauss'
 @render_error
@@ -614,7 +609,7 @@ def build_denoise_gauss_dialog(image_name: str) -> None:
         build_tr_name_input(TR_DENOISE_GAUSS, image_name)
         build_tr_value_float_selector('sigma', 1, 7, default_value=3)
         build_tr_radio_buttons(PaddingStrategy.names())
-        build_tr_dialog_end_buttons(TR_DENOISE_GAUSS, image_name, tr_denoise_gauss)
+        build_tr_dialog_end_buttons(TR_DENOISE_GAUSS, image_name, tr_denoise_gauss, generic_tr_inductive_handle(denoise.gauss))
 
 def tr_denoise_gauss(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -623,9 +618,9 @@ def tr_denoise_gauss(image_name: str) -> Image:
     sigma       = get_tr_float_value()
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data, transformation = denoise.gauss(image, sigma, padding_str)
+    new_data, channels_tr = denoise.gauss(image, sigma, padding_str)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_DENOISE_GAUSS, {'sigma': sigma}, {'padding_str': padding_str}, channels_tr))
 
 TR_DENOISE_DIFFUSION: str = 'diffusion'
 @render_error
@@ -636,43 +631,42 @@ def build_denoise_diffusion_dialog(image_name: str) -> None:
         build_tr_value_int_selector('sigma', 1, 10, default_value=4, tag='sigma')
         build_tr_radio_buttons(PaddingStrategy.names())
         build_tr_radio_buttons(denoise.DiffusionStrategy.names(), tag='function')
-        build_tr_dialog_end_buttons(TR_DENOISE_DIFFUSION, image_name, tr_denoise_diffusion)
+        build_tr_dialog_end_buttons(TR_DENOISE_DIFFUSION, image_name, tr_denoise_diffusion, generic_tr_inductive_handle(denoise.diffusion))
 
 def tr_denoise_diffusion(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image       = img_repo.get_image(image_name)
     new_name    = get_tr_name_value(image)
     iterations  = get_tr_int_value()
-    sigma       = get_tr_int_value(int_input='sigma')
+    sigma       = get_tr_int_value('sigma')
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     function = denoise.DiffusionStrategy.from_str(get_tr_radio_buttons_value(radio_buttons='function'))
     # 2. Procesamos
-    new_data, transformation = denoise.diffusion(image, iterations, sigma, padding_str, function)
+    new_data, channels_tr = denoise.diffusion(image, iterations, sigma, padding_str, function)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_DENOISE_DIFFUSION, {'iterations': iterations, 'sigma': sigma, 'function': function}, {'padding_str': padding_str}, channels_tr))
 
 TR_DENOISE_BILATERAL: str = 'bilateral'
 @render_error
 def build_denoise_bilateral_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_DENOISE_BILATERAL):
         build_tr_name_input(TR_DENOISE_BILATERAL, image_name)
-        build_tr_value_int_selector('sigma_space', 0, 10, default_value=8, tag='sigma_space')
-        build_tr_value_float_selector('sigma_intensity', 0, 20, default_value=4, tag='sigma_intensity')
+        build_tr_value_int_selector('sigma space', 0, 10, default_value=8, tag='sigma_space')
+        build_tr_value_float_selector('sigma intensity', 0, 20, default_value=4, tag='sigma_intensity')
         build_tr_radio_buttons(PaddingStrategy.names())
-        build_tr_dialog_end_buttons(TR_DENOISE_BILATERAL, image_name, tr_denoise_bilateral_filter)
+        build_tr_dialog_end_buttons(TR_DENOISE_BILATERAL, image_name, tr_denoise_bilateral_filter, generic_tr_inductive_handle(denoise.bilateral))
 
 def tr_denoise_bilateral_filter(image_name: str) -> Image:
     # 1. Obtenemos inputs
-    image       = img_repo.get_image(image_name)
-    new_name    = get_tr_name_value(image)
-    sigma_space  = get_tr_int_value(int_input='sigma_space')
-    sigma_intensity       = get_tr_float_value(float_input='sigma_intensity')
-
-    padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
+    image           = img_repo.get_image(image_name)
+    new_name        = get_tr_name_value(image)
+    sigma_space     = get_tr_int_value('sigma_space')
+    sigma_intensity = get_tr_float_value('sigma_intensity')
+    padding_str     = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data, transformation = denoise.bilateral_filter(image, sigma_space, sigma_intensity, padding_str)
+    new_data, channels_tr = denoise.bilateral(image, sigma_space, sigma_intensity, padding_str)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_DENOISE_BILATERAL, {'sigma_space': sigma_space, 'sigma_intensity': sigma_intensity}, {'padding_str': padding_str}, channels_tr))
 
 ########################################################
 # ********************** Border *********************** #
@@ -685,7 +679,7 @@ def build_border_high_pass_dialog(image_name: str) -> None:
         build_tr_name_input(TR_BORDER_HIGH_PASS, image_name)
         build_tr_value_int_selector('kernel size', 3, 23, step=2)
         build_tr_radio_buttons(PaddingStrategy.names())
-        build_tr_dialog_end_buttons(TR_BORDER_HIGH_PASS, image_name, tr_border_high_pass)
+        build_tr_dialog_end_buttons(TR_BORDER_HIGH_PASS, image_name, tr_border_high_pass, generic_tr_inductive_handle(border.high_pass))
 
 def tr_border_high_pass(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -694,10 +688,9 @@ def tr_border_high_pass(image_name: str) -> Image:
     kernel_size = require_odd(get_tr_int_value(), 'Kernel size must be odd')
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data, transformation = border.high_pass(image, kernel_size, padding_str)
-    transformation = ImageTransformation(TR_BORDER_HIGH_PASS, kernel_size=kernel_size)
+    new_data, channels_tr = border.high_pass(image, kernel_size, padding_str)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_BORDER_HIGH_PASS, {'kernel_size': kernel_size}, {'padding_str': padding_str}, channels_tr))
 
 TR_BORDER_DIRECTIONAL: str = 'directional'
 @render_error
@@ -707,19 +700,19 @@ def build_border_directional_dialog(image_name: str) -> None:
         build_tr_radio_buttons(PaddingStrategy.names())
         build_tr_radio_buttons(border.Direction.names(), tag="direction")
         build_tr_checkbox('Juliana\'s Kernel')
-        build_tr_dialog_end_buttons(TR_BORDER_DIRECTIONAL, image_name, tr_border_directional)
+        build_tr_dialog_end_buttons(TR_BORDER_DIRECTIONAL, image_name, tr_border_directional, generic_tr_inductive_handle(border.directional))
 
 def tr_border_directional(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image       = img_repo.get_image(image_name)
     new_name    = get_tr_name_value(image)
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
-    border_dir = border.Direction.from_str(get_tr_radio_buttons_value(radio_buttons="direction"))
-    kernel = border.FamousKernel.JULIANA if get_tr_checkbox_value() else border.FamousKernel.PREWITT
+    border_dir  = border.Direction.from_str(get_tr_radio_buttons_value(radio_buttons="direction"))
+    kernel      = border.FamousKernel.JULIANA if get_tr_checkbox_value() else border.FamousKernel.PREWITT
     # 2. Procesamos
-    new_data, transformation = border.directional(image, kernel, border_dir, padding_str)
+    new_data, channels_tr = border.directional(image, kernel, border_dir, padding_str)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_BORDER_DIRECTIONAL, {'border_dir': border_dir}, {'kernel': kernel, 'padding_str': padding_str}, channels_tr))
 
 TR_BORDER_PREWITT: str = 'prewitt'
 @render_error
@@ -727,7 +720,7 @@ def build_border_prewitt_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_BORDER_PREWITT):
         build_tr_name_input(TR_BORDER_PREWITT, image_name)
         build_tr_radio_buttons(PaddingStrategy.names())
-        build_tr_dialog_end_buttons(TR_BORDER_PREWITT, image_name, tr_border_prewitt)
+        build_tr_dialog_end_buttons(TR_BORDER_PREWITT, image_name, tr_border_prewitt, generic_tr_inductive_handle(border.prewitt))
 
 def tr_border_prewitt(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -735,9 +728,9 @@ def tr_border_prewitt(image_name: str) -> Image:
     new_name    = get_tr_name_value(image)
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data, transformation = border.prewitt(image, padding_str)
+    new_data, channels_tr = border.prewitt(image, padding_str)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_BORDER_PREWITT, {}, {'padding_str': padding_str}, channels_tr))
 
 TR_BORDER_SOBEL: str = 'sobel'
 @render_error
@@ -745,7 +738,7 @@ def build_border_sobel_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_BORDER_SOBEL):
         build_tr_name_input(TR_BORDER_SOBEL, image_name)
         build_tr_radio_buttons(PaddingStrategy.names())
-        build_tr_dialog_end_buttons(TR_BORDER_SOBEL, image_name, tr_border_sobel)
+        build_tr_dialog_end_buttons(TR_BORDER_SOBEL, image_name, tr_border_sobel, generic_tr_inductive_handle(border.sobel))
 
 def tr_border_sobel(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -753,9 +746,9 @@ def tr_border_sobel(image_name: str) -> Image:
     new_name    = get_tr_name_value(image)
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data, transformation = border.sobel(image, padding_str)
+    new_data, channels_tr = border.sobel(image, padding_str)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_BORDER_SOBEL, {}, {'padding_str': padding_str}, channels_tr))
 
 TR_BORDER_LAPLACIAN: str = 'laplacian'
 @render_error
@@ -764,18 +757,18 @@ def build_border_laplacian_dialog(image_name: str) -> None:
         build_tr_name_input(TR_BORDER_LAPLACIAN, image_name)
         build_tr_radio_buttons(PaddingStrategy.names())
         build_tr_value_int_selector('crossing threshold', 0, MAX_COLOR, default_value=100)
-        build_tr_dialog_end_buttons(TR_BORDER_LAPLACIAN, image_name, tr_border_laplacian)
+        build_tr_dialog_end_buttons(TR_BORDER_LAPLACIAN, image_name, tr_border_laplacian, generic_tr_inductive_handle(border.laplace))
 
 def tr_border_laplacian(image_name: str) -> Image:
     # 1. Obtenemos inputs
-    image       = img_repo.get_image(image_name)
-    new_name    = get_tr_name_value(image)
-    padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
-    crossing_threshold = get_tr_int_value()
+    image               = img_repo.get_image(image_name)
+    new_name            = get_tr_name_value(image)
+    padding_str         = PaddingStrategy.from_str(get_tr_radio_buttons_value())
+    crossing_threshold  = get_tr_int_value()
     # 2. Procesamos
-    new_data, transformation = border.laplace(image, crossing_threshold, padding_str)
+    new_data, channels_tr = border.laplace(image, crossing_threshold, padding_str)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_BORDER_LAPLACIAN, {'crossing_threshold': crossing_threshold}, {'padding_str': padding_str}, channels_tr))
 
 TR_BORDER_LOG: str = 'LOG'
 @render_error
@@ -785,7 +778,7 @@ def build_border_log_dialog(image_name: str) -> None:
         build_tr_radio_buttons(PaddingStrategy.names())
         build_tr_value_float_selector('sigma', 1, 20, default_value=2)
         build_tr_value_int_selector('crossing threshold', 0, MAX_COLOR, default_value=10)
-        build_tr_dialog_end_buttons(TR_BORDER_LOG, image_name, tr_border_log)
+        build_tr_dialog_end_buttons(TR_BORDER_LOG, image_name, tr_border_log, generic_tr_inductive_handle(border.log))
 
 def tr_border_log(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -795,9 +788,9 @@ def tr_border_log(image_name: str) -> Image:
     sigma = get_tr_float_value()
     crossing_threshold = get_tr_int_value()
     # 2. Procesamos
-    new_data, transformation = border.log(image, sigma, crossing_threshold, padding_str)
+    new_data, channels_tr = border.log(image, sigma, crossing_threshold, padding_str)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_BORDER_LOG, {'sigma': sigma, 'crossing_threshold': crossing_threshold}, {'padding_str': padding_str}, channels_tr))
 
 TR_BORDER_SUSAN: str = 'susan'
 @render_error
@@ -805,7 +798,7 @@ def build_border_susan_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_BORDER_SUSAN):
         build_tr_name_input(TR_BORDER_SUSAN, image_name)
         build_tr_radio_buttons(PaddingStrategy.names())
-        build_tr_dialog_end_buttons(TR_BORDER_SUSAN, image_name, tr_border_susan)
+        build_tr_dialog_end_buttons(TR_BORDER_SUSAN, image_name, tr_border_susan, generic_tr_inductive_handle(border.susan))
 
 def tr_border_susan(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -813,9 +806,9 @@ def tr_border_susan(image_name: str) -> Image:
     new_name    = get_tr_name_value(image)
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     # 2. Procesamos
-    new_data, transformation = border.susan(image, padding_str)
+    new_data, channels_tr = border.susan(image, padding_str)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_BORDER_SUSAN, {}, {'padding_str': padding_str}, channels_tr))
 
 TR_BORDER_HOUGH: str = 'hough'
 @render_error
@@ -825,8 +818,8 @@ def build_border_hough_dialog(image_name: str) -> None:
         build_tr_value_float_selector('t', 0, 20, default_value=1, tag='threshold')
         build_tr_value_float_selector('ratio', 0, 1, default_value=0.7, tag='ratio')
         build_tr_value_int_list_selector('theta', -90, 90, default_value=0, tag='theta')
-        build_tr_value_range_selector('rho', min_val=-200, max_val=200, max_count=401, tag='rho') #TODO(nacho): mejores defaults
-        build_tr_dialog_end_buttons(TR_BORDER_HOUGH, image_name, tr_border_hough)
+        build_tr_value_range_selector('rho', min_val=-200, max_val=200, max_count=401, tag='rho')  # TODO(nacho): mejores defaults
+        build_tr_dialog_end_buttons(TR_BORDER_HOUGH, image_name, tr_border_hough, generic_tr_inductive_handle(border.hough))
 
 def tr_border_hough(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -837,9 +830,9 @@ def tr_border_hough(image_name: str) -> Image:
     theta       = get_tr_int_list_value('theta')
     rho         = get_tr_range_value('rho')
     # 2. Procesamos
-    new_data, transformation = border.hough(image, theta, rho, threshold, ratio)
+    new_data, channels_tr = border.hough(image, theta, rho, threshold, ratio)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_BORDER_HOUGH, {'threshold': threshold, 'most_fitted_ratio': ratio, 'theta': theta, 'rho': rho}, {}, channels_tr))
 
 TR_BORDER_CANNY: str = 'canny'
 @render_error
@@ -849,7 +842,7 @@ def build_border_canny_dialog(image_name: str) -> None:
         build_tr_radio_buttons(PaddingStrategy.names())
         build_tr_value_int_selector('lower threshold', 0, MAX_COLOR, default_value=10, tag='t1')
         build_tr_value_int_selector('upper threshold', 0, MAX_COLOR, default_value=70, tag='t2')
-        build_tr_dialog_end_buttons(TR_BORDER_CANNY, image_name, tr_border_canny)
+        build_tr_dialog_end_buttons(TR_BORDER_CANNY, image_name, tr_border_canny, generic_tr_inductive_handle(border.canny))
 
 def tr_border_canny(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -859,35 +852,33 @@ def tr_border_canny(image_name: str) -> Image:
     t1 = get_tr_int_value('t1')
     t2 = get_tr_int_value('t2')
     # 2. Procesamos
-    new_data, transformation = border.canny(image, t1, t2, padding_str)
+    new_data, channels_tr = border.canny(image, t1, t2, padding_str)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_BORDER_CANNY, {'t1': t1, 't2': t2}, {'padding_str': padding_str}, channels_tr))
 
 TR_BORDER_ACTIVE_OUTLINE: str = 'active_outline'
 @render_error
 def build_border_active_outline_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_BORDER_ACTIVE_OUTLINE):
         build_tr_name_input(TR_BORDER_ACTIVE_OUTLINE, image_name)
-        build_movie_tr_dialog_end_buttons(TR_BORDER_ACTIVE_OUTLINE, image_name, tr_border_active_outline, tr_border_active_outline_inductive)
+        build_tr_dialog_end_buttons(TR_BORDER_ACTIVE_OUTLINE, image_name, tr_border_active_outline_base, tr_border_active_outline_inductive)
 
-def tr_border_active_outline(image_name: str) -> Image:
+    # TODO(tobi): Hacer que se pueda ejecutar la transformacion desde la frame n?
+def tr_border_active_outline_base(image_name: str) -> Image:
     # 1. Obtenemos inputs
-    image       = img_repo.get_image(image_name)
-    new_name    = get_tr_name_value(image)
-    # TODO(tobi): Hacer que se pueda ejecutar la transformacion desde la frame n
-    rect_selection = interface.get_image_window_rect_selection(f'image_window_{image_name}')
+    image           = img_repo.get_image(image_name)
+    new_name        = get_tr_name_value(image)
+    rect_selection  = interface.get_image_window_rect_selection(f'image_window_{image_name}')
     if rect_selection is None:
         raise ValueError('An initial bounding box on first frame is required in Active Outline')
-
     # 2. Procesamos
-    new_data, transformation  = border.active_outline_first_frame(image, rect_selection[0], rect_selection[1])
+    new_data, channels_tr = border.active_outline_base(image, *rect_selection)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_BORDER_CANNY, {'rect_selection': rect_selection}, {}, channels_tr))
 
 def tr_border_active_outline_inductive(new_name: str, prev: Image, current: Image) -> Image:
-    new_data = current.data  # Por ahora nop
-    transformation = ImageTransformation(TR_BORDER_ACTIVE_OUTLINE)
-    return current.transform(new_name, new_data, transformation)
+    new_data, channels_tr = border.active_outline_inductive(prev, current)
+    return current.transform(new_name, new_data, ImageTransformation(TR_BORDER_ACTIVE_OUTLINE, {}, {}, channels_tr))
 
 ########################################################
 # ********************* Combine ********************** #
@@ -899,7 +890,7 @@ def build_combine_add_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_COMBINE_ADD):
         build_tr_name_input(TR_COMBINE_ADD, image_name)
         build_tr_img_selector(image_name)
-        build_tr_dialog_end_buttons(TR_COMBINE_ADD, image_name, tr_combine_add)
+        build_tr_dialog_end_buttons(TR_COMBINE_ADD, image_name, tr_combine_add, generic_tr_inductive_handle(combine.add))
 
 def tr_combine_add(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -908,9 +899,9 @@ def tr_combine_add(image_name: str) -> Image:
     sec_image   = get_tr_img_value()
     require_same_shape(image, sec_image, 'You can only sum images with the same shape')
     # 2. Procesamos
-    new_data, transformation = combine.add(image, sec_image)
+    new_data, channels_tr = combine.add(image, sec_image)
     # 3. Creamos Imagen y finalizamos
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_COMBINE_ADD, {'sec_image_name': sec_image.name}, {'sec_image': sec_image}, channels_tr))
 
 TR_COMBINE_SUB: str = 'sub'
 @render_error
@@ -918,7 +909,7 @@ def build_combine_sub_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_COMBINE_SUB):
         build_tr_name_input(TR_COMBINE_SUB, image_name)
         build_tr_img_selector(image_name)
-        build_tr_dialog_end_buttons(TR_COMBINE_SUB, image_name, tr_combine_sub)
+        build_tr_dialog_end_buttons(TR_COMBINE_SUB, image_name, tr_combine_sub, generic_tr_inductive_handle(combine.sub))
 
 def tr_combine_sub(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -927,9 +918,9 @@ def tr_combine_sub(image_name: str) -> Image:
     sec_image   = get_tr_img_value()
     require_same_shape(image, sec_image, 'You can only sub images with the same shape')
     # 2. Procesamos
-    new_data, transformation = combine.sub(image, sec_image)
+    new_data, channels_tr = combine.sub(image, sec_image)
     # 3. Creamos Imagen y finalizamos
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_COMBINE_SUB, {'sec_image_name': sec_image.name}, {'sec_image': sec_image}, channels_tr))
 
 TR_COMBINE_MULT: str = 'multiply'
 @render_error
@@ -937,7 +928,7 @@ def build_combine_mult_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_COMBINE_MULT):
         build_tr_name_input(TR_COMBINE_MULT, image_name)
         build_tr_img_selector(image_name)
-        build_tr_dialog_end_buttons(TR_COMBINE_MULT, image_name, tr_combine_mult)
+        build_tr_dialog_end_buttons(TR_COMBINE_MULT, image_name, tr_combine_mult, generic_tr_inductive_handle(combine.multiply))
 
 def tr_combine_mult(image_name: str) -> Image:
     # 1. Obtenemos inputs
@@ -946,7 +937,6 @@ def tr_combine_mult(image_name: str) -> Image:
     sec_image   = get_tr_img_value()
     require_same_shape(image, sec_image, 'You can only multiply images with the same shape')
     # 2. Procesamos
-    new_data, transformation = combine.multiply(image, sec_image)
-    transformation = ImageTransformation(TR_COMBINE_MULT)
+    new_data, channels_tr = combine.multiply(image, sec_image)
     # 3. Creamos Imagen y finalizamos
-    return image.transform(new_name, new_data, transformation)
+    return image.transform(new_name, new_data, ImageTransformation(TR_COMBINE_ADD, {'sec_image_name': sec_image.name}, {'sec_image': sec_image}, channels_tr))

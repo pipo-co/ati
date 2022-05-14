@@ -1,9 +1,9 @@
 from enum import Enum
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Union
 
 import numpy as np
 from models.draw_cmd import LineDrawCmd, ScatterDrawCmd
-from models.image import MAX_COLOR, Image, ImageChannelTransformation, ImageTransformation, normalize
+from models.image import MAX_COLOR, Image, ImageChannelTransformation, normalize
 
 from transformations.np_utils import index_matrix
 from .sliding import PaddingStrategy, sliding_window, weighted_sum
@@ -96,7 +96,6 @@ class FamousKernel(Enum):
         [-1,  4, -1],
         [ 0, -1,  0]
     ]
-    # TODO(tobi): Se cambio el kernel de juliana?? Igual yo no importa
     JULIANA = [
         [ 1,  1, -1],
         [ 1, -2, -1],
@@ -116,14 +115,14 @@ class FamousKernel(Enum):
     def kernel(self) -> np.ndarray:
         return np.array(self.value)
 
-def directional_channel(channel: np.ndarray, vertical_kernel: np.ndarray, border_dir: Direction, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageChannelTransformation]:
+def directional_channel(channel: np.ndarray, vertical_kernel: np.ndarray, border_dir: Direction, padding_str: PaddingStrategy) -> np.ndarray:
     kernel = border_dir.align_vertical_kernel(vertical_kernel)
-    return weighted_sum(channel, kernel, padding_str), ImageChannelTransformation()
+    return weighted_sum(channel, kernel, padding_str)
 
-def high_pass_channel(channel: np.ndarray, kernel_size: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageChannelTransformation]:
+def high_pass_channel(channel: np.ndarray, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
     kernel = np.full((kernel_size, kernel_size), -1 / kernel_size)
     kernel[kernel_size // 2, kernel_size // 2] = (kernel_size ** 2 - 1) / kernel_size
-    return weighted_sum(channel, kernel, padding_str), ImageChannelTransformation()
+    return weighted_sum(channel, kernel, padding_str)
 
 def gradient_modulus(img: np.ndarray, kernel: np.ndarray, padding_str: PaddingStrategy) -> np.ndarray:
     x_channel = weighted_sum(img, kernel, padding_str)
@@ -131,11 +130,11 @@ def gradient_modulus(img: np.ndarray, kernel: np.ndarray, padding_str: PaddingSt
     y_channel = weighted_sum(img, kernel, padding_str)
     return np.sqrt(y_channel ** 2 + x_channel ** 2)
 
-def prewitt_channel(channel: np.ndarray, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageChannelTransformation]:
-    return gradient_modulus(channel, FamousKernel.PREWITT.kernel, padding_str), ImageChannelTransformation()
+def prewitt_channel(channel: np.ndarray, padding_str: PaddingStrategy) -> np.ndarray:
+    return gradient_modulus(channel, FamousKernel.PREWITT.kernel, padding_str)
 
-def sobel_channel(channel: np.ndarray, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageChannelTransformation]:
-    return gradient_modulus(channel, FamousKernel.SOBEL.kernel, padding_str), ImageChannelTransformation()
+def sobel_channel(channel: np.ndarray, padding_str: PaddingStrategy) -> np.ndarray:
+    return gradient_modulus(channel, FamousKernel.SOBEL.kernel, padding_str)
 
 def zero_crossing_vertical(data: np.ndarray, threshold: int) -> np.ndarray:
     ans = np.empty(data.shape, dtype=np.bool8)
@@ -165,12 +164,12 @@ def zero_crossing_borders(data: np.ndarray, threshold: int) -> np.ndarray:
     ret[mask] = MAX_COLOR
     return ret
 
-def laplacian_channel(channel: np.ndarray, crossing_threshold: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageChannelTransformation]:
+def laplacian_channel(channel: np.ndarray, crossing_threshold: int, padding_str: PaddingStrategy) -> np.ndarray:
     # Derivada segunda
     channel = weighted_sum(channel, FamousKernel.LAPLACE.kernel, padding_str)
 
     # Queremos ver donde se hace 0, pues son los minimos/maximos de la derivada => borde
-    return zero_crossing_borders(channel, crossing_threshold), ImageChannelTransformation()
+    return zero_crossing_borders(channel, crossing_threshold)
 
 def log_kernel(sigma: float) -> np.ndarray:
     kernel_size = int(sigma * 10 + 1)
@@ -180,28 +179,31 @@ def log_kernel(sigma: float) -> np.ndarray:
     k = (np.sqrt(2 * np.pi) * sigma**3)                             # sqrt(2pi) * sigma^3
     return - ((2 - sum_squared_over_sigma) / k) * np.exp(-sum_squared_over_sigma/2)
 
-def log_channel(channel: np.ndarray, sigma: float, crossing_threshold: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageChannelTransformation]:
+def log_channel(channel: np.ndarray, sigma: float, crossing_threshold: int, padding_str: PaddingStrategy) -> np.ndarray:
     # Derivada segunda con gauss
     channel = weighted_sum(channel, log_kernel(sigma), padding_str)
 
     # Queremos ver donde se hace 0, pues son los minimos/maximos de la derivada => borde
-    return zero_crossing_borders(channel, crossing_threshold), ImageChannelTransformation()
+    return zero_crossing_borders(channel, crossing_threshold)
 
-def susan_channel(channel: np.ndarray, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageChannelTransformation]:
+def susan_channel(channel: np.ndarray, padding_str: PaddingStrategy) -> np.ndarray:
     kernel = FamousKernel.SUSAN.kernel
     sw = sliding_window(channel, np.shape(kernel), padding_str)
+
     # Expando dimensiones para que sea compatible con el tamaño de la sliding window
     new_channel = np.expand_dims(channel, axis=(2,3))
     absolute_values = np.absolute(sw[:,:]*kernel - new_channel[:,:])
     absolute_values[absolute_values < 15] = 1
     absolute_values[absolute_values >= 15] = 0
+
     values = 1 - np.sum(absolute_values, axis=(2, 3)) / kernel.size
     values[(values < 0.4) | (values >= 0.85)] = 0
     values[(values >= 0.4) & (values < 0.65)] = 63
     values[(values >= 0.65) & (values < 0.85)] = 255
-    return values, ImageChannelTransformation()
 
-def hough_channel(channel: np.ndarray, theta: np.ndarray, rho: np.ndarray, threshold: float, most_fitted_ratio: float) -> Tuple[np.ndarray, np.ndarray]:
+    return values
+
+def hough_channel(channel: np.ndarray, theta: np.ndarray, rho: np.ndarray, threshold: float, most_fitted_ratio: float) -> Tuple[np.ndarray, ImageChannelTransformation]:
     indices = np.insert(index_matrix(*channel.shape), 0, -1, axis=2)
     acum = np.empty((rho.size, theta.size))
     white_points = channel > 0
@@ -221,11 +223,11 @@ def hough_channel(channel: np.ndarray, theta: np.ndarray, rho: np.ndarray, thres
 
     lines = list(filter(lambda l: l, (get_border_points(rho, theta, channel.shape) for rho, theta in best)))
     
-    return channel, ImageChannelTransformation(lines, best=best)  
+    return channel, ImageChannelTransformation({'best': best}, {}, lines)
 
 def get_border_points(rho: float, theta: float, img_shape) -> Optional[LineDrawCmd]:
     if np.isclose(theta, 0):
-        return LineDrawCmd(0, rho, img_shape[0]-1, rho)
+        return LineDrawCmd(0, round(rho), img_shape[0]-1, round(rho))
 
     max_y = img_shape[0] - 1
     max_x = img_shape[1] - 1
@@ -256,7 +258,7 @@ def canny_drag_borders(gradient_mod: np.ndarray, t1: int, t2: int, max_col: int,
         gradient_mod[row, col] = MAX_COLOR if np.amax(neighbour) == MAX_COLOR else 0
 
 # Asume que ya fue paso por un filtro gaussiano
-def canny_channel(channel: np.ndarray, t1: int, t2: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageChannelTransformation]:
+def canny_channel(channel: np.ndarray, t1: int, t2: int, padding_str: PaddingStrategy) -> np.ndarray:
     # Usamos prewitt para derivar
     kernel = FamousKernel.PREWITT.kernel
     dx = weighted_sum(channel, kernel, padding_str)
@@ -301,7 +303,7 @@ def canny_channel(channel: np.ndarray, t1: int, t2: int, padding_str: PaddingStr
         for row in range(max_row):
             canny_drag_borders(gradient_mod, t1, t2, max_col, max_row, row, col)
 
-    return gradient_mod, ImageChannelTransformation()
+    return gradient_mod
 
 def get_rectangular_boundrie(x: Tuple[int, int], y: Tuple[int, int]) -> List[Tuple[int, int]]:
     rectangular_boundrie = []
@@ -312,6 +314,11 @@ def get_rectangular_boundrie(x: Tuple[int, int], y: Tuple[int, int]) -> List[Tup
 
     return rectangular_boundrie
 
+def calculate_sigma(image: Image, x: Tuple[int, int], y: Tuple[int, int]) -> Union[float, np.ndarray]:
+    if image.channels > 1:
+        return np.mean(np.array(image.data[y[0]:y[1], x[0]:x[1]]).reshape((-1, 3)), axis=0)
+    else:
+        return np.mean(image.data[y[0]:y[1], x[0]:x[1]])
 
 def get_initial_boundries(x: Tuple[int, int], y: Tuple[int, int], phi_size: int):
     lout = get_rectangular_boundrie(x, y)
@@ -327,7 +334,6 @@ def get_indexes() -> np.ndarray:
     
 def in_bounds(x: int, y: int, shape: Tuple[int, int]):
     return 0 <= x < shape[1] and 0 <= y < shape[0]
-
 
 def new_phi_values(previous_phi: np.ndarray, new_phi: np.ndarray, indices: np.ndarray, point: Tuple[int, int], target: int, new_value: int):
     value_list = []
@@ -346,7 +352,7 @@ def new_phi_values(previous_phi: np.ndarray, new_phi: np.ndarray, indices: np.nd
                 new_phi[phi_y, phi_x] = -target
     return value_list, remove_values
 
-def active_outline(image: np.ndarray, sigma, lout: np.ndarray, lin: np.ndarray, phi: np.ndarray):
+def active_outline_all_channels(image: np.ndarray, sigma: Union[float, np.ndarray], lout: np.ndarray, lin: np.ndarray, phi: np.ndarray) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
     flag = True
     indices = get_indexes()
     while flag:
@@ -383,63 +389,47 @@ def active_outline(image: np.ndarray, sigma, lout: np.ndarray, lin: np.ndarray, 
     lout = np.asarray(list(lout))
     lin = np.asarray(list(lin))
 
-    return lout, lin, phi
+    overlay = [ScatterDrawCmd(lout, (255, 0, 0)), ScatterDrawCmd(lin, (255, 0, 255))]
+    return image.data, [ImageChannelTransformation({'sigma': sigma}, {'phi': phi, 'lout': lout, 'lin': lin}, overlay)]
 
-    
 
 # ******************* Export Functions ********************** #
-def directional(image: Image, kernel: FamousKernel, border_dir: Direction, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageTransformation]:
-    return image.apply_over_channels('directional', directional_channel, vertical_kernel=kernel.kernel, border_dir=border_dir, padding_str=padding_str)
 
-def high_pass(image: Image, kernel_size: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageTransformation]:
-    return image.apply_over_channels('high_pass', high_pass_channel, kernel_size=kernel_size, padding_str=padding_str)
+def directional(image: Image, kernel: FamousKernel, border_dir: Direction, padding_str: PaddingStrategy) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return image.apply_over_channels(directional_channel, vertical_kernel=kernel.kernel, border_dir=border_dir, padding_str=padding_str)
 
-def prewitt(image: Image, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageTransformation]:
-    return image.apply_over_channels('prewitt', prewitt_channel, padding_str=padding_str)
+def high_pass(image: Image, kernel_size: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return image.apply_over_channels(high_pass_channel, kernel_size=kernel_size, padding_str=padding_str)
 
-def sobel(image: Image, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageTransformation]:
-    return image.apply_over_channels('sobel', sobel_channel, padding_str=padding_str)
+def prewitt(image: Image, padding_str: PaddingStrategy) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return image.apply_over_channels(prewitt_channel, padding_str=padding_str)
 
-def laplace(image: Image, crossing_threshold: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageTransformation]:
-    return image.apply_over_channels('laplace', laplacian_channel, crossing_threshold=crossing_threshold, padding_str=padding_str)
+def sobel(image: Image, padding_str: PaddingStrategy) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return image.apply_over_channels(sobel_channel, padding_str=padding_str)
 
-def log(image: Image, sigma: float, crossing_threshold: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageTransformation]:
-    return image.apply_over_channels('log', log_channel, sigma=sigma, crossing_threshold=crossing_threshold, padding_str=padding_str)
+def laplace(image: Image, crossing_threshold: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return image.apply_over_channels(laplacian_channel, crossing_threshold=crossing_threshold, padding_str=padding_str)
 
-def susan(image: Image, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageTransformation]:
-    return image.apply_over_channels('susan', susan_channel, padding_str=padding_str)
+def log(image: Image, sigma: float, crossing_threshold: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return image.apply_over_channels(log_channel, sigma=sigma, crossing_threshold=crossing_threshold, padding_str=padding_str)
 
-def hough(image: Image, theta: List[int], rho: np.ndarray, threshold: float, most_fitted_ratio: float) -> Tuple[np.ndarray, ImageTransformation]:    
-    theta = np.asarray(theta) * np.pi / 180
-    return image.apply_over_channels('hough', hough_channel, theta=theta, rho=rho, threshold=threshold, most_fitted_ratio=most_fitted_ratio)
-    
-def canny(image: Image, t1: int, t2: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageTransformation]:
-    return image.apply_over_channels('canny', canny_channel, t1=t1, t2=t2, padding_str=padding_str)
+def susan(image: Image, padding_str: PaddingStrategy) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return image.apply_over_channels(susan_channel, padding_str=padding_str)
 
-def make_dimension_point(p1: Tuple[int, int], p2: Tuple[int, int], dim: int):
-    if p1[dim] > p2[dim]:
-        return p2[dim], p1[dim]
-    else:
-        return p1[dim], p2[dim]
+def hough(image: Image, theta: List[int], rho: np.ndarray, threshold: float, most_fitted_ratio: float) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    theta = np.asarray(theta) * np.pi / 180  # TODO(nacho): Usar deg2rad o el inverso
+    return image.apply_over_channels(hough_channel, theta=theta, rho=rho, threshold=threshold, most_fitted_ratio=most_fitted_ratio)
 
-def active_outline_first_frame(image: Image, p1: Tuple[int, int], p2: Tuple[int, int]) -> Tuple[np.ndarray, ImageTransformation]:
-    x = make_dimension_point(p1, p2, 1)
-    y = make_dimension_point(p1, p2, 0)
+def canny(image: Image, t1: int, t2: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return image.apply_over_channels(canny_channel, t1=t1, t2=t2, padding_str=padding_str)
 
-    if image.channels > 1:
-        sigma = np.mean(np.array(image.data[y[0]:y[1], x[0]:x[1]]).reshape((-1, 3)), axis=0)
-    else:
-        sigma = np.mean(image.data[y[0]:y[1], x[0]:x[1]])
-
+def active_outline_base(image: Image, p1: Tuple[int, int], p2: Tuple[int, int]) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    x = p1[1], p2[1]
+    y = p1[0], p2[0]
+    sigma = calculate_sigma(image, x, y)
     lout, lin, phi = get_initial_boundries(x, y, image.data[:, 1].size)
+    # TODO(faus): Aca hay un problema de tipos
+    return active_outline_all_channels(image.data, sigma, lout, lin, phi)
 
-    lout, lin, phi = active_outline(image.data, sigma, lout, lin, phi)
-
-    img_transformation = ImageTransformation('active_outline')
-
-    # img_transformation.channel_transformations.append(ImageChannelTransformation([ScatterDrawCmd(lin),ScatterDrawCmd(lout)]))
-    img_transformation.channel_transformations.append(ImageChannelTransformation([ScatterDrawCmd(lout, (255, 0, 0)), ScatterDrawCmd(lin, (255, 0, 255))]))
-    return image.data, img_transformation
-
-def active_outline_middle_frame(prev: Image, current: Image, in_color: int, l_in: np.ndarray, l_out: np.ndarray) -> np.ndarray:
-    pass
+def active_outline_inductive(prev: Image, current: Image) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return active_outline_all_channels(current.data, **prev.last_transformation.channel_transformations[0].all_results())

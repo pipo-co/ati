@@ -1,12 +1,12 @@
 import functools
 from enum import Enum
-from typing import Tuple
+from typing import Tuple, List
 
 import numpy as np
 
 from transformations.np_utils import index_matrix
 from .sliding import PaddingStrategy, sliding_window, sliding_window_tensor, require_valid_kernel, weighted_sum
-from models.image import Image, ImageChannelTransformation, ImageTransformation
+from models.image import Image, ImageChannelTransformation
 
 class DirectionalDerivatives(Enum):
     NORTH = [
@@ -57,15 +57,15 @@ class DiffusionStrategy(Enum):
             raise ValueError(f'"{strategy_name.title()}" is not a supported anisotropic function')
         return cls[strategy_name]
 
-def mean_channel(channel: np.ndarray, kernel_size: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageChannelTransformation]:
-    return weighted_sum(channel, np.full((kernel_size, kernel_size), 1 / kernel_size**2), padding_str), ImageChannelTransformation()
+def mean_channel(channel: np.ndarray, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
+    return weighted_sum(channel, np.full((kernel_size, kernel_size), 1 / kernel_size**2), padding_str)
 
-def weighted_median_channel(channel: np.ndarray, kernel: np.ndarray, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageChannelTransformation]:
+def weighted_median_channel(channel: np.ndarray, kernel: np.ndarray, padding_str: PaddingStrategy) -> np.ndarray:
     require_valid_kernel(kernel)
     sw = sliding_window(channel, kernel.shape, padding_str)
-    return np.median(np.repeat(sw.reshape(*channel.shape, -1), kernel.flatten(), axis=2), axis=2), ImageChannelTransformation()
+    return np.median(np.repeat(sw.reshape(*channel.shape, -1), kernel.flatten(), axis=2), axis=2)
 
-def median_channel(channel: np.ndarray, kernel_size: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageChannelTransformation]:
+def median_channel(channel: np.ndarray, kernel_size: int, padding_str: PaddingStrategy) -> np.ndarray:
     return weighted_median_channel(channel, np.full((kernel_size, kernel_size), 1), padding_str)
 
 def gauss_kernel(sigma: float) -> np.ndarray:
@@ -75,8 +75,8 @@ def gauss_kernel(sigma: float) -> np.ndarray:
     indices = np.exp(-indices / sigma**2)
     return indices / (2 * np.pi * sigma**2)
 
-def gauss_channel(channel: np.ndarray, sigma: float, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageChannelTransformation]:
-    return weighted_sum(channel, gauss_kernel(sigma), padding_str), ImageChannelTransformation()
+def gauss_channel(channel: np.ndarray, sigma: float, padding_str: PaddingStrategy) -> np.ndarray:
+    return weighted_sum(channel, gauss_kernel(sigma), padding_str)
 
 # TODO(nacho): Esta constante?
 MAX_ANISOTROPIC_ITERATIONS: int = 20
@@ -88,11 +88,11 @@ def diffusion_step(channel: np.ndarray, sigma: int, padding_str: PaddingStrategy
         new_channel += function(derivatives, sigma) * derivatives / 4
     return new_channel
 
-def diffusion_channel(channel: np.ndarray, iterations: int, sigma: int, padding_str: PaddingStrategy, function: DiffusionStrategy) -> Tuple[np.ndarray, ImageChannelTransformation]:
+def diffusion_channel(channel: np.ndarray, iterations: int, sigma: int, padding_str: PaddingStrategy, function: DiffusionStrategy) -> np.ndarray:
     new_channel = channel
     for _ in range(iterations):
         new_channel = diffusion_step(new_channel, sigma, padding_str, function)
-    return new_channel, ImageChannelTransformation()
+    return new_channel
 
 def bilateral_kernel(sw: np.ndarray, sigma_space: int, sigma_intensity: int, kernel_size: int) -> np.ndarray:
     indexes = np.array(list(np.ndindex((kernel_size, kernel_size)))) - kernel_size//2 # noqa
@@ -125,20 +125,21 @@ def bilateral_all_channels(channels: np.ndarray, sigma_space: int, sigma_intensi
     return np.squeeze(new_data)
 
 # ******************* Export Functions ********************** #
-def mean(img: Image, kernel_size: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageTransformation]:
-    return img.apply_over_channels('mean', mean_channel, kernel_size=kernel_size, padding_str=padding_str)
 
-def median(img: Image, kernel_size: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageTransformation]:
-    return img.apply_over_channels('median', median_channel, kernel_size=kernel_size, padding_str=padding_str)
+def mean(img: Image, kernel_size: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return img.apply_over_channels(mean_channel, kernel_size=kernel_size, padding_str=padding_str)
 
-def weighted_median(img: Image, kernel: np.ndarray, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageTransformation]:
-    return img.apply_over_channels('weighted_median', weighted_median_channel, kernel=kernel, padding_str=padding_str)
+def median(img: Image, kernel_size: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return img.apply_over_channels(median_channel, kernel_size=kernel_size, padding_str=padding_str)
 
-def gauss(img: Image, sigma: float, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageTransformation]:
-    return img.apply_over_channels('gauss', gauss_channel, sigma=sigma, padding_str=padding_str)
+def weighted_median(img: Image, kernel: np.ndarray, padding_str: PaddingStrategy) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return img.apply_over_channels(weighted_median_channel, kernel=kernel, padding_str=padding_str)
 
-def diffusion(img: Image, iterations: int, sigma: int, padding_str: PaddingStrategy, function: DiffusionStrategy) -> Tuple[np.ndarray, ImageTransformation]:
-    return img.apply_over_channels('diffusion', diffusion_channel, iterations, sigma, padding_str, function)
+def gauss(img: Image, sigma: float, padding_str: PaddingStrategy) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return img.apply_over_channels(gauss_channel, sigma=sigma, padding_str=padding_str)
 
-def bilateral(image: Image, sigma_space: int, sigma_intensity: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, ImageTransformation]:
-    return bilateral_all_channels(image.data, sigma_space, sigma_intensity, padding_str), ImageTransformation('bilateral', sigma_space=sigma_space, sigma_intensity=sigma_intensity, padding_str=padding_str)
+def diffusion(img: Image, iterations: int, sigma: int, padding_str: PaddingStrategy, function: DiffusionStrategy) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return img.apply_over_channels(diffusion_channel, iterations, sigma, padding_str, function)
+
+def bilateral(image: Image, sigma_space: int, sigma_intensity: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return bilateral_all_channels(image.data, sigma_space, sigma_intensity, padding_str), []

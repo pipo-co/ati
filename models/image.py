@@ -50,39 +50,62 @@ class ImageFormat(Enum):
 
 @dataclass
 class ImageChannelTransformation:
-    results: Dict[str, Any]
-    overlay: Optional[List[DrawCmd]]
+    public_results:     Dict[str, Any]
+    internal_results:   Dict[str, Any]
+    overlay:            List[DrawCmd]
 
-    def __init__(self, overlay: Optional[List[DrawCmd]] = None, **kwargs):
-        self.overlay = overlay
-        self.results = kwargs
+    def __init__(self, public_results: Dict[str, Any], internal_results: Dict[str, Any], overlay: Optional[List[DrawCmd]] = None):
+        self.public_results     = public_results
+        self.internal_results   = internal_results
+        self.overlay            = overlay if overlay is not None else []
 
+    def __str__(self) -> str:
+        return ', '.join((f'{k}: {v}' for k, v in self.public_results.items())) + '\n'
+
+    def all_results(self) -> Dict[str, Any]:
+        return {**self.public_results, **self.internal_results}
 
 @dataclass
 class ImageTransformation:
-    name: str
-    properties: Dict[str, Any]
-    channel_transformations: List[ImageChannelTransformation]
+    name:                       str
+    major_inputs:               Dict[str, Any]
+    minor_inputs:               Dict[str, Any]
+    channel_transformations:    List[ImageChannelTransformation]
 
-    def __init__(self, name: str, **kwargs):
-        self.name = name
-        self.properties = kwargs
-        self.channel_transformations = []
+    def __init__(self, name: str, major_inputs: Dict[str, Any], minor_inputs: Dict[str, Any], channel_transformations: Optional[List[ImageChannelTransformation]] = None):
+        self.name                       = name
+        self.major_inputs               = major_inputs
+        self.minor_inputs               = minor_inputs
+        self.channel_transformations    = channel_transformations if channel_transformations is not None else []
 
     def __str__(self) -> str:
-        return '[{0}] {1}'.format(self.name, ", ".join([f'{k}={v}' for k,v in self.properties.items()]))
+        ret = f'Transformation {self.name}:\n'
+
+        if self.major_inputs:
+            ret += '\tMayor inputs: ' + ', '.join((f'{k}: {v}' for k, v in self.major_inputs.items()))
+
+        channel_tr_len = len(self.channel_transformations)
+        if channel_tr_len == 0:
+            pass  # No hacemos nada
+        elif channel_tr_len == 1:
+            ret += '\tResults: ' + str(self.channel_transformations[0]) + '\n'
+        elif channel_tr_len == 3:
+            ret += ''.join((f'\tChannel {i} Results: {str(channel_tr)}\n' for i, channel_tr in self.channel_transformations))
+
+        return ret
 
 @dataclass
 class Image:
-    name:   str
-    format: ImageFormat
-    data:   np.ndarray
-    movie: Optional[str] = None
-    transformations: List[ImageTransformation] = field(default_factory=list)
+    name:               str
+    format:             ImageFormat
+    data:               np.ndarray
+    movie:              Optional[str]
+    transformations:    List[ImageTransformation]
 
-    RED_CHANNEL:    int = 0
-    GREEN_CHANNEL:  int = 1
-    BLUE_CHANNEL:   int = 2
+    # No le ponemos tipo para que dataclass no lo agarre como field
+    RED_CHANNEL     = 0
+    GREEN_CHANNEL   = 1
+    BLUE_CHANNEL    = 2
 
     def __init__(self, name: str, fmt: ImageFormat, data: np.ndarray, allow_reserved: bool = False, movie: Optional[str] = None, transformations: Optional[List[ImageTransformation]] = None):
         if not allow_reserved and name in RESERVED_IMAGE_NAMES:
@@ -105,20 +128,28 @@ class Image:
     def get_channel(self, channel: int) -> np.ndarray:
         return self.data[:, :, channel] if self.channels > 1 else self.data
 
-    def apply_over_channels(self, tr_name: str, fn: Callable[[np.ndarray, Any], np.ndarray], *args, **kwargs) -> Tuple[np.ndarray, ImageTransformation]:
+    def apply_over_channels(self, fn: Callable[[np.ndarray, Any], Union[np.ndarray, Tuple[np.ndarray, ImageChannelTransformation]]], *args, **kwargs) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
         new_data: np.ndarray
-        transformation: ImageTransformation = ImageTransformation(tr_name, **kwargs)
-        channel_tr: ImageChannelTransformation
+        channels_tr: List[ImageChannelTransformation] = []
+
         if self.channels == 1:
-            new_data, channel_tr = fn(self.data, *args, **kwargs)
-            transformation.channel_transformations.append(channel_tr)
+            fn_ret = fn(self.data, *args, **kwargs)
+            if isinstance(fn_ret, tuple):
+                new_data = fn_ret[0]
+                channels_tr.append(fn_ret[1])
+            else:
+                new_data = fn_ret
         else:
             new_data = np.empty(self.shape)
             for channel in range(self.channels):
-                new_data[:, :, channel], channel_tr = fn(self.get_channel(channel), *args, **kwargs)
-                transformation.channel_transformations.append(channel_tr)
+                fn_ret = fn(self.get_channel(channel), *args, **kwargs)
+                if isinstance(fn_ret, tuple):
+                    new_data[:, :, channel] = fn_ret[0]
+                    channels_tr.append(fn_ret[1])
+                else:
+                    new_data[:, :, channel] = fn_ret
 
-        return new_data, transformation
+        return new_data, channels_tr
 
     def get_histograms(self) -> Union[Tuple[Hist], Tuple[Hist, Hist, Hist]]:
         if self.channels == 1:
@@ -132,6 +163,14 @@ class Image:
 
     def transform(self, new_name: str, new_data: np.ndarray, transformation: ImageTransformation):
         return Image(new_name, self.format, new_data, movie=self.movie, transformations=self.transformations + [transformation])
+
+    def input(self, input_name: str) -> Any:
+        tr = self.last_transformation
+        return tr.major_inputs.get(input_name, tr.minor_inputs[input_name])
+
+    def all_inputs(self) -> Dict[str, Any]:
+        tr = self.last_transformation
+        return {**tr.major_inputs, **tr.minor_inputs}
 
     @property
     def shape(self) -> Tuple[int]:
@@ -163,6 +202,14 @@ class Image:
         if not self.transformations:
             raise ValueError('Image has no transformations')
         return self.transformations[-1]
+
+    @property
+    def major_inputs(self) -> Dict[str, Any]:
+        return self.last_transformation.major_inputs
+
+    @property
+    def minor_inputs(self) -> Dict[str, Any]:
+        return self.last_transformation.minor_inputs
 
     @staticmethod
     def name_from_path(path: str) -> str:

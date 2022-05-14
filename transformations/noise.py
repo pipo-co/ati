@@ -37,16 +37,16 @@ def pollute_channel(channel: np.ndarray, noise_supplier: NoiseSupplier, noise_ty
     ret[indices] = noise_type(ret[indices], noise)
     return np.reshape(ret, shape)
 
-def gaus_channel(channel: np.ndarray, sigma: float, noise_type: Type, percentage: int) -> Tuple[np.ndarray, ImageChannelTransformation]:
-    return pollute_channel(channel, lambda size: rng.gaussian(0, sigma, size), noise_type, percentage), ImageChannelTransformation()
+def gauss_channel(channel: np.ndarray, sigma: float, noise_type: Type, percentage: int) -> np.ndarray:
+    return pollute_channel(channel, lambda size: rng.gaussian(0, sigma, size), noise_type, percentage)
 
-def exponential_channel(channel: np.ndarray, lam: float, noise_type: Type, percentage: int) -> Tuple[np.ndarray, ImageChannelTransformation]:
-    return pollute_channel(channel, lambda size: rng.exponential(lam, size), noise_type, percentage), ImageChannelTransformation()
+def exponential_channel(channel: np.ndarray, lam: float, noise_type: Type, percentage: int) -> np.ndarray:
+    return pollute_channel(channel, lambda size: rng.exponential(lam, size), noise_type, percentage)
 
-def rayleigh_channel(channel: np.ndarray, epsilon: float, noise_type: Type, percentage: int) -> Tuple[np.ndarray, ImageChannelTransformation]:
-    return pollute_channel(channel, lambda size: rng.rayleigh(epsilon, size), noise_type, percentage), ImageChannelTransformation()
+def rayleigh_channel(channel: np.ndarray, epsilon: float, noise_type: Type, percentage: int) -> np.ndarray:
+    return pollute_channel(channel, lambda size: rng.rayleigh(epsilon, size), noise_type, percentage)
 
-def salt_channel(channel: np.ndarray, percentage: int) -> Tuple[np.ndarray, ImageChannelTransformation]:
+def salt_channel(channel: np.ndarray, percentage: int) -> np.ndarray:
     p = percentage / 100
 
     shape = np.shape(channel)
@@ -56,17 +56,18 @@ def salt_channel(channel: np.ndarray, percentage: int) -> Tuple[np.ndarray, Imag
     noised_channel[uniform < p]   = 0
     noised_channel[uniform > 1-p] = MAX_COLOR
 
-    return np.reshape(noised_channel, shape), ImageChannelTransformation()
+    return np.reshape(noised_channel, shape)
 
 # ******************* Export Functions ********************** #
-def gaus(img: Image, sigma: float, noise_type: Type, percentage: int) -> Tuple[np.ndarray, ImageTransformation]:
-    return img.apply_over_channels('gaus_noise', gaus_channel, sigma=sigma, noise_type=noise_type, percentage=percentage)
 
-def exponential(img: Image, lam: float, noise_type: Type, percentage: int) -> Tuple[np.ndarray, ImageTransformation]:
-    return img.apply_over_channels('exponential_noise', exponential_channel, lam=lam, noise_type=noise_type, percentage=percentage)
+def gauss(img: Image, sigma: float, noise_type: Type, percentage: int) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return img.apply_over_channels(gauss_channel, sigma=sigma, noise_type=noise_type, percentage=percentage)
 
-def rayleigh(img: Image, epsilon: float, noise_type: Type, percentage: int) -> Tuple[np.ndarray, ImageTransformation]:
-    return img.apply_over_channels('rayleigh_noise', rayleigh_channel, epsilon=epsilon, noise_type=noise_type, percentage=percentage)
+def exponential(img: Image, lam: float, noise_type: Type, percentage: int) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return img.apply_over_channels(exponential_channel, lam=lam, noise_type=noise_type, percentage=percentage)
 
-def salt(img: Image, percentage: int) -> Tuple[np.ndarray, ImageTransformation]:
-    return img.apply_over_channels('salt', salt_channel, percentage=percentage)
+def rayleigh(img: Image, epsilon: float, noise_type: Type, percentage: int) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return img.apply_over_channels(rayleigh_channel, epsilon=epsilon, noise_type=noise_type, percentage=percentage)
+
+def salt(img: Image, percentage: int) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return img.apply_over_channels(salt_channel, percentage=percentage)
