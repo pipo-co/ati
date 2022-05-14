@@ -335,7 +335,7 @@ def get_initial_boundries(x: Tuple[int, int], y: Tuple[int, int], phi_size: int)
     return lout, lin, phi
 
 def get_indexes() -> np.ndarray:
-    return np.reshape(np.array(list(np.ndindex((3, 3)))) - 3//2, (9, 2))
+    return np.reshape(np.array(list(np.ndindex(3, 3))) - 3//2, (9, 2))
     
 def in_bounds(x: int, y: int, shape: Tuple[int, int]):
     return 0 <= x < shape[1] and 0 <= y < shape[0]
@@ -434,7 +434,6 @@ def make_dimension_point(p1: Tuple[int, int], p2: Tuple[int, int], dim: int):
         return p1[dim], p2[dim]
 
 def active_outline_first_frame(image: Image, p1: Tuple[int, int], p2: Tuple[int, int]) -> Tuple[np.ndarray, ImageTransformation]:
-    
     x = make_dimension_point(p1, p2, 1)
     y = make_dimension_point(p1, p2, 0)
 
@@ -450,7 +449,7 @@ def active_outline_first_frame(image: Image, p1: Tuple[int, int], p2: Tuple[int,
     img_transformation = ImageTransformation('active_outline')
 
     # img_transformation.channel_transformations.append(ImageChannelTransformation([ScatterDrawCmd(lin),ScatterDrawCmd(lout)]))
-    img_transformation.channel_transformations.append(ImageChannelTransformation([ScatterDrawCmd(lout), ScatterDrawCmd(lin)]))
+    img_transformation.channel_transformations.append(ImageChannelTransformation([ScatterDrawCmd(lout, (255, 0, 0)), ScatterDrawCmd(lin, (255, 0, 255))]))
     return image.data, img_transformation
 
 def active_outline_middle_frame(prev: Image, current: Image, in_color: int, l_in: np.ndarray, l_out: np.ndarray) -> np.ndarray:

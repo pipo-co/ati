@@ -56,19 +56,23 @@ def render_image_window(image_name: str, movie: Optional[Movie] = None, pos: Uni
 
             with dpg.group(horizontal=True):
                 with dpg.group():
-                    dpg.add_image(image_name, tag=f'image_{image_name}', width=image.width, height=image.height)
-    
+                    rendered_img = dpg.add_image(image_name, tag=f'image_{image_name}', width=image.width, height=image.height)
+                    dpg.split_frame()
+
                     for tr in image.transformations:
                         for tr_channel in tr.channel_transformations:
                             if tr_channel.overlay:
-                                for cmd in tr_channel.overlay:
+                                for i, cmd in enumerate(tr_channel.overlay):
                                     if isinstance(cmd, LineDrawCmd):
-                                        dpg.draw_line((cmd.p1_x, cmd.p1_y), (cmd.p2_x, cmd.p2_y), color=(0,255,0), parent=window)
+                                        dpg.draw_line((cmd.p1_x, cmd.p1_y), (cmd.p2_x, cmd.p2_y), color=cmd.color, parent=window)
                                     elif isinstance(cmd, CircleDrawCmd):
-                                        dpg.draw_circle((cmd.c_x, cmd.c_y), parent=window)
+                                        dpg.draw_circle((cmd.c_x, cmd.c_y), color=cmd.color, parent=window)
                                     elif isinstance(cmd, ScatterDrawCmd):
-                                        dpg.draw_polygon(cmd.points, color=(0,255,0), parent=window)
-                    
+                                        mask = np.zeros((image.height, image.width, 4))
+                                        mask[cmd.points[:,0], cmd.points[:,1]] = np.array([*cmd.color, 255]) / 255
+                                        mask_tag = dpg.add_static_texture(image.width, image.height, mask.flatten(), parent=TEXTURE_REGISTRY) # noqa
+                                        dpg.add_image(mask_tag, width=image.width, height=image.height, pos=dpg.get_item_pos(rendered_img), parent=window)
+
                     if movie:
                         with dpg.group(horizontal=True):
                             if not movie.on_first_frame():
