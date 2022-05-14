@@ -2,7 +2,7 @@ from enum import Enum
 from typing import List, Optional, Tuple, Union
 
 import numpy as np
-from models.draw_cmd import LineDrawCmd, ScatterDrawCmd
+from models.draw_cmd import CircleDrawCmd, LineDrawCmd, ScatterDrawCmd
 from models.image import MAX_COLOR, Image, ImageChannelTransformation, normalize
 
 from transformations.np_utils import index_matrix
@@ -203,7 +203,7 @@ def susan_channel(channel: np.ndarray, padding_str: PaddingStrategy) -> np.ndarr
 
     return values
 
-def hough_channel(channel: np.ndarray, theta: np.ndarray, rho: np.ndarray, threshold: float, most_fitted_ratio: float) -> Tuple[np.ndarray, ImageChannelTransformation]:
+def hough_lines_channel(channel: np.ndarray, theta: np.ndarray, rho: np.ndarray, threshold: float, most_fitted_ratio: float) -> Tuple[np.ndarray, ImageChannelTransformation]:
     indices = np.insert(index_matrix(*channel.shape), 0, -1, axis=2)
     acum = np.empty((rho.size, theta.size))
     white_points = channel > 0
@@ -224,6 +224,30 @@ def hough_channel(channel: np.ndarray, theta: np.ndarray, rho: np.ndarray, thres
     lines = list(filter(lambda l: l, (get_border_points(rho, theta, channel.shape) for rho, theta in best)))
     
     return channel, ImageChannelTransformation({'best': best}, {}, lines)
+
+def hough_circle_channel(channel: np.ndarray, radius: np.ndarray, x_axis: np.ndarray, y_axis: np.ndarray, threshold: float, most_fitted_ratio: float) -> Tuple[np.ndarray, ImageChannelTransformation]:
+    indices = index_matrix(*channel.shape)
+    centers = np.stack(np.meshgrid(y_axis, x_axis), -1).reshape((-1, 2))
+    acum = np.empty((radius.size, len(centers)))
+    white_points = channel > 0
+
+    for i in range(len(radius)):
+        for j in range(len(centers)):
+            # |rho - (y - b)^2 - (x - a)^2|
+            circles = (indices - centers[j]) ** 2
+            circles = np.insert(circles, 0, - radius[i] ** 2, axis=2)
+            circles = np.abs(np.sum(circles, axis=2)) < threshold
+            acum[i, j] = np.sum(white_points & circles)
+
+    most_fitted_lines = np.argwhere(acum > most_fitted_ratio * acum.max())
+    Y = np.transpose(most_fitted_lines)[0]
+    X = np.transpose(most_fitted_lines)[1]
+
+    best = np.hstack((radius[Y, None], centers[X]))
+
+    overlay = list(filter(lambda l: l, (CircleDrawCmd(r, y, x) for r, y, x in best)))
+    
+    return channel, ImageChannelTransformation({'best': best}, {}, overlay)
 
 def get_border_points(rho: float, theta: float, img_shape) -> Optional[LineDrawCmd]:
     if np.isclose(theta, 0):
@@ -250,7 +274,6 @@ def get_border_points(rho: float, theta: float, img_shape) -> Optional[LineDrawC
         
     return LineDrawCmd(*ans[0], *ans[1])
     
-
 def canny_drag_borders(gradient_mod: np.ndarray, t1: int, t2: int, max_col: int, max_row: int, row: int, col: int) -> None:
     if t1 < gradient_mod[row, col] < t2:
         # Conectado por un borde de manera 8-conexo
@@ -412,9 +435,12 @@ def log(image: Image, sigma: float, crossing_threshold: int, padding_str: Paddin
 def susan(image: Image, padding_str: PaddingStrategy) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
     return image.apply_over_channels(susan_channel, padding_str=padding_str)
 
-def hough(image: Image, theta: List[int], rho: np.ndarray, threshold: float, most_fitted_ratio: float) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
-    theta = np.asarray(theta) * np.pi / 180  # TODO(nacho): Usar deg2rad o el inverso
-    return image.apply_over_channels(hough_channel, theta=theta, rho=rho, threshold=threshold, most_fitted_ratio=most_fitted_ratio)
+def hough_lines(image: Image, theta: List[int], rho: np.ndarray, threshold: float, most_fitted_ratio: float) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    theta = np.deg2rad(theta)
+    return image.apply_over_channels(hough_lines_channel, theta=theta, rho=rho, threshold=threshold, most_fitted_ratio=most_fitted_ratio)
+
+def hough_circles(image: Image, radius: np.ndarray, x_axis: np.ndarray, y_axis: np.ndarray, threshold: float, most_fitted_ratio: float) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return image.apply_over_channels(hough_circle_channel, radius=radius, x_axis=x_axis, y_axis=y_axis, threshold=threshold, most_fitted_ratio=most_fitted_ratio)
 
 def canny(image: Image, t1: int, t2: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
     return image.apply_over_channels(canny_channel, t1=t1, t2=t2, padding_str=padding_str)

@@ -66,7 +66,8 @@ def build_transformations_menu(image_name: str) -> None:
             build_tr_menu_item(TR_BORDER_LAPLACIAN,         build_border_laplacian_dialog,          image_name)
             build_tr_menu_item(TR_BORDER_LOG,               build_border_log_dialog,                image_name)
             build_tr_menu_item(TR_BORDER_SUSAN,             build_border_susan_dialog,              image_name)
-            build_tr_menu_item(TR_BORDER_HOUGH,             build_border_hough_dialog,              image_name)
+            build_tr_menu_item(TR_BORDER_HOUGH_LINE,        build_border_hough_line_dialog,              image_name)
+            build_tr_menu_item(TR_BORDER_HOUGH_CIRCLE,      build_border_hough_circle_dialog,              image_name)
             build_tr_menu_item(TR_BORDER_CANNY,             build_border_canny_dialog,              image_name)
             build_tr_menu_item(TR_BORDER_ACTIVE_OUTLINE,    build_border_active_outline_dialog,     image_name)
         with dpg.menu(label='Combine'):
@@ -810,18 +811,18 @@ def tr_border_susan(image_name: str) -> Image:
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, ImageTransformation(TR_BORDER_SUSAN, {}, {'padding_str': padding_str}, channels_tr))
 
-TR_BORDER_HOUGH: str = 'hough'
+TR_BORDER_HOUGH_LINE: str = 'hough_line'
 @render_error
-def build_border_hough_dialog(image_name: str) -> None:
-    with build_tr_dialog(TR_BORDER_HOUGH):
-        build_tr_name_input(TR_BORDER_HOUGH, image_name)
+def build_border_hough_line_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_BORDER_HOUGH_LINE):
+        build_tr_name_input(TR_BORDER_HOUGH_LINE, image_name)
         build_tr_value_float_selector('t', 0, 20, default_value=1, tag='threshold')
         build_tr_value_float_selector('ratio', 0, 1, default_value=0.7, tag='ratio')
         build_tr_value_int_list_selector('theta', -90, 90, default_value=0, tag='theta')
         build_tr_value_range_selector('rho', min_val=-200, max_val=200, max_count=401, tag='rho')  # TODO(nacho): mejores defaults
-        build_tr_dialog_end_buttons(TR_BORDER_HOUGH, image_name, tr_border_hough, generic_tr_inductive_handle(border.hough))
+        build_tr_dialog_end_buttons(TR_BORDER_HOUGH_LINE, image_name, tr_border_hough_line, generic_tr_inductive_handle(border.hough_lines))
 
-def tr_border_hough(image_name: str) -> Image:
+def tr_border_hough_line(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image       = img_repo.get_image(image_name)
     new_name    = get_tr_name_value(image)
@@ -830,9 +831,35 @@ def tr_border_hough(image_name: str) -> Image:
     theta       = get_tr_int_list_value('theta')
     rho         = get_tr_range_value('rho')
     # 2. Procesamos
-    new_data, channels_tr = border.hough(image, theta, rho, threshold, ratio)
+    new_data, channels_tr = border.hough_lines(image, theta, rho, threshold, ratio)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, ImageTransformation(TR_BORDER_HOUGH, {'threshold': threshold, 'most_fitted_ratio': ratio, 'theta': theta, 'rho': rho}, {}, channels_tr))
+    return image.transform(new_name, new_data, ImageTransformation(TR_BORDER_HOUGH_LINE, {'threshold': threshold, 'most_fitted_ratio': ratio, 'theta': theta, 'rho': rho}, {}, channels_tr))
+
+TR_BORDER_HOUGH_CIRCLE: str = 'hough_circle'
+@render_error
+def build_border_hough_circle_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_BORDER_HOUGH_CIRCLE):
+        build_tr_name_input(TR_BORDER_HOUGH_CIRCLE, image_name)
+        build_tr_value_float_selector('t', 0, 20, default_value=1, tag='threshold')
+        build_tr_value_float_selector('ratio', 0, 1, default_value=0.7, tag='ratio')
+        build_tr_value_range_selector('radius', min_val=-200, max_val=200, max_count=401, tag='radius')  # TODO(nacho): mejores defaults
+        build_tr_value_range_selector('x', min_val=0, max_val=255, max_count=256, tag='x')  # TODO(nacho): mejores defaults
+        build_tr_value_range_selector('y', min_val=0, max_val=255, max_count=256, tag='y')  # TODO(nacho): mejores defaults
+        build_tr_dialog_end_buttons(TR_BORDER_HOUGH_CIRCLE, image_name, tr_border_hough_circle, generic_tr_inductive_handle(border.hough_lines))
+
+def tr_border_hough_circle(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image       = img_repo.get_image(image_name)
+    new_name    = get_tr_name_value(image)
+    threshold   = get_tr_float_value('threshold')
+    ratio       = get_tr_float_value('ratio')
+    radius      = get_tr_range_value('radius')
+    x           = get_tr_range_value('x')
+    y           = get_tr_range_value('y')
+    # 2. Procesamos
+    new_data, channels_tr = border.hough_circles(image, radius, x, y, threshold, ratio)
+    # 3. Creamos Imagen
+    return image.transform(new_name, new_data, ImageTransformation(TR_BORDER_HOUGH_CIRCLE, {'threshold': threshold, 'most_fitted_ratio': ratio, 'radius': radius, 'x': x, 'y': y}, {}, channels_tr))
 
 TR_BORDER_CANNY: str = 'canny'
 @render_error

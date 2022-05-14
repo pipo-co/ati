@@ -27,11 +27,11 @@ class LineDrawCmd(DrawCmd):
 
 @dataclass
 class CircleDrawCmd(DrawCmd):
-    c_x: int
-    c_y: int
     r: float
+    c_y: int
+    c_x: int
 
-    def __init__(self, c_x: int, c_y: int, r: float, color: Tuple[int, int, int] = (255, 0, 0)) -> None:
+    def __init__(self, r: int, c_y: int, c_x: float, color: Tuple[int, int, int] = (255, 0, 0)) -> None:
         super().__init__(color)
         self.c_x = c_x
         self.c_y = c_y
