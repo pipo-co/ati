@@ -328,6 +328,12 @@ def canny_channel(channel: np.ndarray, t1: int, t2: int, padding_str: PaddingStr
 
     return gradient_mod
 
+def set_difference(new_values: np.ndarray, removed_values: np.ndarray) -> np.ndarray:
+    nrows, ncols = new_values.shape
+    dtype = {'names': ['f{}'.format(i) for i in range(ncols)], 'formats': ncols * [new_values.dtype]}
+    C = np.setdiff1d(new_values.copy().view(dtype), removed_values.copy().view(dtype))
+    return C.view(new_values.dtype).reshape(-1, ncols)
+
 def get_rectangular_boundary(x: Tuple[int, int], y: Tuple[int, int]) -> np.ndarray:
     upper_line = np.asarray([(y[0], x) for x in range(x[0], x[1] + 1)])
     bottom_line = np.asarray([(y[1], x) for x in range(x[0], x[1] + 1)])
@@ -391,7 +397,7 @@ def change_isolated_values(candidates: np.ndarray, phi:np.ndarray, new_phi: np.n
 
     return np.asarray(removed_values)
 
-def active_outline_all_channels(image: np.ndarray, sigma: Union[float, np.ndarray], lout: np.ndarray, lin: np.ndarray,
+def active_outline_all_channels(image: np.ndarray, threshold:float, sigma: Union[float, np.ndarray], lout: np.ndarray, lin: np.ndarray,
                                 phi: np.ndarray):
     flag = True
     indices_4 = np.array([[-1, 0], [0, -1], [1, 0], [0, 1]])
@@ -404,7 +410,7 @@ def active_outline_all_channels(image: np.ndarray, sigma: Union[float, np.ndarra
         new_phi = np.copy(phi)
         for point in lout:
             norm_lout = np.linalg.norm(sigma - image[point[0], point[1]])
-            if norm_lout < 25:
+            if norm_lout < threshold:
                 new_lin.append(point)
                 new_val, remove_val = new_phi_values(phi, new_phi, indices_4, point, 3, 1)
                 new_phi[point[0], point[1]] = -1
@@ -415,7 +421,7 @@ def active_outline_all_channels(image: np.ndarray, sigma: Union[float, np.ndarra
                 new_lout.append(point)
         for point in lin:
             norm_lin = np.linalg.norm(sigma - image[point[0], point[1]])
-            if norm_lin >= 25:
+            if norm_lin >= threshold:
                 new_lout.append(point)
                 new_val, remove_val = new_phi_values(phi, new_phi, indices_4, point, -3, -1)
                 new_phi[point[0], point[1]] = 1
