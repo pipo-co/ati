@@ -358,7 +358,7 @@ def in_bounds(x: int, y: int, shape: Tuple[int, int]):
 def new_phi_values(previous_phi: np.ndarray, new_phi: np.ndarray, indices: np.ndarray, point: Tuple[int, int],
                    target: int, new_value: int):
     value_list = []
-    remove_values = []
+    remove_candidates_values = []
     for index in indices:
         phi_y = point[0] + index[0]
         phi_x = point[1] + index[1]
@@ -367,31 +367,31 @@ def new_phi_values(previous_phi: np.ndarray, new_phi: np.ndarray, indices: np.nd
                 value_list.append((phi_y, phi_x))
                 new_phi[phi_y, phi_x] = new_value
             elif previous_phi[phi_y, phi_x] == -new_value:
-                remove_values.append((phi_y, phi_x))
-    return value_list, remove_values
+                remove_candidates_values.append((phi_y, phi_x))
+    return value_list, remove_candidates_values
 
-def change_isolated_values(candidates: np.ndarray, new_phi: np.ndarray, indices: np.ndarray, condition, new_value: int) -> np.ndarray:
+def change_isolated_values(candidates: np.ndarray, phi:np.ndarray, new_phi: np.ndarray, indices: np.ndarray, condition, new_value: int) -> np.ndarray:
     removed_values = []
     for point in candidates:
-        flag: bool = True
+        neighbor: bool = True
+        isle: bool = True
         for index in indices:
             phi_y = point[0] + index[0]
             phi_x = point[1] + index[1]
-            if condition(new_phi[phi_y, phi_x]):
-                flag = False
-        if flag:
+            #Tengo que tener a alguien que sea mi borde contrario al lado
+            if condition(phi[phi_y, phi_x]):
+                neighbor = False
+            #Tengo que tener a alguien que sea mi contorno correspondiente
+            if phi[phi_y, phi_x] == new_value:
+                isle = False
+        #si tengo algun vecino que es mi borde contrario y algun vecino que es mi contorno contrario no te borro
+        if neighbor or isle:
             new_phi[point[0], point[1]] = new_value
             removed_values.append(point)
 
     return np.asarray(removed_values)
 
-def set_difference(new_values: np.ndarray, removed_values: np.ndarray) -> np.ndarray:
-    nrows, ncols = new_values.shape
-    dtype={'names':['f{}'.format(i) for i in range(ncols)], 'formats':ncols * [new_values.dtype]}
-    C = np.setdiff1d(new_values.copy().view(dtype), removed_values.copy().view(dtype))
-    return C.view(new_values.dtype).reshape(-1, ncols)
-
-def active_outline_all_channels(image: np.ndarray, threshold: float, sigma: Union[float, np.ndarray], lout: np.ndarray, lin: np.ndarray,
+def active_outline_all_channels(image: np.ndarray, sigma: Union[float, np.ndarray], lout: np.ndarray, lin: np.ndarray,
                                 phi: np.ndarray):
     flag = True
     indices_4 = np.array([[-1, 0], [0, -1], [1, 0], [0, 1]])
@@ -404,7 +404,7 @@ def active_outline_all_channels(image: np.ndarray, threshold: float, sigma: Unio
         new_phi = np.copy(phi)
         for point in lout:
             norm_lout = np.linalg.norm(sigma - image[point[0], point[1]])
-            if norm_lout < threshold:
+            if norm_lout < 25:
                 new_lin.append(point)
                 new_val, remove_val = new_phi_values(phi, new_phi, indices_4, point, 3, 1)
                 new_phi[point[0], point[1]] = -1
@@ -415,7 +415,7 @@ def active_outline_all_channels(image: np.ndarray, threshold: float, sigma: Unio
                 new_lout.append(point)
         for point in lin:
             norm_lin = np.linalg.norm(sigma - image[point[0], point[1]])
-            if norm_lin >= threshold:
+            if norm_lin >= 25:
                 new_lout.append(point)
                 new_val, remove_val = new_phi_values(phi, new_phi, indices_4, point, -3, -1)
                 new_phi[point[0], point[1]] = 1
@@ -425,8 +425,10 @@ def active_outline_all_channels(image: np.ndarray, threshold: float, sigma: Unio
             else:
                 new_lin.append(point)
 
-        remove_lout_val = change_isolated_values(np.unique(remove_lout_candidates_val, axis=0), new_phi, indices_4, lambda x: x < 0, 3)
-        remove_lin_val = change_isolated_values(np.unique(remove_lin_candidates_val, axis=0), new_phi, indices_4, lambda x: x > 0, -3)
+        intermediate_phi = np.copy(new_phi)
+        remove_lout_val = change_isolated_values(np.unique(remove_lout_candidates_val, axis=0), intermediate_phi, new_phi, indices_4, lambda x: x < 0, 3)
+        remove_lin_val = change_isolated_values(np.unique(remove_lin_candidates_val, axis=0), intermediate_phi, new_phi, indices_4, lambda x: x > 0, -3)
+
         lout = set_difference(np.unique(new_lout, axis=0), remove_lout_val)
         lin = set_difference(np.unique(new_lin, axis=0), remove_lin_val)
 
