@@ -90,7 +90,7 @@ class ImageTransformation:
         elif channel_tr_len == 1:
             ret += '\tResults: ' + str(self.channel_transformations[0]) + '\n'
         elif channel_tr_len == 3:
-            ret += ''.join((f'\tChannel {i} Results: {str(channel_tr)}\n' for i, channel_tr in self.channel_transformations))
+            ret += ''.join((f'\tChannel {i} Results: {str(channel_tr)}\n' for i, channel_tr in enumerate(self.channel_transformations)))
 
         return ret
 
