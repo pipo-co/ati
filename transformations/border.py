@@ -342,11 +342,12 @@ def calculate_sigma(image: Image, x: Tuple[int, int], y: Tuple[int, int]) -> Uni
     else:
         return np.mean(image.data[y[0]:y[1], x[0]:x[1]])
 
-def get_initial_boundaries(x: Tuple[int, int], y: Tuple[int, int], phi_size: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+def get_initial_boundaries(x: Tuple[int, int], y: Tuple[int, int], shape:Tuple[int, int]) -> Tuple[
+    np.ndarray, np.ndarray, np.ndarray]:
     lout = get_rectangular_boundary(x, y)
     lin = get_rectangular_boundary((x[0] + 1, x[1] - 1), (y[0] + 1, y[1] - 1))
-    phi = np.full((phi_size, phi_size), 3)
-    phi[y[0]:y[1]+1, x[0]:x[1]+1] = 1
+    phi = np.full(shape, 3)
+    phi[y[0]:y[1] + 1, x[0]:x[1] + 1] = 1
     phi[y[0] + 1:y[1], x[0] + 1:x[1]] = -1
     phi[y[0] + 2:y[1] - 1, x[0] + 2:x[1] - 1] = -3
     return lout, lin, phi
@@ -354,7 +355,8 @@ def get_initial_boundaries(x: Tuple[int, int], y: Tuple[int, int], phi_size: int
 def in_bounds(x: int, y: int, shape: Tuple[int, int]):
     return 0 <= x < shape[1] and 0 <= y < shape[0]
 
-def new_phi_values(previous_phi: np.ndarray, new_phi: np.ndarray, indices: np.ndarray, point: Tuple[int, int], target: int, new_value: int):
+def new_phi_values(previous_phi: np.ndarray, new_phi: np.ndarray, indices: np.ndarray, point: Tuple[int, int],
+                   target: int, new_value: int):
     value_list = []
     remove_values = []
     for index in indices:
@@ -364,52 +366,74 @@ def new_phi_values(previous_phi: np.ndarray, new_phi: np.ndarray, indices: np.nd
             if previous_phi[phi_y, phi_x] == target:
                 value_list.append((phi_y, phi_x))
                 new_phi[phi_y, phi_x] = new_value
-            elif previous_phi[phi_y, phi_x] == new_value:
-                new_phi[phi_y, phi_x] = -new_value
             elif previous_phi[phi_y, phi_x] == -new_value:
                 remove_values.append((phi_y, phi_x))
-                new_phi[phi_y, phi_x] = -target
     return value_list, remove_values
 
-def active_outline_all_channels(image: np.ndarray, sigma: Union[float, np.ndarray], lout: np.ndarray, lin: np.ndarray, phi: np.ndarray) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+def change_isolated_values(candidates: np.ndarray, new_phi: np.ndarray, indices: np.ndarray, condition, new_value: int) -> np.ndarray:
+    removed_values = []
+    for point in candidates:
+        flag: bool = True
+        for index in indices:
+            phi_y = point[0] + index[0]
+            phi_x = point[1] + index[1]
+            if condition(new_phi[phi_y, phi_x]):
+                flag = False
+        if flag:
+            new_phi[point[0], point[1]] = new_value
+            removed_values.append(point)
+
+    return np.asarray(removed_values)
+
+def set_difference(new_values: np.ndarray, removed_values: np.ndarray) -> np.ndarray:
+    nrows, ncols = new_values.shape
+    dtype={'names':['f{}'.format(i) for i in range(ncols)], 'formats':ncols * [new_values.dtype]}
+    C = np.setdiff1d(new_values.copy().view(dtype), removed_values.copy().view(dtype))
+    return C.view(new_values.dtype).reshape(-1, ncols)
+
+def active_outline_all_channels(image: np.ndarray, threshold: float, sigma: Union[float, np.ndarray], lout: np.ndarray, lin: np.ndarray,
+                                phi: np.ndarray):
     flag = True
-    indices = np.reshape(np.array(list(np.ndindex(3, 3))) - 3//2, (9, 2))
+    indices_4 = np.array([[-1, 0], [0, -1], [1, 0], [0, 1]])
     while flag:
         flag = False
         new_lout = []
         new_lin = []
-        remove_lin_val = []
-        remove_lout_val = []
+        remove_lin_candidates_val = []
+        remove_lout_candidates_val = []
         new_phi = np.copy(phi)
         for point in lout:
             norm_lout = np.linalg.norm(sigma - image[point[0], point[1]])
-            if norm_lout <= 10:
+            if norm_lout < threshold:
                 new_lin.append(point)
-                new_val, remove_val = new_phi_values(phi, new_phi, indices, point, 3, 1)
+                new_val, remove_val = new_phi_values(phi, new_phi, indices_4, point, 3, 1)
+                new_phi[point[0], point[1]] = -1
                 new_lout.extend(new_val)
-                remove_lin_val.extend(remove_val)
+                remove_lin_candidates_val.extend(remove_val)
                 flag = True
             else:
                 new_lout.append(point)
         for point in lin:
             norm_lin = np.linalg.norm(sigma - image[point[0], point[1]])
-            if norm_lin >= 10:
+            if norm_lin >= threshold:
                 new_lout.append(point)
-                new_val, remove_val = new_phi_values(phi, new_phi, indices, point, -3, -1)
+                new_val, remove_val = new_phi_values(phi, new_phi, indices_4, point, -3, -1)
+                new_phi[point[0], point[1]] = 1
                 new_lin.extend(new_val)
-                remove_lout_val.extend(remove_val)
+                remove_lout_candidates_val.extend(remove_val)
                 flag = True
             else:
                 new_lin.append(point)
-        lout = set(new_lout) - set(remove_lout_val)
-        lin = set(new_lin) - set(remove_lin_val)
+
+        remove_lout_val = change_isolated_values(np.unique(remove_lout_candidates_val, axis=0), new_phi, indices_4, lambda x: x < 0, 3)
+        remove_lin_val = change_isolated_values(np.unique(remove_lin_candidates_val, axis=0), new_phi, indices_4, lambda x: x > 0, -3)
+        lout = set_difference(np.unique(new_lout, axis=0), remove_lout_val)
+        lin = set_difference(np.unique(new_lin, axis=0), remove_lin_val)
+
         phi = new_phi
 
-    lout = np.asarray(list(lout))
-    lin = np.asarray(list(lin))
-
     overlay = [ScatterDrawCmd(lout, (255, 0, 0)), ScatterDrawCmd(lin, (255, 0, 255))]
-    return image, [ImageChannelTransformation({'sigma': sigma}, {'phi': phi, 'lout': lout, 'lin': lin}, overlay)]
+    return image, [ImageChannelTransformation({'threshold': threshold, 'sigma': sigma}, {'phi': phi, 'lout': lout, 'lin': lin}, overlay)]
 
 
 # ******************* Export Functions ********************** #
@@ -445,12 +469,12 @@ def hough_circles(image: Image, radius: np.ndarray, x_axis: np.ndarray, y_axis: 
 def canny(image: Image, t1: int, t2: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
     return image.apply_over_channels(canny_channel, t1=t1, t2=t2, padding_str=padding_str)
 
-def active_outline_base(image: Image, p1: Tuple[int, int], p2: Tuple[int, int]) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+def active_outline_base(image: Image, threshold: float, p1: Tuple[int, int], p2: Tuple[int, int]) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
     x = p1[1], p2[1]
     y = p1[0], p2[0]
     sigma = calculate_sigma(image, x, y)
-    lout, lin, phi = get_initial_boundaries(x, y, image.data[:, 1].size)
-    return active_outline_all_channels(image.data, sigma, lout, lin, phi)
+    lout, lin, phi = get_initial_boundaries(x, y, image.data.shape[:2])
+    return active_outline_all_channels(image.data, threshold, sigma, lout, lin, phi)
 
 def active_outline_inductive(prev: Image, current: Image) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
     return active_outline_all_channels(current.data, **prev.last_transformation.channel_transformations[0].all_results())

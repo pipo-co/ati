@@ -204,6 +204,10 @@ class Image:
         return self.transformations[-1]
 
     @property
+    def is_transformed(self) -> bool:
+        return self.transformations and len(self.transformations) > 0
+
+    @property
     def major_inputs(self) -> Dict[str, Any]:
         return self.last_transformation.major_inputs
 
