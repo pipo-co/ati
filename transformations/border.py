@@ -334,13 +334,15 @@ def set_difference(new_values: np.ndarray, removed_values: np.ndarray) -> np.nda
     C = np.setdiff1d(new_values.copy().view(dtype), removed_values.copy().view(dtype))
     return C.view(new_values.dtype).reshape(-1, ncols)
 
-def get_rectangular_boundary(x: Tuple[int, int], y: Tuple[int, int]) -> np.ndarray:
-    upper_line = np.asarray([(y[0], x) for x in range(x[0], x[1] + 1)])
-    bottom_line = np.asarray([(y[1], x) for x in range(x[0], x[1] + 1)])
-    left_line = np.asarray([(y, x[0]) for y in range(y[0], y[1] + 1)])
-    right_line = np.asarray([(y, x[1]) for y in range(y[0], y[1] + 1)])
+def get_rectangular_boundary(x: Tuple[int, int], y: Tuple[int, int]) -> List[Tuple[int, int]]:
+    boundary = []
+    boundary.extend([(y[0], x) for x in range(x[0], x[1] + 1)])
+    boundary.extend([(y[1], x) for x in range(x[0], x[1] + 1)])
+    boundary.extend([(y, x[0]) for y in range(y[0], y[1] + 1)])
+    boundary.extend([(y, x[1]) for y in range(y[0], y[1] + 1)])
 
-    return np.concatenate([upper_line, right_line, bottom_line, left_line])
+    return boundary
+
 
 def calculate_sigma(image: Image, x: Tuple[int, int], y: Tuple[int, int]) -> Union[float, np.ndarray]:
     if image.channels > 1:
@@ -348,8 +350,9 @@ def calculate_sigma(image: Image, x: Tuple[int, int], y: Tuple[int, int]) -> Uni
     else:
         return np.mean(image.data[y[0]:y[1], x[0]:x[1]])
 
+
 def get_initial_boundaries(x: Tuple[int, int], y: Tuple[int, int], shape:Tuple[int, int]) -> Tuple[
-    np.ndarray, np.ndarray, np.ndarray]:
+    List[Tuple[int, int]], List[Tuple[int, int]], np.ndarray]:
     lout = get_rectangular_boundary(x, y)
     lin = get_rectangular_boundary((x[0] + 1, x[1] - 1), (y[0] + 1, y[1] - 1))
     phi = np.full(shape, 3)
@@ -357,90 +360,75 @@ def get_initial_boundaries(x: Tuple[int, int], y: Tuple[int, int], shape:Tuple[i
     phi[y[0] + 1:y[1], x[0] + 1:x[1]] = -1
     phi[y[0] + 2:y[1] - 1, x[0] + 2:x[1] - 1] = -3
     return lout, lin, phi
-    
+
+
 def in_bounds(x: int, y: int, shape: Tuple[int, int]):
     return 0 <= x < shape[1] and 0 <= y < shape[0]
 
-def new_phi_values(previous_phi: np.ndarray, new_phi: np.ndarray, indices: np.ndarray, point: Tuple[int, int],
-                   target: int, new_value: int):
-    value_list = []
-    remove_candidates_values = []
+def new_phi_values(phi: np.ndarray, add_collection: List[Tuple[int, int]], remove_collection: List[Tuple[int, int]],  indices: np.ndarray, point: Tuple[int, int],
+                   target: int, new_value: int, delete_condition):
+
     for index in indices:
         phi_y = point[0] + index[0]
         phi_x = point[1] + index[1]
-        if in_bounds(phi_x, phi_y, previous_phi.shape):
-            if previous_phi[phi_y, phi_x] == target:
-                value_list.append((phi_y, phi_x))
-                new_phi[phi_y, phi_x] = new_value
-            elif previous_phi[phi_y, phi_x] == -new_value:
-                remove_candidates_values.append((phi_y, phi_x))
-    return value_list, remove_candidates_values
+        if in_bounds(phi_x, phi_y, phi.shape):
+            if phi[phi_y, phi_x] == target:
+                add_collection.append((phi_y, phi_x))
+                phi[phi_y, phi_x] = new_value
+            #Si eras el borde contrario a mi tengo que revisar si seguis siendo valido como dicho borde
+            elif phi[phi_y, phi_x] == -new_value:
+                check_value_state((phi_y, phi_x), phi, remove_collection, indices, delete_condition, -target)
 
-def change_isolated_values(candidates: np.ndarray, phi:np.ndarray, new_phi: np.ndarray, indices: np.ndarray, condition, new_value: int) -> np.ndarray:
-    removed_values = []
-    for point in candidates:
-        neighbor: bool = True
-        isle: bool = True
-        for index in indices:
-            phi_y = point[0] + index[0]
-            phi_x = point[1] + index[1]
-            #Tengo que tener a alguien que sea mi borde contrario al lado
-            if condition(phi[phi_y, phi_x]):
-                neighbor = False
-            #Tengo que tener a alguien que sea mi contorno correspondiente
-            if phi[phi_y, phi_x] == new_value:
-                isle = False
-        #si tengo algun vecino que es mi borde contrario y algun vecino que es mi contorno contrario no te borro
-        if neighbor or isle:
-            new_phi[point[0], point[1]] = new_value
-            removed_values.append(point)
 
-    return np.asarray(removed_values)
+def check_value_state(point: Tuple[int, int], phi:np.ndarray, remove_collection: List[Tuple[int, int]], indices: np.ndarray, condition, new_value: int):
+    neighbor: bool = True
+    for index in indices:
+        phi_y = point[0] + index[0]
+        phi_x = point[1] + index[1]
+        #Tengo que tener a alguien que sea mi borde contrario al lado
+        if condition(phi[phi_y, phi_x]):
+            neighbor = False
+    #si tengo algun vecino que es mi borde contrario y algun vecino que es mi contorno contrario no te borro
+    if neighbor:
+        phi[point[0], point[1]] = new_value
+        remove_collection.append((point[0], point[1]))
 
-def active_outline_all_channels(image: np.ndarray, threshold:float, sigma: Union[float, np.ndarray], lout: np.ndarray, lin: np.ndarray,
+
+def is_lout(val: int) -> bool:
+    return val > 0
+
+
+def is_lin(val: int) -> bool:
+    return val < 0
+
+def active_outline_all_channels(image: np.ndarray, threshold: float, sigma: Union[float, np.ndarray], lout: List[Tuple[int, int]], lin: List[Tuple[int, int]],
                                 phi: np.ndarray):
     flag = True
     indices_4 = np.array([[-1, 0], [0, -1], [1, 0], [0, 1]])
+    remove_lout = []
+    remove_lin = []
     while flag:
         flag = False
-        new_lout = []
-        new_lin = []
-        remove_lin_candidates_val = []
-        remove_lout_candidates_val = []
-        new_phi = np.copy(phi)
         for point in lout:
             norm_lout = np.linalg.norm(sigma - image[point[0], point[1]])
             if norm_lout < threshold:
-                new_lin.append(point)
-                new_val, remove_val = new_phi_values(phi, new_phi, indices_4, point, 3, 1)
-                new_phi[point[0], point[1]] = -1
-                new_lout.extend(new_val)
-                remove_lin_candidates_val.extend(remove_val)
+                lin.append(point)
+                remove_lout.append(point)
+                phi[point[0], point[1]] = -1
+                new_phi_values(phi, lout, remove_lin, indices_4, point, 3, 1, is_lout)
                 flag = True
-            else:
-                new_lout.append(point)
         for point in lin:
             norm_lin = np.linalg.norm(sigma - image[point[0], point[1]])
             if norm_lin >= threshold:
-                new_lout.append(point)
-                new_val, remove_val = new_phi_values(phi, new_phi, indices_4, point, -3, -1)
-                new_phi[point[0], point[1]] = 1
-                new_lin.extend(new_val)
-                remove_lout_candidates_val.extend(remove_val)
+                lout.append(point)
+                remove_lin.append(point)
+                phi[point[0], point[1]] = 1
+                new_phi_values(phi, lin, remove_lout, indices_4, point, -3, -1, is_lin)
                 flag = True
-            else:
-                new_lin.append(point)
-
-        intermediate_phi = np.copy(new_phi)
-        remove_lout_val = change_isolated_values(np.unique(remove_lout_candidates_val, axis=0), intermediate_phi, new_phi, indices_4, lambda x: x < 0, 3)
-        remove_lin_val = change_isolated_values(np.unique(remove_lin_candidates_val, axis=0), intermediate_phi, new_phi, indices_4, lambda x: x > 0, -3)
-
-        lout = set_difference(np.unique(new_lout, axis=0), remove_lout_val)
-        lin = set_difference(np.unique(new_lin, axis=0), remove_lin_val)
-
-        phi = new_phi
-
-    overlay = [ScatterDrawCmd(lout, (255, 0, 0)), ScatterDrawCmd(lin, (255, 0, 255))]
+        lout = list(set(lout) - set(remove_lout))
+        lin = list(set(lin) - set(remove_lin))
+       
+    overlay = [ScatterDrawCmd(np.asarray(lout), (255, 0, 0)), ScatterDrawCmd(np.asarray(lin), (255, 0, 255))]
     return image, [ImageChannelTransformation({'threshold': threshold, 'sigma': sigma}, {'phi': phi, 'lout': lout, 'lin': lin}, overlay)]
 
 
