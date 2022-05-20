@@ -375,13 +375,13 @@ def new_phi_values(phi: np.ndarray, add_collection: List[Tuple[int, int]], remov
                 check_value_state((phi_y, phi_x), phi, remove_collection, indices, delete_condition, -target)
 
 
-def check_value_state(point: Tuple[int, int], phi:np.ndarray, remove_collection: List[Tuple[int, int]], indices: np.ndarray, condition, new_value: int):
+def check_value_state(point: Tuple[int, int], phi: np.ndarray, remove_collection: List[Tuple[int, int]], indices: np.ndarray, condition, new_value: int):
     neighbor: bool = True
     for index in indices:
         phi_y = point[0] + index[0]
         phi_x = point[1] + index[1]
         #Tengo que tener a alguien que sea mi borde contrario al lado
-        if condition(phi[phi_y, phi_x]):
+        if in_bounds(phi_x, phi_y, phi.shape) and condition(phi[phi_y, phi_x]):
             neighbor = False
     #si tengo algun vecino que es mi borde contrario y algun vecino que es mi contorno contrario no te borro
     if neighbor:
