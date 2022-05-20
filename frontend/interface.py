@@ -59,13 +59,7 @@ def render_image_window(image_name: str, movie: Optional[Movie] = None, pos: Uni
                     image_item = dpg.add_image(image_name, tag=f'image_{image_name}', width=image.width, height=image.height)
                     render_image_overlay(image, window, image_item)
                     if movie:
-                        with dpg.group(horizontal=True):
-                            if not movie.on_first_frame():
-                                dpg.add_button(label='<<- 10',                                   width=image.width // 4 - 1, user_data=(movie.name, movie.current_frame - 10), callback=lambda s, ad, ud: render_movie_frame(*ud))
-                                dpg.add_button(label='<- Step', indent=image.width // 4 + 1,     width=image.width // 4 - 1, user_data=(movie.name, movie.current_frame - 1),  callback=lambda s, ad, ud: render_movie_frame(*ud))
-                            if not movie.on_last_frame():
-                                dpg.add_button(label='Step ->', indent=image.width // 2 + 1,     width=image.width // 4 - 1, user_data=(movie.name, movie.current_frame + 1),  callback=lambda s, ad, ud: render_movie_frame(*ud))
-                                dpg.add_button(label='10 ->>',  indent=image.width * 3 // 4 + 1, width=image.width // 4 - 1, user_data=(movie.name, movie.current_frame + 10), callback=lambda s, ad, ud: render_movie_frame(*ud))
+                        render_movie_controls(movie, image.width)
                     with dpg.group(horizontal=True, width=image.width):
                         dpg.add_text(f'Height {image.height}')
                         dpg.add_separator()
@@ -119,6 +113,60 @@ def render_image_overlay(image: Image, window: Union[int, str], image_item: Unio
                     else:
                         raise NotImplementedError()
 
+def render_movie_controls(movie: Movie, image_width: int):
+    name = movie.name
+    fr = movie.current_frame
+    b1, b2, b3, b4 = f'movie_{name}_{fr}_ctrl_b1', f'movie_{name}_{fr}_ctrl_b2', f'movie_{name}_{fr}_ctrl_b3', f'movie_{name}_{fr}_ctrl_b4'
+    width = image_width // 4
+
+    @render_error
+    def movie_control_callback(movie_name: str, frame: int):
+        if not movie.on_first_frame():
+            dpg.disable_item(b1)
+            dpg.disable_item(b2)
+        if not movie.on_last_frame():
+            dpg.disable_item(b3)
+            dpg.disable_item(b4)
+        render_movie_frame(movie_name, frame)
+
+    with dpg.group(horizontal=True):
+        if not movie.on_first_frame():
+            dpg.add_button(
+                enabled=False,
+                tag=b1,
+                label='<<- 10',
+                width=width - 1,
+                user_data=(movie.name, movie.current_frame - 10),
+                callback=lambda s, ad, ud: movie_control_callback(*ud),
+            )
+            dpg.add_button(
+                enabled=False,
+                tag=b2,
+                label='<- Step',
+                indent=width + 1,
+                width=width - 1,
+                user_data=(movie.name, movie.current_frame - 1),
+                callback=lambda s, ad, ud: movie_control_callback(*ud)
+            )
+        if not movie.on_last_frame():
+            dpg.add_button(
+                enabled=False,
+                tag=b3,
+                label='Step ->',
+                indent=(width + 1) * 2,
+                width=width - 1,
+                user_data=(movie.name, movie.current_frame + 1),
+                callback=lambda s, ad, ud: movie_control_callback(*ud)
+            )
+            dpg.add_button(
+                enabled=False,
+                tag=b4,
+                label='10 ->>',
+                indent=(width + 1) * 3,
+                width=width - 1,
+                user_data=(movie.name, movie.current_frame + 10),
+                callback=lambda s, ad, ud: movie_control_callback(*ud)
+            )
 
 @render_error
 def toggle_hists(image_name: str) -> None:
