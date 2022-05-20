@@ -7,6 +7,7 @@ from models.draw_cmd import CircleDrawCmd, LineDrawCmd, ScatterDrawCmd
 from models.image import MAX_COLOR, Image, ImageChannelTransformation, normalize
 
 from transformations.np_utils import index_matrix
+from .input.lin_range import LinRange
 from .sliding import PaddingStrategy, sliding_window, weighted_sum
 
 RHO_RESOLUTION = 125
@@ -418,7 +419,6 @@ def active_outline_all_channels(image: np.ndarray, threshold: float, sigma: Unio
         lout = list(set(lout) - set(remove_lout))
         lin = list(set(lin) - set(remove_lin))
 
-    # TODO: Tenemos que calcular el tiempo que nos toma
     overlay = [ScatterDrawCmd(np.asarray(lout), (255, 0, 0)), ScatterDrawCmd(np.asarray(lin), (255, 0, 255))]
     return image, ImageChannelTransformation({'threshold': threshold, 'sigma': sigma}, {'phi': phi, 'lout': lout, 'lin': lin}, overlay)
 
@@ -446,12 +446,12 @@ def log(image: Image, sigma: float, crossing_threshold: int, padding_str: Paddin
 def susan(image: Image, padding_str: PaddingStrategy) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
     return image.apply_over_channels(susan_channel, padding_str=padding_str)
 
-def hough_lines(image: Image, theta: List[int], rho: np.ndarray, threshold: float, most_fitted_ratio: float) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+def hough_lines(image: Image, theta: List[int], rho: LinRange, threshold: float, most_fitted_ratio: float) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
     theta = np.deg2rad(theta)
-    return image.apply_over_channels(hough_lines_channel, theta=theta, rho=rho, threshold=threshold, most_fitted_ratio=most_fitted_ratio)
+    return image.apply_over_channels(hough_lines_channel, theta=theta, rho=rho.to_linspace(), threshold=threshold, most_fitted_ratio=most_fitted_ratio)
 
-def hough_circles(image: Image, radius: np.ndarray, x_axis: np.ndarray, y_axis: np.ndarray, threshold: float, most_fitted_ratio: float) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
-    return image.apply_over_channels(hough_circle_channel, radius=radius, x_axis=x_axis, y_axis=y_axis, threshold=threshold, most_fitted_ratio=most_fitted_ratio)
+def hough_circles(image: Image, radius: LinRange, x_axis: LinRange, y_axis: LinRange, threshold: float, most_fitted_ratio: float) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return image.apply_over_channels(hough_circle_channel, radius=radius.to_linspace(), x_axis=x_axis.to_linspace(), y_axis=y_axis.to_linspace(), threshold=threshold, most_fitted_ratio=most_fitted_ratio)
 
 def canny(image: Image, t1: int, t2: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
     return image.apply_over_channels(canny_channel, t1=t1, t2=t2, padding_str=padding_str)

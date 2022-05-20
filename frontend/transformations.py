@@ -8,6 +8,7 @@ from models.movie import TransformedMovie, MovieTransformation
 from transformations import basic, border, combine, denoise, noise, threshold as thresh
 from repositories import images_repo as img_repo
 from repositories import movies_repo as mov_repo
+from transformations.input.lin_range import LinRange
 from . import interface
 from models.image import Image, ImageTransformation, strip_extension, get_extension, ImageFormat, normalize, MAX_COLOR, \
     ImageChannelTransformation
@@ -249,12 +250,11 @@ def get_tr_float_value(float_input: str = TR_FLOAT_VALUE_SELECTOR) -> float:
 def get_tr_int_list_value(list_input: str = TR_INT_LIST_VALUE_SELECTOR) -> List[int]:
     return list(map(lambda n: int(n), dpg.get_value(list_input).split(',')))
 
-# TODO(nacho): Lo que dijo nacho
-def get_tr_range_value(range_input: str = TR_RANGE_VALUE_SELECTOR) -> np.ndarray:
+def get_tr_range_value(range_input: str = TR_RANGE_VALUE_SELECTOR) -> LinRange:
     min_v = dpg.get_value(f'{range_input}_min_val')
     max_v = dpg.get_value(f'{range_input}_max_val')
     count = dpg.get_value(f'{range_input}_count')
-    return np.linspace(min_v, max_v, count)
+    return LinRange(min_v, max_v, count)
 
 def get_tr_percentage_value(percentage_input: str = TR_FLOAT_VALUE_SELECTOR) -> int:
     percentage = get_tr_int_value(percentage_input)
@@ -841,9 +841,9 @@ def build_border_hough_circle_dialog(image_name: str) -> None:
         build_tr_name_input(TR_BORDER_HOUGH_CIRCLE, image_name)
         build_tr_value_float_selector('t', 0, 20, default_value=1, tag='threshold')
         build_tr_value_float_selector('ratio', 0, 1, default_value=0.7, tag='ratio')
-        build_tr_value_range_selector('radius', min_val=-200, max_val=200, max_count=401, tag='radius')  # TODO(nacho): mejores defaults
-        build_tr_value_range_selector('x', min_val=0, max_val=255, max_count=256, tag='x')  # TODO(nacho): mejores defaults
-        build_tr_value_range_selector('y', min_val=0, max_val=255, max_count=256, tag='y')  # TODO(nacho): mejores defaults
+        build_tr_value_range_selector('radius', min_val=-200, max_val=200, max_count=401, tag='radius')
+        build_tr_value_range_selector('x', min_val=0, max_val=255, max_count=256, tag='x')
+        build_tr_value_range_selector('y', min_val=0, max_val=255, max_count=256, tag='y')
         build_tr_dialog_end_buttons(TR_BORDER_HOUGH_CIRCLE, image_name, tr_border_hough_circle, generic_tr_inductive_handle(border.hough_lines))
 
 def tr_border_hough_circle(image_name: str) -> Image:
