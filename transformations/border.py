@@ -246,7 +246,7 @@ def hough_circle_channel(channel: np.ndarray, radius: np.ndarray, x_axis: np.nda
     best = np.hstack((radius[Y, None], centers[X]))
 
     overlay = list(filter(lambda l: l, (CircleDrawCmd(r, y, x) for r, y, x in best)))
-    
+
     return channel, ImageChannelTransformation({'best': best}, {}, overlay)
 
 def get_border_points(rho: float, theta: float, img_shape) -> Optional[LineDrawCmd]:
@@ -273,7 +273,7 @@ def get_border_points(rho: float, theta: float, img_shape) -> Optional[LineDrawC
         return None
         
     return LineDrawCmd(*ans[0], *ans[1])
-    
+
 def canny_drag_borders(gradient_mod: np.ndarray, t1: int, t2: int, max_col: int, max_row: int, row: int, col: int) -> None:
     if t1 < gradient_mod[row, col] < t2:
         # Conectado por un borde de manera 8-conexo
@@ -343,13 +343,11 @@ def get_rectangular_boundary(x: Tuple[int, int], y: Tuple[int, int]) -> List[Tup
 
     return boundary
 
-
 def calculate_sigma(image: Image, x: Tuple[int, int], y: Tuple[int, int]) -> Union[float, np.ndarray]:
     if image.channels > 1:
         return np.mean(np.array(image.data[y[0]:y[1], x[0]:x[1]]).reshape((-1, 3)), axis=0)
     else:
         return np.mean(image.data[y[0]:y[1], x[0]:x[1]])
-
 
 def get_initial_boundaries(x: Tuple[int, int], y: Tuple[int, int], shape:Tuple[int, int]) -> Tuple[
     List[Tuple[int, int]], List[Tuple[int, int]], np.ndarray]:
@@ -361,13 +359,10 @@ def get_initial_boundaries(x: Tuple[int, int], y: Tuple[int, int], shape:Tuple[i
     phi[y[0] + 2:y[1] - 1, x[0] + 2:x[1] - 1] = -3
     return lout, lin, phi
 
-
 def in_bounds(x: int, y: int, shape: Tuple[int, int]):
     return 0 <= x < shape[1] and 0 <= y < shape[0]
 
-def new_phi_values(phi: np.ndarray, add_collection: List[Tuple[int, int]], remove_collection: List[Tuple[int, int]],  indices: np.ndarray, point: Tuple[int, int],
-                   target: int, new_value: int, delete_condition):
-
+def new_phi_values(phi: np.ndarray, add_collection: List[Tuple[int, int]], remove_collection: List[Tuple[int, int]],  indices: np.ndarray, point: Tuple[int, int], target: int, new_value: int, delete_condition):
     for index in indices:
         phi_y = point[0] + index[0]
         phi_x = point[1] + index[1]
@@ -397,12 +392,10 @@ def check_value_state(point: Tuple[int, int], phi:np.ndarray, remove_collection:
 def is_lout(val: int) -> bool:
     return val > 0
 
-
 def is_lin(val: int) -> bool:
     return val < 0
 
-def active_outline_all_channels(image: np.ndarray, threshold: float, sigma: Union[float, np.ndarray], lout: List[Tuple[int, int]], lin: List[Tuple[int, int]],
-                                phi: np.ndarray):
+def active_outline_all_channels(image: np.ndarray, threshold: float, sigma: Union[float, np.ndarray], lout: List[Tuple[int, int]], lin: List[Tuple[int, int]], phi: np.ndarray):
     flag = True
     indices_4 = np.array([[-1, 0], [0, -1], [1, 0], [0, 1]])
     remove_lout = []
@@ -427,7 +420,8 @@ def active_outline_all_channels(image: np.ndarray, threshold: float, sigma: Unio
                 flag = True
         lout = list(set(lout) - set(remove_lout))
         lin = list(set(lin) - set(remove_lin))
-       
+
+    # TODO: Tenemos que calcular el tiempo que nos toma
     overlay = [ScatterDrawCmd(np.asarray(lout), (255, 0, 0)), ScatterDrawCmd(np.asarray(lin), (255, 0, 255))]
     return image, [ImageChannelTransformation({'threshold': threshold, 'sigma': sigma}, {'phi': phi, 'lout': lout, 'lin': lin}, overlay)]
 
