@@ -91,7 +91,7 @@ def execute_image_transformation(image_name: str, handler: TrHandler) -> None:
     interface.render_image_window(new_image.name)
 
 @render_error
-def execute_movie_transformation(base_movie_name: str, base_handle: TrHandler, inductive_handle: Callable[[str, Image, Image], Image]) -> None:
+def execute_movie_transformation(base_movie_name: str, base_handle: TrHandler, inductive_handle: Callable[[str, int, Image, Image], Image]) -> None:
     base_movie = mov_repo.get_movie(base_movie_name)
     base_image = interface.load_movie_frame(base_movie, 0)
 
@@ -120,14 +120,14 @@ def build_tr_dialog(tr_id: str) -> int:
     return dpg.window(label=f'Apply {tr_id.title().replace("_", " ")} Transformation', tag=TR_DIALOG, modal=True, no_close=True, pos=interface.CENTER_POS)
 
 # Generic inductive handler that takes all inputs from previous movie frame
-def generic_tr_inductive_handle(fn: Callable[[Image, Any], Tuple[np.ndarray, List[ImageChannelTransformation]]]) -> Callable[[str, Image], Image]:
-    def ret(new_name: str, prev: Image, image: Image) -> Image:
+def generic_tr_inductive_handle(fn: Callable[[Image, Any], Tuple[np.ndarray, List[ImageChannelTransformation]]]) -> Callable[[str, int, Image, Image], Image]:
+    def ret(new_name: str, _: int, prev: Image, image: Image) -> Image:
         new_data, channels_tr = fn(image, **prev.all_inputs())
         return image.transform(new_name, new_data, ImageTransformation(prev.last_transformation.name, prev.major_inputs, prev.minor_inputs, channels_tr))
     return ret
 
 # Also allows to transform a movie
-def build_tr_dialog_end_buttons(tr_id: str, image_name: str, handle: TrHandler, inductive_handle: Optional[Callable[[str, Image], Image]]) -> None:
+def build_tr_dialog_end_buttons(tr_id: str, image_name: str, handle: TrHandler, inductive_handle: Optional[Callable[[str, int, Image, Image], Image]]) -> None:
     image = img_repo.get_image(image_name)
 
     with dpg.group(horizontal=True):
@@ -904,8 +904,8 @@ def tr_border_active_outline_base(image_name: str) -> Image:
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, ImageTransformation(TR_BORDER_CANNY, {'rect_selection': rect_selection}, {}, channels_tr))
 
-def tr_border_active_outline_inductive(new_name: str, prev: Image, current: Image) -> Image:
-    new_data, channels_tr = border.active_outline_inductive(prev, current)
+def tr_border_active_outline_inductive(new_name: str, frame: int, prev: Image, current: Image) -> Image:
+    new_data, channels_tr = border.active_outline_inductive(frame, prev, current)
     return current.transform(new_name, new_data, ImageTransformation(TR_BORDER_ACTIVE_OUTLINE, {}, {}, channels_tr))
 
 ########################################################

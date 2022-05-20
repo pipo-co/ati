@@ -1,3 +1,4 @@
+import time
 from enum import Enum
 from typing import List, Optional, Tuple, Union
 
@@ -269,8 +270,7 @@ def get_border_points(rho: float, theta: float, img_shape) -> Optional[LineDrawC
     if 0 < y_f < max_y: ans.append((y_f, max_x))
 
     if len(ans) != 2:
-        print(f'Cantidad incorrecta de puntos {len(ans)} para rho:{rho} y theta:{theta}')
-        return None
+        raise ValueError(f'Cantidad incorrecta de puntos {len(ans)} para rho:{rho} y theta:{theta}')
         
     return LineDrawCmd(*ans[0], *ans[1])
 
@@ -349,8 +349,7 @@ def calculate_sigma(image: Image, x: Tuple[int, int], y: Tuple[int, int]) -> Uni
     else:
         return np.mean(image.data[y[0]:y[1], x[0]:x[1]])
 
-def get_initial_boundaries(x: Tuple[int, int], y: Tuple[int, int], shape:Tuple[int, int]) -> Tuple[
-    List[Tuple[int, int]], List[Tuple[int, int]], np.ndarray]:
+def get_initial_boundaries(x: Tuple[int, int], y: Tuple[int, int], shape:Tuple[int, int]) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]], np.ndarray]:
     lout = get_rectangular_boundary(x, y)
     lin = get_rectangular_boundary((x[0] + 1, x[1] - 1), (y[0] + 1, y[1] - 1))
     phi = np.full(shape, 3)
@@ -370,24 +369,22 @@ def new_phi_values(phi: np.ndarray, add_collection: List[Tuple[int, int]], remov
             if phi[phi_y, phi_x] == target:
                 add_collection.append((phi_y, phi_x))
                 phi[phi_y, phi_x] = new_value
-            #Si eras el borde contrario a mi tengo que revisar si seguis siendo valido como dicho borde
+            # Si eras el borde contrario a mi tengo que revisar si seguis siendo valido como dicho borde
             elif phi[phi_y, phi_x] == -new_value:
                 check_value_state((phi_y, phi_x), phi, remove_collection, indices, delete_condition, -target)
-
 
 def check_value_state(point: Tuple[int, int], phi: np.ndarray, remove_collection: List[Tuple[int, int]], indices: np.ndarray, condition, new_value: int):
     neighbor: bool = True
     for index in indices:
         phi_y = point[0] + index[0]
         phi_x = point[1] + index[1]
-        #Tengo que tener a alguien que sea mi borde contrario al lado
+        # Tengo que tener a alguien que sea mi borde contrario al lado
         if in_bounds(phi_x, phi_y, phi.shape) and condition(phi[phi_y, phi_x]):
             neighbor = False
-    #si tengo algun vecino que es mi borde contrario y algun vecino que es mi contorno contrario no te borro
+    # si tengo algun vecino que es mi borde contrario y algun vecino que es mi contorno contrario no te borro
     if neighbor:
         phi[point[0], point[1]] = new_value
         remove_collection.append((point[0], point[1]))
-
 
 def is_lout(val: int) -> bool:
     return val > 0
@@ -395,7 +392,7 @@ def is_lout(val: int) -> bool:
 def is_lin(val: int) -> bool:
     return val < 0
 
-def active_outline_all_channels(image: np.ndarray, threshold: float, sigma: Union[float, np.ndarray], lout: List[Tuple[int, int]], lin: List[Tuple[int, int]], phi: np.ndarray):
+def active_outline_all_channels(image: np.ndarray, threshold: float, sigma: Union[float, np.ndarray], lout: List[Tuple[int, int]], lin: List[Tuple[int, int]], phi: np.ndarray) -> Tuple[np.ndarray, ImageChannelTransformation]:
     flag = True
     indices_4 = np.array([[-1, 0], [0, -1], [1, 0], [0, 1]])
     remove_lout = []
@@ -423,7 +420,7 @@ def active_outline_all_channels(image: np.ndarray, threshold: float, sigma: Unio
 
     # TODO: Tenemos que calcular el tiempo que nos toma
     overlay = [ScatterDrawCmd(np.asarray(lout), (255, 0, 0)), ScatterDrawCmd(np.asarray(lin), (255, 0, 255))]
-    return image, [ImageChannelTransformation({'threshold': threshold, 'sigma': sigma}, {'phi': phi, 'lout': lout, 'lin': lin}, overlay)]
+    return image, ImageChannelTransformation({'threshold': threshold, 'sigma': sigma}, {'phi': phi, 'lout': lout, 'lin': lin}, overlay)
 
 
 # ******************* Export Functions ********************** #
@@ -460,11 +457,30 @@ def canny(image: Image, t1: int, t2: int, padding_str: PaddingStrategy) -> Tuple
     return image.apply_over_channels(canny_channel, t1=t1, t2=t2, padding_str=padding_str)
 
 def active_outline_base(image: Image, threshold: float, p1: Tuple[int, int], p2: Tuple[int, int]) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    start_time = time.thread_time_ns() // 1000000
+
     x = p1[1], p2[1]
     y = p1[0], p2[0]
     sigma = calculate_sigma(image, x, y)
     lout, lin, phi = get_initial_boundaries(x, y, image.data.shape[:2])
-    return active_outline_all_channels(image.data, threshold, sigma, lout, lin, phi)
+    img, tr = active_outline_all_channels(image.data, threshold, sigma, lout, lin, phi)
 
-def active_outline_inductive(prev: Image, current: Image) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
-    return active_outline_all_channels(current.data, **prev.last_transformation.channel_transformations[0].all_results())
+    duration = time.thread_time_ns() // 1000000 - start_time
+    tr.public_results['duration']           = duration
+    tr.public_results['total_duration']     = duration
+
+    return img, [tr]
+
+def active_outline_inductive(frame: int, prev: Image, current: Image) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    prev_results = prev.last_transformation.channel_transformations[0].all_results()
+    inputs = map(prev_results.get, ('threshold', 'sigma', 'lout', 'lin', 'phi'))
+
+    start_time = time.thread_time_ns() // 1000000
+    img, tr = active_outline_all_channels(current.data, *inputs)
+
+    duration = time.thread_time_ns() // 1000000 - start_time
+    tr.public_results['duration']           = duration
+    tr.public_results['total_duration']     = prev_results['total_duration'] + duration
+    tr.public_results['mean_duration']      = round(tr.public_results['total_duration'] / (frame + 1), 2)
+
+    return img, [tr]

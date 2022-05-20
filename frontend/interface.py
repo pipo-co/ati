@@ -46,7 +46,7 @@ def render_image_window(image_name: str, movie: Optional[Movie] = None, pos: Uni
         width, height = calculate_image_window_size(image)
         hists = image.get_histograms()
 
-        window_label = f'Movie: {movie.name} - Frame: {image_name}' if movie else image_name
+        window_label = f'Movie: {movie.name} - Frame {movie.current_frame}' if movie else image_name
         with dpg.window(label=window_label, tag=f'image_window_{image_name}', width=width, height=height, pos=pos, no_scrollbar=False, no_resize=True, user_data={'image_name': image_name, 'hists_toggled': False, 'history_toggled': False}, on_close=lambda: dpg.delete_item(window)) as window:
             with dpg.menu_bar():
                 dpg.add_menu_item(label='Save', user_data=image_name, callback=lambda s, ad, ud: trigger_save_image_dialog(ud))
@@ -291,7 +291,7 @@ def load_movie_frame(movie: Movie, frame: int) -> Image:
             image = load_image(movie.get_frame_path(frame), movie.name)
         elif isinstance(movie, TransformedMovie):
             prev_image = load_movie_frame(mov_repo.get_movie(movie.base_movie), frame)
-            image = movie.last_transformation.inductive_handle(frame_name, img_repo.get_image(movie.get_frame_name(frame - 1)), prev_image)
+            image = movie.last_transformation.inductive_handle(frame_name, frame, img_repo.get_image(movie.get_frame_name(frame - 1)), prev_image)
             image.movie = movie.name
         else:
             raise NotImplementedError()

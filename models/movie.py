@@ -9,13 +9,13 @@ from .path_utils import get_extension
 
 @dataclass
 class MovieTransformation(ImageTransformation):
-    inductive_handle: Callable[[str, Image, Image], Image]
+    inductive_handle: Callable[[str, int, Image, Image], Image]
 
     @classmethod
-    def from_img_tr(cls, image_transformation: ImageTransformation, inductive_handle: Callable[[str, Image, Image], Image]) -> 'MovieTransformation':
+    def from_img_tr(cls, image_transformation: ImageTransformation, inductive_handle: Callable[[str, int, Image, Image], Image]) -> 'MovieTransformation':
         return cls(image_transformation.name, inductive_handle, image_transformation.major_inputs, image_transformation.minor_inputs)
 
-    def __init__(self, name: str, inductive_handle: Callable[[str, Image, Image], Image], major_inputs: Dict[str, Any], minor_inputs: Dict[str, Any]):
+    def __init__(self, name: str, inductive_handle: Callable[[str, int, Image, Image], Image], major_inputs: Dict[str, Any], minor_inputs: Dict[str, Any]):
         super().__init__(name, major_inputs, minor_inputs, [])
         self.inductive_handle = inductive_handle
 

@@ -37,7 +37,6 @@ def channel_otsu(channel: np.ndarray) -> Tuple[np.ndarray, ImageChannelTransform
     intra_variance = (mg*p - m)**2 / (p * (1-p))
     max_variance = np.ravel(np.where(intra_variance == np.amax(intra_variance)))
     t = int(max_variance.mean().round())
-    print(f'Otsu Umbral Chosen: {t}')
 
     return binary_threshold(channel, t), ImageChannelTransformation({'selected_threshold': t}, {})
 
