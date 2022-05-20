@@ -93,6 +93,10 @@ def calculate_image_window_size(image: Image) -> Tuple[int, int]:
     return width, height
 
 def render_image_overlay(image: Image, window: Union[int, str], image_item: Union[int, str]):
+    # IMPORTANTE: Para conseguir la posicion del image_item tenemos que darle a dpg un frame para que lo renderee
+    dpg.split_frame()
+    pos = dpg.get_item_pos(image_item)
+
     for tr in image.transformations:
         for tr_channel in tr.channel_transformations:
             if tr_channel.overlay:
@@ -107,8 +111,8 @@ def render_image_overlay(image: Image, window: Union[int, str], image_item: Unio
                         mask = np.zeros((image.height, image.width, 4))
                         mask[cmd.points[:, 0], cmd.points[:, 1]] = np.array([*cmd.color, 255]) / 255
                         mask_tag = dpg.add_static_texture(image.width, image.height, mask.flatten(), parent=TEXTURE_REGISTRY)  # noqa
-                        dpg.split_frame()  # IMPORTANTE: Para conseguir la posicion del image_item tenemos que darle a dpg un frame para que lo renderee
-                        dpg.add_image(mask_tag, width=image.width, height=image.height, pos=dpg.get_item_pos(image_item), parent=window)
+
+                        dpg.add_image(mask_tag, width=image.width, height=image.height, pos=pos, parent=window)
 
                     else:
                         raise NotImplementedError()
@@ -132,7 +136,6 @@ def render_movie_controls(movie: Movie, image_width: int):
     with dpg.group(horizontal=True):
         if not movie.on_first_frame():
             dpg.add_button(
-                enabled=False,
                 tag=b1,
                 label='<<- 10',
                 width=width - 1,
@@ -140,7 +143,6 @@ def render_movie_controls(movie: Movie, image_width: int):
                 callback=lambda s, ad, ud: movie_control_callback(*ud),
             )
             dpg.add_button(
-                enabled=False,
                 tag=b2,
                 label='<- Step',
                 indent=width + 1,
@@ -150,7 +152,6 @@ def render_movie_controls(movie: Movie, image_width: int):
             )
         if not movie.on_last_frame():
             dpg.add_button(
-                enabled=False,
                 tag=b3,
                 label='Step ->',
                 indent=(width + 1) * 2,
@@ -159,7 +160,6 @@ def render_movie_controls(movie: Movie, image_width: int):
                 callback=lambda s, ad, ud: movie_control_callback(*ud)
             )
             dpg.add_button(
-                enabled=False,
                 tag=b4,
                 label='10 ->>',
                 indent=(width + 1) * 3,
