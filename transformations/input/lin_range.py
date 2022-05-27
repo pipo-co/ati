@@ -10,8 +10,8 @@ class LinRange:
     count:  int
 
     def __init__(self, start: float, end: float, count: int) -> None:
-        if count < 2:
-            raise ValueError('Count must be at least 2')
+        if count < 1:
+            raise ValueError('Count must be at least 1')
 
         self.start  = start
         self.end    = end

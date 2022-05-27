@@ -177,9 +177,9 @@ def build_tr_value_range_selector(name: str, min_val: float, max_val: float, max
         dpg.add_table_column()
 
         with dpg.table_row():
-            dpg.add_input_float(min_value=min_val, max_value=max_val,   default_value=min_val,    step=0, label='min', tag=f'{tag}_min_val')
-            dpg.add_input_float(min_value=min_val, max_value=max_val,   default_value=max_val,    step=0, label='max', tag=f'{tag}_max_val')
-            dpg.add_input_float(min_value=0,       max_value=max_count, default_value=max_count,  step=0, label='n', tag=f'{tag}_count')
+            dpg.add_input_float(min_value=min_val, max_value=max_val,   default_value=min_val,    step=0, label='min',  tag=f'{tag}_min_val')
+            dpg.add_input_float(min_value=min_val, max_value=max_val,   default_value=max_val,    step=0, label='max',  tag=f'{tag}_max_val')
+            dpg.add_input_int(  min_value=0,       max_value=max_count, default_value=max_count,  step=0, label='n',    tag=f'{tag}_count')
 
 def build_tr_percentage_selector(name: str, default_value: int = 20, tag: str = TR_INT_VALUE_SELECTOR) -> None:
     build_tr_value_int_selector(name, 0, 100, default_value=default_value, suffix='%', tag=tag)
@@ -816,9 +816,9 @@ def build_border_hough_line_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_BORDER_HOUGH_LINE):
         build_tr_name_input(TR_BORDER_HOUGH_LINE, image_name)
         build_tr_value_float_selector('t', 0, 20, default_value=1, tag='threshold')
-        build_tr_value_float_selector('ratio', 0, 1, default_value=0.7, tag='ratio')
+        build_tr_value_float_selector('ratio', 0, 1, default_value=0.8, tag='ratio')
         build_tr_value_int_list_selector('theta', -90, 90, default_value=0, tag='theta')
-        build_tr_value_range_selector('rho', min_val=-200, max_val=200, max_count=401, tag='rho')  # TODO(nacho): mejores defaults
+        build_tr_value_range_selector('rho', min_val=0, max_val=255, max_count=256, tag='rho')  # TODO(nacho): mejores defaults
         build_tr_dialog_end_buttons(TR_BORDER_HOUGH_LINE, image_name, tr_border_hough_line, generic_tr_inductive_handle(border.hough_lines))
 
 def tr_border_hough_line(image_name: str) -> Image:
@@ -839,11 +839,11 @@ TR_BORDER_HOUGH_CIRCLE: str = 'hough_circle'
 def build_border_hough_circle_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_BORDER_HOUGH_CIRCLE):
         build_tr_name_input(TR_BORDER_HOUGH_CIRCLE, image_name)
-        build_tr_value_float_selector('t', 0, 20, default_value=1, tag='threshold')
-        build_tr_value_float_selector('ratio', 0, 1, default_value=0.7, tag='ratio')
-        build_tr_value_range_selector('radius', min_val=-200, max_val=200, max_count=401, tag='radius')
-        build_tr_value_range_selector('x', min_val=0, max_val=255, max_count=256, tag='x')
-        build_tr_value_range_selector('y', min_val=0, max_val=255, max_count=256, tag='y')
+        build_tr_value_float_selector('t', 0, 20, default_value=1.5, tag='threshold')
+        build_tr_value_float_selector('ratio', 0, 1, default_value=0.6, tag='ratio')
+        build_tr_value_range_selector('radius', min_val=0, max_val=200, max_count=1, tag='radius')
+        build_tr_value_range_selector('x', min_val=0, max_val=239, max_count=120, tag='x')
+        build_tr_value_range_selector('y', min_val=0, max_val=239, max_count=120, tag='y')
         build_tr_dialog_end_buttons(TR_BORDER_HOUGH_CIRCLE, image_name, tr_border_hough_circle, generic_tr_inductive_handle(border.hough_lines))
 
 def tr_border_hough_circle(image_name: str) -> Image:
