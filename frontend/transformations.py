@@ -402,7 +402,7 @@ TR_SLICE: str = 'slice'
 def build_slice_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_SLICE):
         build_tr_name_input(TR_SLICE, image_name)
-        build_tr_value_int_selector('channel', 0, 2, 0)
+        build_tr_value_int_selector('channel', min_val=0, max_val=2, default_value=0)
         build_tr_dialog_end_buttons(TR_SLICE, image_name, tr_slice, generic_tr_inductive_handle(basic.slice_channel))
 
 def tr_slice(image_name: str) -> Image:
@@ -1022,7 +1022,12 @@ def build_combine_sift_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_COMBINE_SIFT):
         build_tr_name_input(TR_COMBINE_SIFT, image_name)
         build_tr_img_selector(image_name)
-        build_tr_value_float_selector('Threshold', 0, 1000, default_value=150)
+        build_tr_value_int_selector('Features',             0, 20, default_value=0, tag='features')
+        build_tr_value_int_selector('Layers',               0, 20, default_value=4, tag='layers')
+        build_tr_value_float_selector('Contrast Threshold', 0, 1, default_value=0.04, tag='contrast_t')
+        build_tr_value_float_selector('Edge Threshold',     0, 100, default_value=10, tag='edge_t')
+        build_tr_value_float_selector('Gauss Sigma',        0, 100, default_value=1.6, tag='sigma')
+        build_tr_value_float_selector('Match Threshold',    0, 1000, default_value=200, tag='match_t')
         build_tr_checkbox('cross_check', default_value=True)
         build_tr_dialog_end_buttons(TR_COMBINE_SIFT, image_name, tr_combine_sift, generic_tr_inductive_handle(combine.sift))
 
@@ -1031,10 +1036,19 @@ def tr_combine_sift(image_name: str) -> Image:
     image       = img_repo.get_image(image_name)
     new_name    = get_tr_name_value(image)
     sec_image   = get_tr_img_value()
-    threshold   = get_tr_float_value()
+    features    = get_tr_int_value('features')
+    layers      = get_tr_int_value('layers')
+    contrast_t  = get_tr_float_value('contrast_t')
+    edge_t      = get_tr_float_value('edge_t')
+    sigma       = get_tr_float_value('sigma')
+    match_t     = get_tr_float_value('match_t')
     cross_check = get_tr_checkbox_value()
     # 2. Procesamos
-    new_data, channels_tr = combine.sift(image, sec_image, threshold, cross_check)
+    new_data, channels_tr = combine.sift(image, sec_image, features, layers, contrast_t, edge_t, sigma, match_t, cross_check)
     # 3. Creamos Imagen y finalizamos
-    return image.transform(new_name, new_data, ImageTransformation(TR_COMBINE_SIFT, {'img2_name': sec_image.name, 'threshold': threshold, 'cross_check': cross_check}, {'img2': sec_image}, channels_tr))
-
+    return image.transform(new_name, new_data, ImageTransformation(
+        TR_COMBINE_SIFT,
+       {'img2_name': sec_image.name, 'features': features, 'layers': layers, 'contrast_t': contrast_t, 'edge_t': edge_t, 'sigma': sigma, 'match_t': match_t, 'cross_check': cross_check},
+       {'img2': sec_image},
+       channels_tr
+    ))
