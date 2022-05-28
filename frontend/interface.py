@@ -449,7 +449,8 @@ def build_image_handler_registry() -> None:
                 user_data = dpg.get_item_user_data(win)
                 win_img_name = user_data['image_name']
                 pointer = f'image_{win_img_name}_pointer'
-                dpg.set_value(pointer, '')
+                if dpg.does_item_exist(pointer):
+                    dpg.set_value(pointer, '')
 
         if window == 0:
             return  # No hay ninguna imagen seleccionada
