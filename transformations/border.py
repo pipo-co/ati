@@ -350,14 +350,13 @@ def canny_channel(channel: np.ndarray, t1: int, t2: int, padding_str: PaddingStr
 
 
 def calculate_r1(ix2: np.ndarray, ixy: np.ndarray, iy2: np.ndarray, k: float) -> np.ndarray: 
-    det = np.multiply(ix2, iy2) - np.multiply(ixy, ixy)
+    det = ix2 * iy2 - ixy ** 2
     sum = ix2 + iy2
-    trace = np.multiply(sum, sum)
 
-    return det - k*trace
+    return det - k*sum*sum
 
 def calculate_r2(ix2: np.ndarray, ixy: np.ndarray, iy2: np.ndarray, k: float) -> np.ndarray: 
-    det = ix2 * iy2 - ixy * 4
+    det = ix2 * iy2 - ixy ** 4
     sum = ix2 + iy2
 
     return det - k*sum*sum

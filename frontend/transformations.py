@@ -910,7 +910,7 @@ def build_border_harry_dialog(image_name: str) -> None:
         build_tr_name_input(TR_BORDER_HARRY, image_name)
         build_tr_value_int_selector('sigma', 1, 10, default_value=2, tag='sigma')
         build_tr_value_float_selector('k', 0.01, 0.1, default_value=0.04, tag='k')
-        build_tr_value_float_selector('threshold', 0.5, 30.0, default_value=20.0, tag='threshold')
+        build_tr_value_float_selector('threshold', 0.5, 30.0, default_value=5.0, tag='threshold')
         build_tr_radio_buttons(border.HarrisR.names(), tag='function')
         build_tr_radio_buttons(PaddingStrategy.names())
         build_tr_dialog_end_buttons(TR_BORDER_HARRY, image_name, tr_border_harry, generic_tr_inductive_handle(border.harris))
@@ -1014,7 +1014,7 @@ def tr_combine_mult(image_name: str) -> Image:
     # 2. Procesamos
     new_data, channels_tr = combine.multiply(image, sec_image)
     # 3. Creamos Imagen y finalizamos
-    return image.transform(new_name, new_data, ImageTransformation(TR_COMBINE_ADD, {'sec_image_name': sec_image.name}, {'second_image': sec_image}, channels_tr))
+    return image.transform(new_name, new_data, ImageTransformation(TR_COMBINE_MULT, {'sec_image_name': sec_image.name}, {'sec_image': sec_image}, channels_tr))
 
 TR_COMBINE_SIFT: str = 'sift'
 @render_error
@@ -1036,5 +1036,5 @@ def tr_combine_sift(image_name: str) -> Image:
     # 2. Procesamos
     new_data, channels_tr = combine.sift(image, sec_image, threshold, cross_check)
     # 3. Creamos Imagen y finalizamos
-    return image.transform(new_name, new_data, ImageTransformation(TR_COMBINE_ADD, {'img2_name': sec_image.name, 'threshold': threshold, 'cross_check': cross_check}, {'img2': sec_image}, channels_tr))
-    return image.transform(new_name, new_data, ImageTransformation(TR_COMBINE_MULT, {'sec_image_name': sec_image.name}, {'sec_image': sec_image}, channels_tr))
+    return image.transform(new_name, new_data, ImageTransformation(TR_COMBINE_SIFT, {'img2_name': sec_image.name, 'threshold': threshold, 'cross_check': cross_check}, {'img2': sec_image}, channels_tr))
+
