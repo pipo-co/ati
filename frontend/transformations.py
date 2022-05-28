@@ -43,6 +43,7 @@ def build_transformations_menu(image_name: str) -> None:
             build_tr_menu_item(TR_NEG,                      build_neg_dialog,                       image_name)
             build_tr_menu_item(TR_POW,                      build_pow_dialog,                       image_name)
             build_tr_menu_item(TR_EQUALIZE,                 build_equalize_dialog,                  image_name)
+            build_tr_menu_item(TR_SLICE,                    build_slice_dialog,                     image_name)
         with dpg.menu(label='Threshold'):
             build_tr_menu_item(TR_THRESH_MANUAL,            build_thresh_manual_dialog,             image_name)
             build_tr_menu_item(TR_THRESH_GLOBAL,            build_thresh_global_dialog,             image_name)
@@ -395,6 +396,24 @@ def tr_equalize(image_name: str) -> Image:
     new_data, channels_tr = basic.equalize(image)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, ImageTransformation(TR_EQUALIZE, {}, {}, channels_tr))
+
+TR_SLICE: str = 'slice'
+@render_error
+def build_slice_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_SLICE):
+        build_tr_name_input(TR_SLICE, image_name)
+        build_tr_value_int_selector('channel', 0, 2, 0)
+        build_tr_dialog_end_buttons(TR_SLICE, image_name, tr_slice, generic_tr_inductive_handle(basic.slice_channel))
+
+def tr_slice(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image    = img_repo.get_image(image_name)
+    new_name = get_tr_name_value(image)
+    channel   = get_tr_int_value()
+    # 2. Procesamos
+    new_data, channels_tr = basic.slice_channel(image, channel)
+    # 3. Creamos Imagen
+    return image.transform(new_name, new_data, ImageTransformation(TR_SLICE, {}, {}, channels_tr))
 
 ########################################################
 # ******************** Threshold ********************* #

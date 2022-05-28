@@ -24,3 +24,6 @@ def negate(img: Image) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
 
 def equalize(image: Image) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
     return image.apply_over_channels(channel_equalization)
+
+def slice_channel(img: Image, channel: int) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return img.data.take(channel, axis=2), []
