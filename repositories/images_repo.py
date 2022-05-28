@@ -17,6 +17,10 @@ def persist_image(image: Image) -> None:
         raise ValueError(f'{image.name} already has mapped {_loaded_images[image.name]}')
     _loaded_images[image.name] = image
 
+def get_images(image_name: str) -> Iterable[Image]:
+    original_image = get_image(image_name)
+    return (image for image in _loaded_images.values() if image.name != image_name)
+
 def get_same_shape_images(image_name: str) -> Iterable[Image]:
     original_image = get_image(image_name)
     return (image

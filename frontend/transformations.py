@@ -75,6 +75,7 @@ def build_transformations_menu(image_name: str) -> None:
             build_tr_menu_item(TR_COMBINE_ADD,              build_combine_add_dialog,               image_name)
             build_tr_menu_item(TR_COMBINE_SUB,              build_combine_sub_dialog,               image_name)
             build_tr_menu_item(TR_COMBINE_MULT,             build_combine_mult_dialog,              image_name)
+            build_tr_menu_item(TR_COMBINE_SIFT,             build_combine_sift_dialog,              image_name)
 
 
 def build_tr_menu_item(tr_id: str, tr_dialog_builder: Callable[[str], None], image_name: str) -> None:
@@ -192,11 +193,11 @@ def build_tr_radio_buttons(names: List[str], default_value: Optional[str] = None
         default_value = names[0]
     dpg.add_radio_button(items=names, default_value=default_value, horizontal=horizontal, tag=tag)
 
-def build_tr_checkbox(name: str, tag: str = TR_CHECKBOX) -> None:
-    dpg.add_checkbox(label=name, tag=tag)
+def build_tr_checkbox(name: str, default_value: bool = False, tag: str = TR_CHECKBOX) -> None:
+    dpg.add_checkbox(label=name, default_value=default_value, tag=tag)
     
-def build_tr_img_selector(image_name: str) -> None:
-    image_list = list(map(lambda img: img.name, img_repo.get_same_shape_images(image_name)))
+def build_tr_img_selector(image_name: str, same_shape=False) -> None:
+    image_list = list(map(lambda img: img.name, img_repo.get_same_shape_images(image_name) if same_shape else img_repo.get_images(image_name)))
     dpg.add_text('Select Another Image to combine')
     dpg.add_listbox(image_list, tag=TR_IMG_INPUT)
 
@@ -917,7 +918,7 @@ TR_COMBINE_ADD: str = 'add'
 def build_combine_add_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_COMBINE_ADD):
         build_tr_name_input(TR_COMBINE_ADD, image_name)
-        build_tr_img_selector(image_name)
+        build_tr_img_selector(image_name, same_shape=True)
         build_tr_dialog_end_buttons(TR_COMBINE_ADD, image_name, tr_combine_add, generic_tr_inductive_handle(combine.add))
 
 def tr_combine_add(image_name: str) -> Image:
@@ -929,14 +930,14 @@ def tr_combine_add(image_name: str) -> Image:
     # 2. Procesamos
     new_data, channels_tr = combine.add(image, sec_image)
     # 3. Creamos Imagen y finalizamos
-    return image.transform(new_name, new_data, ImageTransformation(TR_COMBINE_ADD, {'sec_image_name': sec_image.name}, {'sec_image': sec_image}, channels_tr))
+    return image.transform(new_name, new_data, ImageTransformation(TR_COMBINE_ADD, {'sec_image_name': sec_image.name}, {'second_image': sec_image}, channels_tr))
 
 TR_COMBINE_SUB: str = 'sub'
 @render_error
 def build_combine_sub_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_COMBINE_SUB):
         build_tr_name_input(TR_COMBINE_SUB, image_name)
-        build_tr_img_selector(image_name)
+        build_tr_img_selector(image_name, same_shape=True)
         build_tr_dialog_end_buttons(TR_COMBINE_SUB, image_name, tr_combine_sub, generic_tr_inductive_handle(combine.sub))
 
 def tr_combine_sub(image_name: str) -> Image:
@@ -948,14 +949,14 @@ def tr_combine_sub(image_name: str) -> Image:
     # 2. Procesamos
     new_data, channels_tr = combine.sub(image, sec_image)
     # 3. Creamos Imagen y finalizamos
-    return image.transform(new_name, new_data, ImageTransformation(TR_COMBINE_SUB, {'sec_image_name': sec_image.name}, {'sec_image': sec_image}, channels_tr))
+    return image.transform(new_name, new_data, ImageTransformation(TR_COMBINE_SUB, {'sec_image_name': sec_image.name}, {'second_image': sec_image}, channels_tr))
 
 TR_COMBINE_MULT: str = 'multiply'
 @render_error
 def build_combine_mult_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_COMBINE_MULT):
         build_tr_name_input(TR_COMBINE_MULT, image_name)
-        build_tr_img_selector(image_name)
+        build_tr_img_selector(image_name, same_shape=True)
         build_tr_dialog_end_buttons(TR_COMBINE_MULT, image_name, tr_combine_mult, generic_tr_inductive_handle(combine.multiply))
 
 def tr_combine_mult(image_name: str) -> Image:
@@ -967,4 +968,26 @@ def tr_combine_mult(image_name: str) -> Image:
     # 2. Procesamos
     new_data, channels_tr = combine.multiply(image, sec_image)
     # 3. Creamos Imagen y finalizamos
-    return image.transform(new_name, new_data, ImageTransformation(TR_COMBINE_ADD, {'sec_image_name': sec_image.name}, {'sec_image': sec_image}, channels_tr))
+    return image.transform(new_name, new_data, ImageTransformation(TR_COMBINE_ADD, {'sec_image_name': sec_image.name}, {'second_image': sec_image}, channels_tr))
+
+TR_COMBINE_SIFT: str = 'sift'
+@render_error
+def build_combine_sift_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_COMBINE_SIFT):
+        build_tr_name_input(TR_COMBINE_SIFT, image_name)
+        build_tr_img_selector(image_name)
+        build_tr_value_float_selector('Threshold', 0, 1000, default_value=150)
+        build_tr_checkbox('cross_check', default_value=True)
+        build_tr_dialog_end_buttons(TR_COMBINE_SIFT, image_name, tr_combine_sift, generic_tr_inductive_handle(combine.sift))
+
+def tr_combine_sift(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image       = img_repo.get_image(image_name)
+    new_name    = get_tr_name_value(image)
+    sec_image   = get_tr_img_value()
+    threshold   = get_tr_float_value()
+    cross_check = get_tr_checkbox_value()
+    # 2. Procesamos
+    new_data, channels_tr = combine.sift(image, sec_image, threshold, cross_check)
+    # 3. Creamos Imagen y finalizamos
+    return image.transform(new_name, new_data, ImageTransformation(TR_COMBINE_ADD, {'img2_name': sec_image.name, 'threshold': threshold, 'cross_check': cross_check}, {'img2': sec_image}, channels_tr))
