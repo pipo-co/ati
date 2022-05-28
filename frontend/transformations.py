@@ -910,7 +910,8 @@ def build_border_harry_dialog(image_name: str) -> None:
         build_tr_name_input(TR_BORDER_HARRY, image_name)
         build_tr_value_int_selector('sigma', 1, 10, default_value=2, tag='sigma')
         build_tr_value_float_selector('k', 0.01, 0.1, default_value=0.04, tag='k')
-        build_tr_value_float_selector('threshold', 0.5, 30.0, default_value=5.0, tag='threshold')
+        build_tr_value_float_selector('epsilon', 0.5, 10, default_value=4, tag='epsilon')
+        build_tr_value_float_selector('threshold', 20, 100.0, default_value=40, tag='threshold')
         build_tr_radio_buttons(border.HarrisR.names(), tag='function')
         build_tr_radio_buttons(PaddingStrategy.names())
         build_tr_dialog_end_buttons(TR_BORDER_HARRY, image_name, tr_border_harry, generic_tr_inductive_handle(border.harris))
@@ -922,12 +923,13 @@ def tr_border_harry(image_name: str) -> Image:
     padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
     sigma = get_tr_int_value('sigma')
     k   = get_tr_float_value('k')
+    epsilon   = get_tr_float_value('epsilon')
     threshold   = get_tr_float_value('threshold')
     function = border.HarrisR.from_str(get_tr_radio_buttons_value(radio_buttons='function'))
     # 2. Procesamos
-    new_data, channels_tr = border.harris(image, sigma, k, threshold, function, padding_str)
+    new_data, channels_tr = border.harris(image, sigma, k, threshold, epsilon, function, padding_str)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, ImageTransformation(TR_BORDER_HARRY, {'sigma': sigma, 'k': k, 'threshold':threshold, 'r_function':function}, {'padding_str': padding_str}, channels_tr))
+    return image.transform(new_name, new_data, ImageTransformation(TR_BORDER_HARRY, {'sigma': sigma, 'k': k, 'threshold':threshold, 'epsilon': epsilon, 'r_function':function}, {'padding_str': padding_str}, channels_tr))
 
 TR_BORDER_ACTIVE_OUTLINE: str = 'active_outline'
 @render_error

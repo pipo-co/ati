@@ -361,7 +361,7 @@ def calculate_r2(ix2: np.ndarray, ixy: np.ndarray, iy2: np.ndarray, k: float) ->
 
     return det - k*sum*sum
     
-def harris_channel(channel: np.ndarray, sigma:int, k: float, threshold: float, r_function: HarrisR, padding_str: PaddingStrategy) -> np.ndarray:
+def harris_channel(channel: np.ndarray, sigma:int, k: float, threshold: float, epsilon: float, r_function: HarrisR, padding_str: PaddingStrategy) -> np.ndarray:
     # Usamos prewitt para derivar
     kernel = FamousKernel.PREWITT.kernel
     dx = weighted_sum(channel, kernel, padding_str)
@@ -381,7 +381,7 @@ def harris_channel(channel: np.ndarray, sigma:int, k: float, threshold: float, r
     
     normalized_r = normalize(r_abs, np.float64)
 
-    normalized_r[(normalized_r < threshold)] = 0
+    normalized_r[(normalized_r < epsilon)] = 0
     normalized_r[(normalized_r > threshold) & negative_mask] = 125
     normalized_r[(normalized_r > threshold) & np.logical_not(negative_mask)] = 255
     
@@ -514,8 +514,8 @@ def hough_circles(image: Image, radius: LinRange, x_axis: LinRange, y_axis: LinR
 def canny(image: Image, t1: int, t2: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
     return image.apply_over_channels(canny_channel, t1=t1, t2=t2, padding_str=padding_str)
 
-def harris(image: Image, sigma: int, k: float, threshold: float, function: HarrisR, padding_str: PaddingStrategy) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
-    return image.apply_over_channels(harris_channel, sigma=sigma, k=k, threshold=threshold, r_function=function, padding_str=padding_str)
+def harris(image: Image, sigma: int, k: float, threshold: float, epsilon: float, function: HarrisR, padding_str: PaddingStrategy) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return image.apply_over_channels(harris_channel, sigma=sigma, k=k, threshold=threshold, epsilon=epsilon, r_function=function, padding_str=padding_str)
 
 
 def active_outline_base(image: Image, threshold: float, p1: Tuple[int, int], p2: Tuple[int, int]) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
