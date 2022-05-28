@@ -70,6 +70,7 @@ def build_transformations_menu(image_name: str) -> None:
             build_tr_menu_item(TR_BORDER_HOUGH_LINE,        build_border_hough_line_dialog,              image_name)
             build_tr_menu_item(TR_BORDER_HOUGH_CIRCLE,      build_border_hough_circle_dialog,              image_name)
             build_tr_menu_item(TR_BORDER_CANNY,             build_border_canny_dialog,              image_name)
+            build_tr_menu_item(TR_BORDER_HARRY,             build_border_harry_dialog,              image_name)
             build_tr_menu_item(TR_BORDER_ACTIVE_OUTLINE,    build_border_active_outline_dialog,     image_name)
         with dpg.menu(label='Combine'):
             build_tr_menu_item(TR_COMBINE_ADD,              build_combine_add_dialog,               image_name)
@@ -883,6 +884,32 @@ def tr_border_canny(image_name: str) -> Image:
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, ImageTransformation(TR_BORDER_CANNY, {'t1': t1, 't2': t2}, {'padding_str': padding_str}, channels_tr))
 
+TR_BORDER_HARRY: str = 'harry'
+@render_error
+def build_border_harry_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_BORDER_HARRY):
+        build_tr_name_input(TR_BORDER_HARRY, image_name)
+        build_tr_value_int_selector('sigma', 1, 10, default_value=2, tag='sigma')
+        build_tr_value_float_selector('k', 0.01, 0.1, default_value=0.04, tag='k')
+        build_tr_value_float_selector('threshold', 0.5, 30.0, default_value=20.0, tag='threshold')
+        build_tr_radio_buttons(border.HarrisR.names(), tag='function')
+        build_tr_radio_buttons(PaddingStrategy.names())
+        build_tr_dialog_end_buttons(TR_BORDER_HARRY, image_name, tr_border_harry, generic_tr_inductive_handle(border.harris))
+
+def tr_border_harry(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image       = img_repo.get_image(image_name)
+    new_name    = get_tr_name_value(image)
+    padding_str = PaddingStrategy.from_str(get_tr_radio_buttons_value())
+    sigma = get_tr_int_value('sigma')
+    k   = get_tr_float_value('k')
+    threshold   = get_tr_float_value('threshold')
+    function = border.HarrisR.from_str(get_tr_radio_buttons_value(radio_buttons='function'))
+    # 2. Procesamos
+    new_data, channels_tr = border.harris(image, sigma, k, threshold, function, padding_str)
+    # 3. Creamos Imagen
+    return image.transform(new_name, new_data, ImageTransformation(TR_BORDER_HARRY, {'sigma': sigma, 'k': k, 'threshold':threshold, 'r_function':function}, {'padding_str': padding_str}, channels_tr))
+
 TR_BORDER_ACTIVE_OUTLINE: str = 'active_outline'
 @render_error
 def build_border_active_outline_dialog(image_name: str) -> None:
@@ -991,3 +1018,4 @@ def tr_combine_sift(image_name: str) -> Image:
     new_data, channels_tr = combine.sift(image, sec_image, threshold, cross_check)
     # 3. Creamos Imagen y finalizamos
     return image.transform(new_name, new_data, ImageTransformation(TR_COMBINE_ADD, {'img2_name': sec_image.name, 'threshold': threshold, 'cross_check': cross_check}, {'img2': sec_image}, channels_tr))
+    return image.transform(new_name, new_data, ImageTransformation(TR_COMBINE_MULT, {'sec_image_name': sec_image.name}, {'sec_image': sec_image}, channels_tr))
