@@ -108,6 +108,8 @@ def render_image_overlay(image: Image, window: Union[int, str], image_item: Unio
                         dpg.draw_circle((cmd.c_x, cmd.c_y), cmd.r, color=cmd.color, parent=window)
 
                     elif isinstance(cmd, ScatterDrawCmd):
+                        if cmd.points.size == 0:
+                            continue
                         mask = np.zeros((image.height, image.width, 4))
                         mask[cmd.points[:, 0], cmd.points[:, 1]] = np.array([*cmd.color, 255]) / 255
                         mask_tag = dpg.add_static_texture(image.width, image.height, mask.flatten(), parent=TEXTURE_REGISTRY)  # noqa

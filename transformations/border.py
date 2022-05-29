@@ -120,8 +120,8 @@ class FamousKernel(Enum):
         return np.array(self.value)
 
 class HarrisR(Enum):
-    R1  = functools.partial(lambda ix2, ixy, iy2, k: calculate_r1(ix2, ixy, iy2, k))
-    R2  = functools.partial(lambda ix2, ixy, iy2, k: calculate_r2(ix2, ixy, iy2, k))
+    R1  = functools.partial(lambda ix2, ixy, iy2, k: (ix2 * iy2 - ixy ** 2) - k * (ix2 + iy2) ** 2)
+    R2  = functools.partial(lambda ix2, ixy, iy2, k: (ix2 * iy2 - ixy ** 2) - k * (ix2 + iy2) ** 4)
 
     def __call__(self, *args, **kwargs) -> np.ndarray:
         return self.value(*args, **kwargs)
@@ -348,45 +348,31 @@ def canny_channel(channel: np.ndarray, t1: int, t2: int, padding_str: PaddingStr
             canny_drag_borders(gradient_mod, t1, t2, max_col, max_row, row, col)
 
     return gradient_mod
-
-
-def calculate_r1(ix2: np.ndarray, ixy: np.ndarray, iy2: np.ndarray, k: float) -> np.ndarray: 
-    det = ix2 * iy2 - ixy ** 2
-    sum = ix2 + iy2
-
-    return det - k*sum*sum
-
-def calculate_r2(ix2: np.ndarray, ixy: np.ndarray, iy2: np.ndarray, k: float) -> np.ndarray: 
-    det = ix2 * iy2 - ixy ** 4
-    sum = ix2 + iy2
-
-    return det - k*sum*sum
     
-def harris_channel(channel: np.ndarray, sigma:int, k: float, threshold: float, epsilon: float, r_function: HarrisR, padding_str: PaddingStrategy) -> np.ndarray:
+def harris_channel(channel: np.ndarray, sigma:int, k: float, threshold: float, r_function: HarrisR, padding_str: PaddingStrategy, with_border: bool) -> Tuple[np.ndarray, ImageChannelTransformation]:
     # Usamos prewitt para derivar
     kernel = FamousKernel.PREWITT.kernel
     dx = weighted_sum(channel, kernel, padding_str)
     kernel = np.rot90(kernel, k=-1)
     dy = weighted_sum(channel, kernel, padding_str)
-    
 
     ix2 = weighted_sum(np.multiply(dx, dx), gauss_kernel(sigma), padding_str)
     ixy = weighted_sum(np.multiply(dx, dy), gauss_kernel(sigma), padding_str)
     iy2 = weighted_sum(np.multiply(dy, dy), gauss_kernel(sigma), padding_str)
 
-
     r = r_function(ix2, ixy, iy2, k)
-    negative_mask = r < 0
     r_abs = np.abs(r)
+
     # Normalizamos la imagen antes del thresholding
-    
     normalized_r = normalize(r_abs, np.float64)
 
-    normalized_r[(normalized_r < epsilon)] = 0
-    normalized_r[(normalized_r > threshold) & negative_mask] = 125
-    normalized_r[(normalized_r > threshold) & np.logical_not(negative_mask)] = 255
-    
-    return normalized_r
+    # Los r cuya magnitud es mayor al threshold
+    big_r = normalized_r >= threshold
+
+    corner_points = np.argwhere((r > 0) & big_r)
+    border_points = np.argwhere((r < 0) & big_r) if with_border else np.empty((0, 2))
+
+    return channel, ImageChannelTransformation({}, {}, [ScatterDrawCmd(border_points, color=(0, 255, 0)), ScatterDrawCmd(corner_points, color=(255, 0, 0))])
 
 def set_difference(new_values: np.ndarray, removed_values: np.ndarray) -> np.ndarray:
     nrows, ncols = new_values.shape
@@ -515,9 +501,8 @@ def hough_circles(image: Image, radius: LinRange, x_axis: LinRange, y_axis: LinR
 def canny(image: Image, t1: int, t2: int, padding_str: PaddingStrategy) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
     return image.apply_over_channels(canny_channel, t1=t1, t2=t2, padding_str=padding_str)
 
-def harris(image: Image, sigma: int, k: float, threshold: float, epsilon: float, function: HarrisR, padding_str: PaddingStrategy) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
-    return image.apply_over_channels(harris_channel, sigma=sigma, k=k, threshold=threshold, epsilon=epsilon, r_function=function, padding_str=padding_str)
-
+def harris(image: Image, sigma: int, k: float, threshold: float, function: HarrisR, padding_str: PaddingStrategy, with_border: bool) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return image.apply_over_channels(harris_channel, sigma=sigma, k=k, threshold=threshold, r_function=function, padding_str=padding_str, with_border=with_border)
 
 def active_outline_base(image: Image, threshold: float, p1: Tuple[int, int], p2: Tuple[int, int]) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
     start_time = time.thread_time_ns() // 1000000
