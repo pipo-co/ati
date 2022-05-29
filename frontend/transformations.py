@@ -1028,7 +1028,7 @@ def build_combine_sift_dialog(image_name: str) -> None:
         build_tr_name_input(TR_COMBINE_SIFT, image_name)
         build_tr_img_selector(image_name)
         build_tr_value_int_selector('Features',             0, 20, default_value=0, tag='features')
-        build_tr_value_int_selector('Layers',               0, 20, default_value=4, tag='layers')
+        build_tr_value_int_selector('Layers',               0, 20, default_value=3, tag='layers')
         build_tr_value_float_selector('Contrast Threshold', 0, 1, default_value=0.04, tag='contrast_t')
         build_tr_value_float_selector('Edge Threshold',     0, 100, default_value=10, tag='edge_t')
         build_tr_value_float_selector('Gauss Sigma',        0, 100, default_value=1.6, tag='sigma')

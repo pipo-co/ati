@@ -3,41 +3,16 @@ import numpy as np
 import cv2
 
 from models.image import Image, ImageChannelTransformation, normalize
+from transformations.data_models import Measurement
 
-def add(first_img: Image, second_img: Image) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
-    return np.add(first_img.data, second_img.data), []
 
-def sub(first_img: Image, second_img: Image) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
-    return np.subtract(first_img.data, second_img.data), []
+def sift_channel(channel1: np.ndarray, channel2: np.ndarray, features: int, layers: int, contrast_t: float,
+                 edge_t: float, sigma: float, match_t: float, cross_check: bool, multi_channel: bool,
+                 color: Tuple[int, int, int] = (255, 255, 255)
+                 ) -> Tuple[np.ndarray, ImageChannelTransformation]:
+    if multi_channel and not all(elem == color[0] for elem in color):
+        raise ValueError(f'If multi channel, color must be a shade of gray. This means all elements of tuple must be the same value. Not true for {color}')
 
-def multiply(first_img: Image, second_img: Image) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
-    return np.multiply(first_img.data, second_img.data), []
-
-# Por ahora asumimos gris
-def sift(img1: Image, img2: Image, features: int, layers: int, contrast_t: float, edge_t: float, sigma: float, match_t: float, cross_check: bool) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
-    new_data: np.ndarray
-    channels_tr: List[ImageChannelTransformation] = []
-
-    if img1.channels == 1:
-        fn_ret = sift_channel(img1.data, img2.data, features=features, layers=layers, contrast_t=contrast_t, edge_t=edge_t, sigma=sigma, match_t=match_t, cross_check=cross_check, color=(0, 0, 255))
-        if isinstance(fn_ret, tuple):
-            new_data = fn_ret[0]
-            channels_tr.append(fn_ret[1])
-        else:
-            new_data = fn_ret
-    else:
-        new_data = np.empty((max(img1.shape[0], img2.shape[0]), img1.shape[1]+img2.shape[1], 3))
-        for channel in range(img1.channels):
-            fn_ret = sift_channel(img1.get_channel(channel), img2.get_channel(channel), features=features, layers=layers, contrast_t=contrast_t, edge_t=edge_t, sigma=sigma, match_t=match_t, cross_check=cross_check)
-            if isinstance(fn_ret, tuple):
-                new_data[:, :, channel] = fn_ret[0][:,:,0]
-                channels_tr.append(fn_ret[1])
-            else:
-                new_data[:, :, channel] = fn_ret[:,:,0]
-
-    return new_data, channels_tr
-
-def sift_channel(channel1: np.ndarray, channel2: np.ndarray, features: int, layers: int, contrast_t: float, edge_t: float, sigma: float, match_t: float, cross_check: bool, color: Tuple[int, int, int] = (255, 255, 255)) -> np.ndarray:
     data1 = normalize(channel1)
     data2 = normalize(channel2)
 
@@ -50,11 +25,36 @@ def sift_channel(channel1: np.ndarray, channel2: np.ndarray, features: int, laye
 
     matches = matcher.radiusMatch(desc1, desc2, match_t)
     matches = tuple([t[0] for t in matches if t])  # Flateneo
+    matches = sorted(matches, key=lambda x: x.distance)
 
-    match_ratio = len(matches) / len(kp1)
-
-    data1 = cv2.drawKeypoints(data1, kp1, None, color=(255 - color[0], 255 - color[1], 255 - color[2]), flags=cv2.DRAW_MATCHES_FLAGS_DEFAULT)
+    if not multi_channel:
+        data1 = cv2.drawKeypoints(data1, kp1, None, color=(255 - color[0], 255 - color[1], 255 - color[2]), flags=cv2.DRAW_MATCHES_FLAGS_DEFAULT)
 
     new_data = cv2.drawMatches(data1, kp1, data2, kp2, matches, None, matchColor=color, flags=cv2.DRAW_MATCHES_FLAGS_NOT_DRAW_SINGLE_POINTS)
-    result = ImageChannelTransformation({'Match Ratio': round(match_ratio, 2)}, {})
+    if multi_channel:
+        new_data = new_data[:, :, 0]
+
+    result = ImageChannelTransformation({
+        'Total Keypoints'   : len(kp1),
+        'Total Matches'     : len(matches),
+        'Match Percentage'  : Measurement(100 * round(len(matches) / len(kp1), 3), '%'),
+        'Best Match Distance': round(matches[0].distance, 2)
+    }, {})
+
     return new_data, result
+
+# ******************* Export Functions ********************** #
+
+def add(first_img: Image, second_img: Image) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return np.add(first_img.data, second_img.data), []
+
+def sub(first_img: Image, second_img: Image) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return np.subtract(first_img.data, second_img.data), []
+
+def multiply(first_img: Image, second_img: Image) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    return np.multiply(first_img.data, second_img.data), []
+
+def sift(img1: Image, img2: Image, features: int = 0, layers: int = 3, contrast_t: float = 0.04, edge_t: float = 10, sigma: float = 1.6, match_t: float = 200, cross_check: bool = True) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    multi_channel = img1.is_multi_channel()
+    color = (255, 255, 255) if multi_channel else (255, 0, 0)
+    return img1.combine_over_channels(img2, sift_channel, features, layers, contrast_t, edge_t, sigma, match_t, cross_check, img1.is_multi_channel(), color=color)

@@ -153,6 +153,43 @@ class Image:
 
         return new_data, channels_tr
 
+    def combine_over_channels(self, other: 'Image', fn: Callable[[np.ndarray, np.ndarray, Any], Union[np.ndarray, Tuple[np.ndarray, ImageChannelTransformation]]], *args, **kwargs) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+        if self.channels != other.channels:
+            raise ValueError(f'Cannot combine images of different channel count. Img 1 has {self.channels} channels, and img 2 has {other.channels} channels.')
+
+        new_data: np.ndarray
+        channels_tr: List[ImageChannelTransformation] = []
+
+        if self.channels == 1:
+            fn_ret = fn(self.data, other.data, *args, **kwargs)
+            if isinstance(fn_ret, tuple):
+                new_data = fn_ret[0]
+                channels_tr.append(fn_ret[1])
+            else:
+                new_data = fn_ret
+        else:
+            data0: np.ndarrray
+            # Primera iteracion para obtener shape
+            fn_ret = fn(self.get_channel(0), other.get_channel(0), *args, **kwargs)
+            if isinstance(fn_ret, tuple):
+                data0 = fn_ret[0]
+                channels_tr.append(fn_ret[1])
+            else:
+                data0 = fn_ret
+
+            new_data = np.empty((*data0.shape, 3))
+            new_data[:, :, 0] = data0
+
+            for channel in range(1, self.channels):
+                fn_ret = fn(self.get_channel(channel), other.get_channel(channel), *args, **kwargs)
+                if isinstance(fn_ret, tuple):
+                    new_data[:, :, channel] = fn_ret[0]
+                    channels_tr.append(fn_ret[1])
+                else:
+                    new_data[:, :, channel] = fn_ret
+
+        return new_data, channels_tr
+
     def get_histograms(self) -> Union[Tuple[Hist], Tuple[Hist, Hist, Hist]]:
         if self.channels == 1:
             return channel_histogram(self.data),
@@ -224,6 +261,8 @@ class Image:
     def name_from_path(path: str) -> str:
         return lower_extension(path)
 
+def str_round(n: Any) -> str:
+    return f'{n:.2f}' if isinstance(n, float) else str(n)
 
 def valid_image_formats() -> Iterable[str]:
     formats = list(map(lambda fmt: fmt.to_extension(), ImageFormat))
