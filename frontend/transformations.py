@@ -30,6 +30,7 @@ TR_CHECKBOX: str                = 'tr_checkbox'
 TR_INT_TABLE: str               = 'tr_int_table'
 
 TR_DECIMAL_PLACES = 2
+CHANNELS = ['Red', 'Green', 'Blue']
 
 TrHandler = Callable[[str], Image]
 
@@ -39,11 +40,11 @@ def build_transformations_menu(image_name: str) -> None:
             build_tr_menu_item(TR_COPY,                     build_copy_dialog,                      image_name)
             build_tr_menu_item(TR_REFORMAT,                 build_reformat_dialog,                  image_name)
             build_tr_menu_item(TR_NORMALIZE,                build_normalize_dialog,                 image_name)
+            build_tr_menu_item(TR_SLICE,                    build_slice_dialog,                     image_name)
         with dpg.menu(label='Basic'):
             build_tr_menu_item(TR_NEG,                      build_neg_dialog,                       image_name)
             build_tr_menu_item(TR_POW,                      build_pow_dialog,                       image_name)
             build_tr_menu_item(TR_EQUALIZE,                 build_equalize_dialog,                  image_name)
-            build_tr_menu_item(TR_SLICE,                    build_slice_dialog,                     image_name)
         with dpg.menu(label='Threshold'):
             build_tr_menu_item(TR_THRESH_MANUAL,            build_thresh_manual_dialog,             image_name)
             build_tr_menu_item(TR_THRESH_GLOBAL,            build_thresh_global_dialog,             image_name)
@@ -343,6 +344,26 @@ def tr_normalize(image_name: str) -> Image:
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, ImageTransformation(TR_NORMALIZE, {}, {}))
 
+TR_SLICE: str = 'slice'
+@render_error
+def build_slice_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_SLICE):
+        build_tr_name_input(TR_SLICE, image_name)
+        build_tr_radio_buttons(CHANNELS)
+        build_tr_dialog_end_buttons(TR_SLICE, image_name, tr_slice, generic_tr_inductive_handle(basic.slice_channel))
+
+def tr_slice(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image    = img_repo.get_image(image_name)
+    new_name = get_tr_name_value(image)
+    if image.channels == 1:
+        return image.transform(new_name, image.data, ImageTransformation(TR_SLICE, {}, {}, []))
+    channel   = CHANNELS.index(get_tr_radio_buttons_value())
+    # 2. Procesamos
+    new_data, channels_tr = basic.slice_channel(image, channel)
+    # 3. Creamos Imagen
+    return image.transform(new_name, new_data, ImageTransformation(TR_SLICE, {}, {}, channels_tr))
+
 ########################################################
 # ********************** Basic *********************** #
 ########################################################
@@ -396,24 +417,6 @@ def tr_equalize(image_name: str) -> Image:
     new_data, channels_tr = basic.equalize(image)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, ImageTransformation(TR_EQUALIZE, {}, {}, channels_tr))
-
-TR_SLICE: str = 'slice'
-@render_error
-def build_slice_dialog(image_name: str) -> None:
-    with build_tr_dialog(TR_SLICE):
-        build_tr_name_input(TR_SLICE, image_name)
-        build_tr_value_int_selector('channel', min_val=0, max_val=2, default_value=0)
-        build_tr_dialog_end_buttons(TR_SLICE, image_name, tr_slice, generic_tr_inductive_handle(basic.slice_channel))
-
-def tr_slice(image_name: str) -> Image:
-    # 1. Obtenemos inputs
-    image    = img_repo.get_image(image_name)
-    new_name = get_tr_name_value(image)
-    channel   = get_tr_int_value()
-    # 2. Procesamos
-    new_data, channels_tr = basic.slice_channel(image, channel)
-    # 3. Creamos Imagen
-    return image.transform(new_name, new_data, ImageTransformation(TR_SLICE, {}, {}, channels_tr))
 
 ########################################################
 # ******************** Threshold ********************* #
