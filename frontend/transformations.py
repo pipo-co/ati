@@ -8,7 +8,7 @@ from models.movie import TransformedMovie, MovieTransformation
 from transformations import basic, border, combine, denoise, noise, threshold as thresh
 from repositories import images_repo as img_repo
 from repositories import movies_repo as mov_repo
-from transformations.input.lin_range import LinRange
+from transformations.data_models import LinRange
 from . import interface
 from models.image import Image, ImageTransformation, strip_extension, get_extension, ImageFormat, normalize, MAX_COLOR, \
     ImageChannelTransformation

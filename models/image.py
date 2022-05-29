@@ -60,7 +60,7 @@ class ImageChannelTransformation:
         self.overlay            = overlay if overlay is not None else []
 
     def __str__(self) -> str:
-        return ''.join((f'\t\t{k}: {v}\n' for k, v in self.public_results.items()))
+        return ''.join((f'\t\t{k}: {str_round(v)}\n' for k, v in self.public_results.items()))
 
     def all_results(self) -> Dict[str, Any]:
         return {**self.public_results, **self.internal_results}
@@ -82,15 +82,17 @@ class ImageTransformation:
         ret = f'Transformation {self.name}:\n'
 
         if self.major_inputs:
-            ret += '\tMayor inputs:\n' + ''.join((f'\t\t{k}: {v}\n' for k, v in self.major_inputs.items()))
+            ret += '\tMayor inputs:\n' + ''.join((f'\t\t{k}: {str_round(v)}\n' for k, v in self.major_inputs.items())) + '\n'
 
         channel_tr_len = len(self.channel_transformations)
         if channel_tr_len == 0:
             pass  # No hacemos nada
         elif channel_tr_len == 1:
-            ret += '\tResults:\n' + str(self.channel_transformations[0]) + '\n'
+            ret += '\tResults:\n' + str(self.channel_transformations[0]) + '\n\n'
         elif channel_tr_len == 3:
-            ret += ''.join((f'\tChannel {i} Results:\n{str(channel_tr)}\n' for i, channel_tr in enumerate(self.channel_transformations)))
+            ret += ''.join((f'\tChannel {i} Results:\n{channel_tr}\n' for i, channel_tr in enumerate(self.channel_transformations)))
+        else:
+            ret += 'More than 3 channels (???)'
 
         return ret
 
@@ -192,6 +194,9 @@ class Image:
     def channels(self) -> int:
         shape = self.data.shape
         return 1 if len(shape) == 2 else shape[2]
+
+    def is_multi_channel(self) -> bool:
+        return self.channels > 1
 
     @property
     def movie_frame(self) -> bool:

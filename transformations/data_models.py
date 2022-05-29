@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Union
 
 import numpy as np
 
@@ -19,3 +20,12 @@ class LinRange:
 
     def to_linspace(self) -> np.ndarray:
         return np.linspace(self.start, self.end, self.count)
+
+
+@dataclass
+class Measurement:
+    magnitude:  Union[int, float]
+    unit:       str
+
+    def __str__(self):
+        return f'{self.magnitude} {self.unit}'

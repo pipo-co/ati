@@ -6,9 +6,10 @@ from typing import List, Optional, Tuple, Union
 import numpy as np
 from models.draw_cmd import CircleDrawCmd, LineDrawCmd, ScatterDrawCmd
 from models.image import MAX_COLOR, Image, ImageChannelTransformation, normalize
+from transformations.data_models import Measurement
 
 from transformations.np_utils import gauss_kernel, index_matrix
-from .input.lin_range import LinRange
+from .data_models import LinRange
 from .sliding import PaddingStrategy, sliding_window, weighted_sum
 
 RHO_RESOLUTION = 125
@@ -528,8 +529,8 @@ def active_outline_base(image: Image, threshold: float, p1: Tuple[int, int], p2:
     img, tr = active_outline_all_channels(image.data, threshold, sigma, lout, lin, phi)
 
     duration = time.thread_time_ns() // 1000000 - start_time
-    tr.public_results['duration']           = duration
-    tr.public_results['total_duration']     = duration
+    tr.public_results['duration']           = Measurement(duration, 'ms')
+    tr.public_results['total_duration']     = Measurement(duration, 'ms')
 
     return img, [tr]
 
@@ -541,8 +542,8 @@ def active_outline_inductive(frame: int, prev: Image, current: Image) -> Tuple[n
     img, tr = active_outline_all_channels(current.data, *inputs)
 
     duration = time.thread_time_ns() // 1000000 - start_time
-    tr.public_results['duration']           = duration
-    tr.public_results['total_duration']     = prev_results['total_duration'] + duration
-    tr.public_results['mean_duration']      = round(tr.public_results['total_duration'] / (frame + 1), 2)
+    tr.public_results['duration']           = Measurement(duration, 'ms')
+    tr.public_results['total_duration']     = Measurement(prev_results['total_duration'].magnitude + duration, 'ms')
+    tr.public_results['mean_duration']      = Measurement(round(tr.public_results['total_duration'].magnitude / (frame + 1), 2), 'ms')
 
     return img, [tr]
