@@ -48,7 +48,7 @@ def sift_channel(channel1: np.ndarray, channel2: np.ndarray, features: int, laye
         'Total Keypoints'   : len(kp1),
         'Total Matches'     : len(matches),
         'Match Percentage'  : Measurement(100 * round(len(matches) / len(kp1), 3), '%'),
-        'Best Match Distance': round(matches[0].distance, 2)
+        'Best Match Distance': round(matches[0].distance, 2) if len(matches) > 0 else '-'
     }, {})
 
     return new_data, result
