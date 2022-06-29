@@ -74,6 +74,7 @@ def build_transformations_menu(image_name: str) -> None:
             build_tr_menu_item(TR_BORDER_CANNY,             build_border_canny_dialog,              image_name)
             build_tr_menu_item(TR_BORDER_HARRIS,            build_border_harris_dialog,             image_name)
             build_tr_menu_item(TR_BORDER_ACTIVE_OUTLINE,    build_border_active_outline_dialog,     image_name)
+            build_tr_menu_item(TR_BORDER_MULTIPLE_ACTIVE_OUTLINE,    build_border_multiple_active_outline_dialog,     image_name)
         with dpg.menu(label='Combine'):
             build_tr_menu_item(TR_COMBINE_ADD,              build_combine_add_dialog,               image_name)
             build_tr_menu_item(TR_COMBINE_SUB,              build_combine_sub_dialog,               image_name)
@@ -951,11 +952,34 @@ def tr_border_active_outline_base(image_name: str) -> Image:
     # 2. Procesamos
     new_data, channels_tr = border.active_outline_base(image, *rect_selection)
     # 3. Creamos Imagen
-    return image.transform(new_name, new_data, ImageTransformation(TR_BORDER_CANNY, {'rect_selection': rect_selection}, {}, channels_tr))
+    return image.transform(new_name, new_data, ImageTransformation(TR_BORDER_ACTIVE_OUTLINE, {'rect_selection': rect_selection}, {}, channels_tr))
 
 def tr_border_active_outline_inductive(new_name: str, frame: int, prev: Image, current: Image) -> Image:
     new_data, channels_tr = border.active_outline_inductive(frame, prev, current)
     return current.transform(new_name, new_data, ImageTransformation(TR_BORDER_ACTIVE_OUTLINE, {}, {}, channels_tr))
+
+TR_BORDER_MULTIPLE_ACTIVE_OUTLINE: str = 'multiple_active_outline'
+@render_error
+def build_border_multiple_active_outline_dialog(image_name: str) -> None:
+    with build_tr_dialog(TR_BORDER_MULTIPLE_ACTIVE_OUTLINE):
+        build_tr_name_input(TR_BORDER_MULTIPLE_ACTIVE_OUTLINE, image_name)
+        build_tr_dialog_end_buttons(TR_BORDER_MULTIPLE_ACTIVE_OUTLINE, image_name, tr_border_multiple_active_outline_base, tr_border_multiple_active_outline_inductive)
+
+def tr_border_multiple_active_outline_base(image_name: str) -> Image:
+    # 1. Obtenemos inputs
+    image           = img_repo.get_image(image_name)
+    new_name        = get_tr_name_value(image)
+    rect_selection  = interface.get_image_window_rect_selection(f'image_window_{image_name}')
+    if rect_selection is None:
+        raise ValueError('An initial bounding box on first frame is required in Active Outline')
+    # 2. Procesamos
+    new_data, channels_tr = border.multiple_active_outline_base(image, *rect_selection)
+    # 3. Creamos Imagen
+    return image.transform(new_name, new_data, ImageTransformation(TR_BORDER_MULTIPLE_ACTIVE_OUTLINE, {'rect_selection': rect_selection}, {}, channels_tr))
+
+def tr_border_multiple_active_outline_inductive(new_name: str, frame: int, prev: Image, current: Image) -> Image:
+    new_data, channels_tr = border.multiple_active_outline_inductive(frame, prev, current)
+    return current.transform(new_name, new_data, ImageTransformation(TR_BORDER_MULTIPLE_ACTIVE_OUTLINE, {}, {}, channels_tr))
 
 ########################################################
 # ********************* Combine ********************** #

@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Union
+from typing import List, Tuple, Union
 
 import numpy as np
 
@@ -29,3 +29,10 @@ class Measurement:
 
     def __str__(self):
         return f'{self.magnitude} {self.unit}'
+
+@dataclass
+class ActiveOutlineMetrics:
+    lout = List[Tuple[int, int]]
+    lin  = List[Tuple[int, int]]
+    sigma = Union[float, np.ndarray]
+    

@@ -11,7 +11,7 @@ from transformations.data_models import Measurement
 from transformations.denoise import gauss_channel
 
 from transformations.np_utils import gauss_kernel, index_matrix
-from .data_models import LinRange
+from .data_models import ActiveOutlineMetrics, LinRange
 from .sliding import PaddingStrategy, sliding_window, weighted_sum
 
 RHO_RESOLUTION = 125
@@ -406,6 +406,32 @@ def get_initial_boundaries(x: Tuple[int, int], y: Tuple[int, int], shape:Tuple[i
     phi[y[0] + 2:y[1] - 1, x[0] + 2:x[1] - 1] = -3
     return lout, lin, phi
 
+def get_multiple_initial_boundaries(x: Tuple[int, int], y: Tuple[int, int], a: Tuple[int, int], b: Tuple[int, int], shape:Tuple[int, int]) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]], List[Tuple[int, int]], List[Tuple[int, int]], np.ndarray]:
+    first_lout = get_rectangular_boundary(x, y)
+    first_lin = get_rectangular_boundary((x[0] + 1, x[1] - 1), (y[0] + 1, y[1] - 1))
+    second_lout = get_rectangular_boundary(a, b)
+    second_lin = get_rectangular_boundary((a[0] + 1, a[1] - 1), (b[0] + 1, b[1] - 1))
+
+    phi = np.full(shape, 3)
+    phi[y[0]:y[1] + 1, x[0]:x[1] + 1] = 1
+    phi[y[0] + 1:y[1], x[0] + 1:x[1]] = -1
+    phi[y[0] + 2:y[1] - 1, x[0] + 2:x[1] - 1] = -3
+    phi[b[0]:b[1] + 1, a[0]:a[1] + 1] = 1
+    phi[b[0] + 1:b[1], a[0] + 1:a[1]] = -1
+    phi[b[0] + 2:b[1] - 1, a[0] + 2:a[1] - 1] = -3
+
+    psi = np.zeros(shape, 0)
+    psi[y[0] + 1:y[1], x[0] + 1:x[1]] = 1
+    psi[b[0] + 1:b[1], a[0] + 1:a[1]] = 2
+
+    return first_lout, first_lin, second_lout, second_lin, phi, psi
+
+
+def single_switch_io(point: Tuple[int, int], ap_list: List[Tuple[int, int]], del_list: List[Tuple[int, int]], phi: np.ndarray, indices_4: np.ndarray, new_value: int, target: int) -> Boolean:
+  ap_list.append(point)
+  phi[point[0], point[1]] = new_value
+  new_phi_values(phi, del_list, indices_4, point, target, -new_value)
+
 def in_bounds(x: int, y: int, shape: Tuple[int, int]):
     return 0 <= x < shape[1] and 0 <= y < shape[0]
 
@@ -418,7 +444,6 @@ def new_phi_values(phi: np.ndarray, add_collection: List[Tuple[int, int]], indic
           add_collection.append((phi_y, phi_x))
           phi[phi_y, phi_x] = new_value
       
-
 def check_value_state(point: Tuple[int, int], phi: np.ndarray, remove_collection: List[Tuple[int, int]], indices: np.ndarray, condition, new_value: int):
     neighbor: bool = True
     for index in indices:
@@ -448,7 +473,7 @@ def check_surroundings(point: Tuple[int, int], phi: np.ndarray, indices: np.ndar
             neighbor = False
     return neighbor
 
-def active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.ndarray], sigma_obj: Union[float, np.ndarray],  lout: List[Tuple[int, int]], lin: List[Tuple[int, int]], phi: np.ndarray) -> Tuple[np.ndarray, ImageChannelTransformation]:
+def active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.ndarray], , phi: np.ndarray, switch) -> Tuple[np.ndarray, ImageChannelTransformation]:
     flag = True
     indices_4 = np.array([[-1, 0], [0, -1], [1, 0], [0, 1]])
     new_lout = []
@@ -458,9 +483,7 @@ def active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.nda
       for point in lout:
         norm_lout = np.log(np.linalg.norm(sigma_bg - image[point[0], point[1]]) / np.linalg.norm(sigma_obj - image[point[0], point[1]]))
         if np.average(norm_lout) > 0:
-          lin.append(point)
-          phi[point[0], point[1]] = -1
-          new_phi_values(phi, lout, indices_4, point, 3, 1)
+          switch(point, lin, lout, phi, indices_4, -1, 3)
           flag = True
         else:
           new_lout.append(point)
@@ -478,9 +501,7 @@ def active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.nda
       for point in lin:
         norm_lin = np.log(np.linalg.norm(sigma_bg - image[point[0], point[1]])/np.linalg.norm(sigma_obj - image[point[0], point[1]]))
         if np.average(norm_lin) < 0:
-          lout.append(point)
-          phi[point[0], point[1]] = 1
-          new_phi_values(phi, lin, indices_4, point, -3, -1)
+          switch(point, lout, lin, phi, indices_4, 1, -3)
           flag = True
         else:
           new_lin.append(point)
@@ -501,9 +522,7 @@ def active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.nda
 
       for point in lout:
         if gaussian_phi[point[0], point[1]] < 0:
-            lin.append(point)
-            phi[point[0], point[1]] = -1
-            new_phi_values(phi, lout, indices_4, point, 3, 1)
+            switch(point, lin, lout, phi, indices_4, -1, 3)
         else:
           new_lout.append(point)
       lout = new_lout
@@ -519,9 +538,7 @@ def active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.nda
               
       for point in lin:
         if gaussian_phi[point[0], point[1]] > 0:
-          lout.append(point)
-          phi[point[0], point[1]] = 1
-          new_phi_values(phi, lin, indices_4, point, -3, -1)
+          switch(point, lout, lin, phi, indices_4, 1, -3)
           flag = True
         else:
           new_lin.append(point)
@@ -537,8 +554,103 @@ def active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.nda
       new_lout = []
 
     overlay = [ScatterDrawCmd(np.asarray(lout), (255, 0, 0)), ScatterDrawCmd(np.asarray(lin), (255, 0, 255))]
-    return image, ImageChannelTransformation({'sigma_bg': sigma_bg, 'sigma_obj': sigma_obj}, {'phi': phi, 'lout': lout, 'lin': lin}, overlay)
+    return image, ImageChannelTransformation({'sigma_bg': sigma_bg, 'sigma_obj': sigma_obj}, {'phi': phi, 'lout': lout, 'lin': lin, 'switch': switch}, overlay)
 
+# def multiple_active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.ndarray], active_outline_metrics: List[ActiveOutlineMetrics], phi: np.ndarray, psi: np.ndarray) -> Tuple[np.ndarray, ImageChannelTransformation]:
+
+#     for section in active_outline_metrics:
+#       flag = True
+#     indices_4 = np.array([[-1, 0], [0, -1], [1, 0], [0, 1]])
+#     new_lout = []
+#     new_lin = []
+#     while flag:
+#       flag = False
+#       for point in lout:
+#         norm_lout = np.log(np.linalg.norm(sigma_bg - image[point[0], point[1]]) / np.linalg.norm(sigma_obj - image[point[0], point[1]]))
+#         if np.average(norm_lout) > 0:
+#           lin.append(point)
+#           phi[point[0], point[1]] = -1
+#           new_phi_values(phi, lout, indices_4, point, 3, 1)
+#           flag = True
+#         else:
+#           new_lout.append(point)
+#       lout = new_lout
+#       new_lout = []
+
+#       for point in lin:
+#         if check_surroundings(point, phi, indices_4, is_interior):
+#           phi[point[0], point[1]] = -3
+#         else:
+#           new_lin.append(point)
+#       lin = new_lin
+#       new_lin = []
+      
+#       for point in lin:
+#         norm_lin = np.log(np.linalg.norm(sigma_bg - image[point[0], point[1]])/np.linalg.norm(sigma_obj - image[point[0], point[1]]))
+#         if np.average(norm_lin) < 0:
+#           lout.append(point)
+#           phi[point[0], point[1]] = 1
+#           new_phi_values(phi, lin, indices_4, point, -3, -1)
+#           flag = True
+#         else:
+#           new_lin.append(point)
+#       lin = new_lin
+#       new_lin = []
+
+#       for point in lout:
+#         if check_surroundings(point, phi, indices_4, is_exterior):
+#           phi[point[0], point[1]] = 3
+#         else:
+#           new_lout.append(point)
+#       lout = new_lout
+#       new_lout = []
+
+#     for i in range(5):
+    
+#       gaussian_phi = gauss_channel(phi, 1, PaddingStrategy.EDGE)
+
+#       for point in lout:
+#         if gaussian_phi[point[0], point[1]] < 0:
+#             lin.append(point)
+#             phi[point[0], point[1]] = -1
+#             new_phi_values(phi, lout, indices_4, point, 3, 1)
+#         else:
+#           new_lout.append(point)
+#       lout = new_lout
+#       new_lout = []
+
+#       for point in lin:
+#         if check_surroundings(point, phi, indices_4, is_interior):
+#           phi[point[0], point[1]] = -3
+#         else:
+#           new_lin.append(point)
+#       lin = new_lin
+#       new_lin = []
+              
+#       for point in lin:
+#         if gaussian_phi[point[0], point[1]] > 0:
+#           lout.append(point)
+#           phi[point[0], point[1]] = 1
+#           new_phi_values(phi, lin, indices_4, point, -3, -1)
+#           flag = True
+#         else:
+#           new_lin.append(point)
+#       lin = new_lin
+#       new_lin = []
+
+#       for point in lout:
+#         if check_surroundings(point, phi, indices_4, is_exterior):
+#           phi[point[0], point[1]] = 3
+#         else:
+#           new_lout.append(point)
+#       lout = new_lout
+#       new_lout = []
+
+
+    
+#     overlay = [ScatterDrawCmd(np.asarray(first_lout), (255, 0, 0)), ScatterDrawCmd(np.asarray(first_lin), (255, 255, 0)),
+#      ScatterDrawCmd(np.asarray(second_lout), (0, 0, 255)), ScatterDrawCmd(np.asarray(second_lin), (0, 255, 255))]
+#     return image, ImageChannelTransformation({'sigma_bg': sigma_bg, 'sigma_first_obj': sigma_first_obj, 'sigma_second_obj': sigma_second_obj}, {'phi': phi, 'lout': lout, 'lin': lin}, overlay)
 
 # ******************* Export Functions ********************** #
 
@@ -583,23 +695,23 @@ def active_outline_base(image: Image, p1: Tuple[int, int], p2: Tuple[int, int]) 
     y = p1[0], p2[0]
     first_sum = calculate_sum(image, x, y)
     first_region_size = (x[1] - x[0]) * (y[1] - y[0])
-    sigma_obj = calculate_sum(image, x, y) / first_region_size
+    sigma_obj = first_sum / first_region_size
 
     img_shape = np.size(image.data)
     sigma_bg = (np.sum(image.data, axis=(0,1)) - first_sum) / (img_shape - first_region_size) 
    
     lout, lin, phi = get_initial_boundaries(x, y, image.data.shape[:2])
-    img, tr = active_outline_all_channels(image.data, sigma_bg, sigma_obj, lout, lin, phi)
+    img, tr = active_outline_all_channels(image.data, sigma_bg, sigma_obj, lout, lin, phi, single_switch_io)
 
     duration = time.thread_time_ns() // 1000000 - start_time
     tr.public_results['duration']           = Measurement(duration, 'ms')
     tr.public_results['total_duration']     = Measurement(duration, 'ms')
 
     return img, [tr]
-  
+
 def active_outline_inductive(frame: int, prev: Image, current: Image) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
     prev_results = prev.last_transformation.channel_transformations[0].all_results()
-    inputs = map(prev_results.get, ('sigma_bg', 'sigma_obj', 'lout', 'lin', 'phi'))
+    inputs = map(prev_results.get, ('sigma_bg', 'sigma_obj', 'lout', 'lin', 'phi', 'switch'))
 
     start_time = time.thread_time_ns() // 1000000
     img, tr = active_outline_all_channels(current.data, *inputs)
@@ -609,4 +721,39 @@ def active_outline_inductive(frame: int, prev: Image, current: Image) -> Tuple[n
     tr.public_results['total_duration']     = Measurement(prev_results['total_duration'].magnitude + duration, 'ms')
     tr.public_results['mean_duration']      = Measurement(round(tr.public_results['total_duration'].magnitude / (frame + 1), 2), 'ms')
 
-    return img, [tr]
+    return img, [tr]  
+
+# def multiple_active_outline_base(image: Image, p1: Tuple[int, int], p2: Tuple[int, int], p3: Tuple[int, int], p4: Tuple[int, int]) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+#     start_time = time.thread_time_ns() // 1000000
+
+#     x = p1[1], p2[1]
+#     y = p1[0], p2[0]
+
+#     a = p3[1], p4[1]
+#     b = p3[0], p4[0]
+
+#     first_sum = calculate_sum(image, x, y)
+#     first_region_size = (x[1] - x[0]) * (y[1] - y[0])
+#     sigma_first_obj = first_sum / first_region_size
+#     second_sum = calculate_sum(image, x, y)
+#     second_region_size = (a[1] - a[0]) * (b[1] - b[0])
+#     sigma_second_obj = second_sum / first_region_size
+
+
+#     img_shape = np.size(image.data)
+#     sigma_bg = (np.sum(image.data, axis=(0,1)) - first_sum - second_sum) / (img_shape - first_region_size - second_region_size) 
+   
+#     first_lout, first_lin, second_lout, second_lin, phi, psi = get_multiple_initial_boundaries(x, y, a, b, image.data.shape[:2])
+
+#     first_metrics: ActiveOutlineMetrics = ActiveOutlineMetrics(first_lout, first_lin, sigma_first_obj)
+#     second_metrics: ActiveOutlineMetrics = ActiveOutlineMetrics(second_lout, second_lin, sigma_second_obj)
+
+#     img, tr = multiple_active_outline_all_channels(image.data, sigma_bg, [first_metrics, second_metrics], phi, psi)
+
+#     duration = time.thread_time_ns() // 1000000 - start_time
+#     tr.public_results['duration']           = Measurement(duration, 'ms')
+#     tr.public_results['total_duration']     = Measurement(duration, 'ms')
+
+#     return img, [tr]
+  
+
