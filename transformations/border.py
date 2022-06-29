@@ -527,7 +527,7 @@ def active_outline_base(image: Image, p1: Tuple[int, int], p2: Tuple[int, int]) 
   
 def active_outline_inductive(frame: int, prev: Image, current: Image) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
     prev_results = prev.last_transformation.channel_transformations[0].all_results()
-    inputs = map(prev_results.get, ('threshold', 'sigma', 'lout', 'lin', 'phi'))
+    inputs = map(prev_results.get, ('sigma_bg', 'sigma_obj', 'lout', 'lin', 'phi'))
 
     start_time = time.thread_time_ns() // 1000000
     img, tr = active_outline_all_channels(current.data, *inputs)
