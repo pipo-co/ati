@@ -939,19 +939,17 @@ TR_BORDER_ACTIVE_OUTLINE: str = 'active_outline'
 def build_border_active_outline_dialog(image_name: str) -> None:
     with build_tr_dialog(TR_BORDER_ACTIVE_OUTLINE):
         build_tr_name_input(TR_BORDER_ACTIVE_OUTLINE, image_name)
-        build_tr_value_float_selector('t', 15, 50, default_value=30, tag='threshold')
         build_tr_dialog_end_buttons(TR_BORDER_ACTIVE_OUTLINE, image_name, tr_border_active_outline_base, tr_border_active_outline_inductive)
 
 def tr_border_active_outline_base(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image           = img_repo.get_image(image_name)
     new_name        = get_tr_name_value(image)
-    threshold       = get_tr_float_value('threshold')
     rect_selection  = interface.get_image_window_rect_selection(f'image_window_{image_name}')
     if rect_selection is None:
         raise ValueError('An initial bounding box on first frame is required in Active Outline')
     # 2. Procesamos
-    new_data, channels_tr = border.active_outline_base(image, threshold, *rect_selection)
+    new_data, channels_tr = border.active_outline_base(image, *rect_selection)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, ImageTransformation(TR_BORDER_CANNY, {'rect_selection': rect_selection}, {}, channels_tr))
 

@@ -389,11 +389,11 @@ def get_rectangular_boundary(x: Tuple[int, int], y: Tuple[int, int]) -> List[Tup
 
     return boundary
 
-def calculate_sigma(image: Image, x: Tuple[int, int], y: Tuple[int, int]) -> Union[float, np.ndarray]:
+def calculate_sum(image: Image, x: Tuple[int, int], y: Tuple[int, int]) -> Union[float, np.ndarray]:
     if image.channels > 1:
-        return np.mean(np.array(image.data[y[0]:y[1], x[0]:x[1]]).reshape((-1, 3)), axis=0)
+        return np.sum(np.array(image.data[y[0]:y[1], x[0]:x[1]]).reshape((-1, 3)), axis=0)
     else:
-        return np.mean(image.data[y[0]:y[1], x[0]:x[1]])
+        return np.sum(image.data[y[0]:y[1], x[0]:x[1]])
 
 def get_initial_boundaries(x: Tuple[int, int], y: Tuple[int, int], shape:Tuple[int, int]) -> Tuple[List[Tuple[int, int]], List[Tuple[int, int]], np.ndarray]:
     lout = get_rectangular_boundary(x, y)
@@ -438,7 +438,7 @@ def is_lout(val: int) -> bool:
 def is_lin(val: int) -> bool:
     return val < 0
 
-def active_outline_all_channels(image: np.ndarray, threshold: float, sigma: Union[float, np.ndarray], lout: List[Tuple[int, int]], lin: List[Tuple[int, int]], phi: np.ndarray) -> Tuple[np.ndarray, ImageChannelTransformation]:
+def active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.ndarray], sigma_obj: Union[float, np.ndarray],  lout: List[Tuple[int, int]], lin: List[Tuple[int, int]], phi: np.ndarray) -> Tuple[np.ndarray, ImageChannelTransformation]:
     flag = True
     indices_4 = np.array([[-1, 0], [0, -1], [1, 0], [0, 1]])
     remove_lout = []
@@ -446,16 +446,16 @@ def active_outline_all_channels(image: np.ndarray, threshold: float, sigma: Unio
     while flag:
         flag = False
         for point in lout:
-            norm_lout = np.linalg.norm(sigma - image[point[0], point[1]])
-            if norm_lout < threshold:
+            norm_lout = np.log(np.linalg.norm(sigma_bg - image[point[0], point[1]]) / np.linalg.norm(sigma_obj - image[point[0], point[1]]))
+            if np.average(norm_lout) > 0:
                 lin.append(point)
                 remove_lout.append(point)
                 phi[point[0], point[1]] = -1
                 new_phi_values(phi, lout, remove_lin, indices_4, point, 3, 1, is_lout)
                 flag = True
         for point in lin:
-            norm_lin = np.linalg.norm(sigma - image[point[0], point[1]])
-            if norm_lin >= threshold:
+            norm_lin = np.log(np.linalg.norm(sigma_bg - image[point[0], point[1]])/np.linalg.norm(sigma_obj - image[point[0], point[1]]))
+            if np.average(norm_lin) < 0:
                 lout.append(point)
                 remove_lin.append(point)
                 phi[point[0], point[1]] = 1
@@ -465,7 +465,7 @@ def active_outline_all_channels(image: np.ndarray, threshold: float, sigma: Unio
         lin = list(set(lin) - set(remove_lin))
 
     overlay = [ScatterDrawCmd(np.asarray(lout), (255, 0, 0)), ScatterDrawCmd(np.asarray(lin), (255, 0, 255))]
-    return image, ImageChannelTransformation({'threshold': threshold, 'sigma': sigma}, {'phi': phi, 'lout': lout, 'lin': lin}, overlay)
+    return image, ImageChannelTransformation({'sigma_bg': sigma_bg, 'sigma_obj': sigma_obj}, {'phi': phi, 'lout': lout, 'lin': lin}, overlay)
 
 
 # ******************* Export Functions ********************** #
@@ -504,21 +504,27 @@ def canny(image: Image, t1: int, t2: int, padding_str: PaddingStrategy) -> Tuple
 def harris(image: Image, sigma: int, k: float, threshold: float, function: HarrisR, padding_str: PaddingStrategy, with_border: bool) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
     return image.apply_over_channels(harris_channel, sigma=sigma, k=k, threshold=threshold, r_function=function, padding_str=padding_str, with_border=with_border)
 
-def active_outline_base(image: Image, threshold: float, p1: Tuple[int, int], p2: Tuple[int, int]) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+def active_outline_base(image: Image, p1: Tuple[int, int], p2: Tuple[int, int]) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
     start_time = time.thread_time_ns() // 1000000
 
     x = p1[1], p2[1]
     y = p1[0], p2[0]
-    sigma = calculate_sigma(image, x, y)
+    first_sum = calculate_sum(image, x, y)
+    first_region_size = (x[1] - x[0]) * (y[1] - y[0])
+    sigma_obj = calculate_sum(image, x, y) / first_region_size
+
+    img_shape = np.size(image.data)
+    sigma_bg = (np.sum(image.data, axis=(0,1)) - first_sum) / (img_shape - first_region_size) 
+   
     lout, lin, phi = get_initial_boundaries(x, y, image.data.shape[:2])
-    img, tr = active_outline_all_channels(image.data, threshold, sigma, lout, lin, phi)
+    img, tr = active_outline_all_channels(image.data, sigma_bg, sigma_obj, lout, lin, phi)
 
     duration = time.thread_time_ns() // 1000000 - start_time
     tr.public_results['duration']           = Measurement(duration, 'ms')
     tr.public_results['total_duration']     = Measurement(duration, 'ms')
 
     return img, [tr]
-
+  
 def active_outline_inductive(frame: int, prev: Image, current: Image) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
     prev_results = prev.last_transformation.channel_transformations[0].all_results()
     inputs = map(prev_results.get, ('threshold', 'sigma', 'lout', 'lin', 'phi'))
