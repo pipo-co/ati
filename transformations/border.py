@@ -7,6 +7,7 @@ import numpy as np
 from models.draw_cmd import CircleDrawCmd, LineDrawCmd, ScatterDrawCmd
 from models.image import MAX_COLOR, Image, ImageChannelTransformation, normalize
 from transformations.data_models import Measurement
+from transformations.denoise import gauss_channel
 
 from transformations.np_utils import gauss_kernel, index_matrix
 from .data_models import LinRange
@@ -463,6 +464,29 @@ def active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.nda
                 flag = True
         lout = list(set(lout) - set(remove_lout))
         lin = list(set(lin) - set(remove_lin))
+
+    flag = True
+    remove_lout = []
+    remove_lin = []
+
+    for i in range(5):
+    
+      gaussian_phi = gauss_channel(phi, 1, PaddingStrategy.EDGE)
+
+      for point in lout:
+          if gaussian_phi[point[0], point[1]] < 0:
+              lin.append(point)
+              remove_lout.append(point)
+              phi[point[0], point[1]] = -1
+              new_phi_values(phi, lout, remove_lin, indices_4, point, 3, 1, is_lout)
+      for point in lin:
+          if gaussian_phi[point[0], point[1]] > 0:
+              lout.append(point)
+              remove_lin.append(point)
+              phi[point[0], point[1]] = 1
+              new_phi_values(phi, lin, remove_lout, indices_4, point, -3, -1, is_lin)
+      lout = list(set(lout) - set(remove_lout))
+      lin = list(set(lin) - set(remove_lin))
 
     overlay = [ScatterDrawCmd(np.asarray(lout), (255, 0, 0)), ScatterDrawCmd(np.asarray(lin), (255, 0, 255))]
     return image, ImageChannelTransformation({'sigma_bg': sigma_bg, 'sigma_obj': sigma_obj}, {'phi': phi, 'lout': lout, 'lin': lin}, overlay)
