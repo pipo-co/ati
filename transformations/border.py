@@ -2,6 +2,7 @@ import functools
 import time
 from enum import Enum
 from typing import List, Optional, Tuple, Union
+from xmlrpc.client import Boolean
 
 import numpy as np
 from models.draw_cmd import CircleDrawCmd, LineDrawCmd, ScatterDrawCmd
@@ -408,85 +409,132 @@ def get_initial_boundaries(x: Tuple[int, int], y: Tuple[int, int], shape:Tuple[i
 def in_bounds(x: int, y: int, shape: Tuple[int, int]):
     return 0 <= x < shape[1] and 0 <= y < shape[0]
 
-def new_phi_values(phi: np.ndarray, add_collection: List[Tuple[int, int]], remove_collection: List[Tuple[int, int]],  indices: np.ndarray, point: Tuple[int, int], target: int, new_value: int, delete_condition):
+def new_phi_values(phi: np.ndarray, add_collection: List[Tuple[int, int]], indices: np.ndarray, point: Tuple[int, int], target: int, new_value: int):
     for index in indices:
-        phi_y = point[0] + index[0]
-        phi_x = point[1] + index[1]
-        if in_bounds(phi_x, phi_y, phi.shape):
-            if phi[phi_y, phi_x] == target:
-                add_collection.append((phi_y, phi_x))
-                phi[phi_y, phi_x] = new_value
-            # Si eras el borde contrario a mi tengo que revisar si seguis siendo valido como dicho borde
-            elif phi[phi_y, phi_x] == -new_value:
-                check_value_state((phi_y, phi_x), phi, remove_collection, indices, delete_condition, -target)
+      phi_y = point[0] + index[0]
+      phi_x = point[1] + index[1]
+      if in_bounds(phi_x, phi_y, phi.shape):
+        if phi[phi_y, phi_x] == target:
+          add_collection.append((phi_y, phi_x))
+          phi[phi_y, phi_x] = new_value
+      
 
 def check_value_state(point: Tuple[int, int], phi: np.ndarray, remove_collection: List[Tuple[int, int]], indices: np.ndarray, condition, new_value: int):
+    neighbor: bool = True
+    for index in indices:
+      phi_y = point[0] + index[0]
+      phi_x = point[1] + index[1]
+      # Tengo que tener a alguien que sea mi borde contrario al lado
+      if in_bounds(phi_x, phi_y, phi.shape) and condition(phi[phi_y, phi_x]):
+          neighbor = False
+    # si tengo algun vecino que es mi borde contrario y algun vecino que es mi contorno contrario no te borro
+    if neighbor:
+      phi[point[0], point[1]] = new_value
+      remove_collection.append((point[0], point[1]))
+
+def is_exterior(val: int) -> bool:
+    return val > 0
+
+def is_interior(val: int) -> bool:
+    return val < 0
+
+def check_surroundings(point: Tuple[int, int], phi: np.ndarray, indices: np.ndarray, condition) -> Boolean:
     neighbor: bool = True
     for index in indices:
         phi_y = point[0] + index[0]
         phi_x = point[1] + index[1]
         # Tengo que tener a alguien que sea mi borde contrario al lado
-        if in_bounds(phi_x, phi_y, phi.shape) and condition(phi[phi_y, phi_x]):
+        if in_bounds(phi_x, phi_y, phi.shape) and not condition(phi[phi_y, phi_x]):
             neighbor = False
-    # si tengo algun vecino que es mi borde contrario y algun vecino que es mi contorno contrario no te borro
-    if neighbor:
-        phi[point[0], point[1]] = new_value
-        remove_collection.append((point[0], point[1]))
-
-def is_lout(val: int) -> bool:
-    return val > 0
-
-def is_lin(val: int) -> bool:
-    return val < 0
+    return neighbor
 
 def active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.ndarray], sigma_obj: Union[float, np.ndarray],  lout: List[Tuple[int, int]], lin: List[Tuple[int, int]], phi: np.ndarray) -> Tuple[np.ndarray, ImageChannelTransformation]:
     flag = True
     indices_4 = np.array([[-1, 0], [0, -1], [1, 0], [0, 1]])
-    remove_lout = []
-    remove_lin = []
+    new_lout = []
+    new_lin = []
     while flag:
-        flag = False
-        for point in lout:
-            norm_lout = np.log(np.linalg.norm(sigma_bg - image[point[0], point[1]]) / np.linalg.norm(sigma_obj - image[point[0], point[1]]))
-            if np.average(norm_lout) > 0:
-                lin.append(point)
-                remove_lout.append(point)
-                phi[point[0], point[1]] = -1
-                new_phi_values(phi, lout, remove_lin, indices_4, point, 3, 1, is_lout)
-                flag = True
-        for point in lin:
-            norm_lin = np.log(np.linalg.norm(sigma_bg - image[point[0], point[1]])/np.linalg.norm(sigma_obj - image[point[0], point[1]]))
-            if np.average(norm_lin) < 0:
-                lout.append(point)
-                remove_lin.append(point)
-                phi[point[0], point[1]] = 1
-                new_phi_values(phi, lin, remove_lout, indices_4, point, -3, -1, is_lin)
-                flag = True
-        lout = list(set(lout) - set(remove_lout))
-        lin = list(set(lin) - set(remove_lin))
+      flag = False
+      for point in lout:
+        norm_lout = np.log(np.linalg.norm(sigma_bg - image[point[0], point[1]]) / np.linalg.norm(sigma_obj - image[point[0], point[1]]))
+        if np.average(norm_lout) > 0:
+          lin.append(point)
+          phi[point[0], point[1]] = -1
+          new_phi_values(phi, lout, indices_4, point, 3, 1)
+          flag = True
+        else:
+          new_lout.append(point)
+      lout = new_lout
+      new_lout = []
 
-    flag = True
-    remove_lout = []
-    remove_lin = []
+      for point in lin:
+        if check_surroundings(point, phi, indices_4, is_interior):
+          phi[point[0], point[1]] = -3
+        else:
+          new_lin.append(point)
+      lin = new_lin
+      new_lin = []
+      
+      for point in lin:
+        norm_lin = np.log(np.linalg.norm(sigma_bg - image[point[0], point[1]])/np.linalg.norm(sigma_obj - image[point[0], point[1]]))
+        if np.average(norm_lin) < 0:
+          lout.append(point)
+          phi[point[0], point[1]] = 1
+          new_phi_values(phi, lin, indices_4, point, -3, -1)
+          flag = True
+        else:
+          new_lin.append(point)
+      lin = new_lin
+      new_lin = []
+
+      for point in lout:
+        if check_surroundings(point, phi, indices_4, is_exterior):
+          phi[point[0], point[1]] = 3
+        else:
+          new_lout.append(point)
+      lout = new_lout
+      new_lout = []
 
     for i in range(5):
     
       gaussian_phi = gauss_channel(phi, 1, PaddingStrategy.EDGE)
 
       for point in lout:
-          if gaussian_phi[point[0], point[1]] < 0:
-              lin.append(point)
-              remove_lout.append(point)
-              phi[point[0], point[1]] = -1
-              new_phi_values(phi, lout, remove_lin, indices_4, point, 3, 1, is_lout)
+        if gaussian_phi[point[0], point[1]] < 0:
+            lin.append(point)
+            phi[point[0], point[1]] = -1
+            new_phi_values(phi, lout, indices_4, point, 3, 1)
+        else:
+          new_lout.append(point)
+      lout = new_lout
+      new_lout = []
+
       for point in lin:
-          if gaussian_phi[point[0], point[1]] > 0:
-              lout.append(point)
-              remove_lin.append(point)
-              phi[point[0], point[1]] = 1
-              new_phi_values(phi, lin, remove_lout, indices_4, point, -3, -1, is_lin)
-      lout = list(set(lout) - set(remove_lout))
-      lin = list(set(lin) - set(remove_lin))
+        if check_surroundings(point, phi, indices_4, is_interior):
+          phi[point[0], point[1]] = -3
+        else:
+          new_lin.append(point)
+      lin = new_lin
+      new_lin = []
+              
+      for point in lin:
+        if gaussian_phi[point[0], point[1]] > 0:
+          lout.append(point)
+          phi[point[0], point[1]] = 1
+          new_phi_values(phi, lin, indices_4, point, -3, -1)
+          flag = True
+        else:
+          new_lin.append(point)
+      lin = new_lin
+      new_lin = []
+
+      for point in lout:
+        if check_surroundings(point, phi, indices_4, is_exterior):
+          phi[point[0], point[1]] = 3
+        else:
+          new_lout.append(point)
+      lout = new_lout
+      new_lout = []
 
     overlay = [ScatterDrawCmd(np.asarray(lout), (255, 0, 0)), ScatterDrawCmd(np.asarray(lin), (255, 0, 255))]
     return image, ImageChannelTransformation({'sigma_bg': sigma_bg, 'sigma_obj': sigma_obj}, {'phi': phi, 'lout': lout, 'lin': lin}, overlay)
