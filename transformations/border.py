@@ -1,11 +1,12 @@
 import functools
+from re import L
 import time
 from enum import Enum
 from typing import List, Optional, Tuple, Union
 from xmlrpc.client import Boolean
 
 import numpy as np
-from models.draw_cmd import CircleDrawCmd, LineDrawCmd, ScatterDrawCmd
+from models.draw_cmd import CircleDrawCmd, DrawCmd, LineDrawCmd, ScatterDrawCmd
 from models.image import MAX_COLOR, Image, ImageChannelTransformation, normalize
 from transformations.data_models import Measurement
 from transformations.denoise import gauss_channel
@@ -473,184 +474,108 @@ def check_surroundings(point: Tuple[int, int], phi: np.ndarray, indices: np.ndar
             neighbor = False
     return neighbor
 
-def active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.ndarray], , phi: np.ndarray, switch) -> Tuple[np.ndarray, ImageChannelTransformation]:
+def update_img_channel_transformation(img_channel_transformation: ImageChannelTransformation, active_outline_metrics: List[ActiveOutlineMetrics], phi: np.ndarray, switch, psi:np.ndarray, overlay: List[DrawCmd]):
+    img_channel_transformation.internal_results['active_outline_metrics'] = active_outline_metrics
+    img_channel_transformation.internal_results['phi'] = phi
+    img_channel_transformation.internal_results['psi'] = psi
+    img_channel_transformation.internal_results['switch'] = switch
+    img_channel_transformation.overlay = overlay
+  
+
+def active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.ndarray], active_outline_metrics: List[ActiveOutlineMetrics], phi: np.ndarray, switch, psi:np.ndarray = None) -> Tuple[np.ndarray, ImageChannelTransformation]:
     flag = True
     indices_4 = np.array([[-1, 0], [0, -1], [1, 0], [0, 1]])
-    new_lout = []
-    new_lin = []
-    while flag:
-      flag = False
-      for point in lout:
-        norm_lout = np.log(np.linalg.norm(sigma_bg - image[point[0], point[1]]) / np.linalg.norm(sigma_obj - image[point[0], point[1]]))
-        if np.average(norm_lout) > 0:
-          switch(point, lin, lout, phi, indices_4, -1, 3)
-          flag = True
-        else:
-          new_lout.append(point)
-      lout = new_lout
+    overlay = []
+    img_channel_transformation = ImageChannelTransformation({'sigma_bg': sigma_bg}, {}, None)
+    for section in active_outline_metrics:
       new_lout = []
-
-      for point in lin:
-        if check_surroundings(point, phi, indices_4, is_interior):
-          phi[point[0], point[1]] = -3
-        else:
-          new_lin.append(point)
-      lin = new_lin
       new_lin = []
-      
-      for point in lin:
-        norm_lin = np.log(np.linalg.norm(sigma_bg - image[point[0], point[1]])/np.linalg.norm(sigma_obj - image[point[0], point[1]]))
-        if np.average(norm_lin) < 0:
-          switch(point, lout, lin, phi, indices_4, 1, -3)
-          flag = True
-        else:
-          new_lin.append(point)
-      lin = new_lin
-      new_lin = []
-
-      for point in lout:
-        if check_surroundings(point, phi, indices_4, is_exterior):
-          phi[point[0], point[1]] = 3
-        else:
-          new_lout.append(point)
-      lout = new_lout
-      new_lout = []
-
-    for i in range(5):
-    
-      gaussian_phi = gauss_channel(phi, 1, PaddingStrategy.EDGE)
-
-      for point in lout:
-        if gaussian_phi[point[0], point[1]] < 0:
+      lout = section.lout
+      lin = section.lin
+      sigma_obj = section.sigma
+      while flag:
+        flag = False
+        for point in lout:
+          norm_lout = np.log(np.linalg.norm(sigma_bg - image[point[0], point[1]]) / np.linalg.norm(sigma_obj - image[point[0], point[1]]))
+          if np.average(norm_lout) > 0:
             switch(point, lin, lout, phi, indices_4, -1, 3)
-        else:
-          new_lout.append(point)
-      lout = new_lout
-      new_lout = []
+            flag = True
+          else:
+            new_lout.append(point)
+        lout = new_lout
+        new_lout = []
 
-      for point in lin:
-        if check_surroundings(point, phi, indices_4, is_interior):
-          phi[point[0], point[1]] = -3
-        else:
-          new_lin.append(point)
-      lin = new_lin
-      new_lin = []
-              
-      for point in lin:
-        if gaussian_phi[point[0], point[1]] > 0:
-          switch(point, lout, lin, phi, indices_4, 1, -3)
-          flag = True
-        else:
-          new_lin.append(point)
-      lin = new_lin
-      new_lin = []
+        for point in lin:
+          if check_surroundings(point, phi, indices_4, is_interior):
+            phi[point[0], point[1]] = -3
+          else:
+            new_lin.append(point)
+        lin = new_lin
+        new_lin = []
+        
+        for point in lin:
+          norm_lin = np.log(np.linalg.norm(sigma_bg - image[point[0], point[1]])/np.linalg.norm(sigma_obj - image[point[0], point[1]]))
+          if np.average(norm_lin) < 0:
+            switch(point, lout, lin, phi, indices_4, 1, -3)
+            flag = True
+          else:
+            new_lin.append(point)
+        lin = new_lin
+        new_lin = []
 
-      for point in lout:
-        if check_surroundings(point, phi, indices_4, is_exterior):
-          phi[point[0], point[1]] = 3
-        else:
-          new_lout.append(point)
-      lout = new_lout
-      new_lout = []
+        for point in lout:
+          if check_surroundings(point, phi, indices_4, is_exterior):
+            phi[point[0], point[1]] = 3
+          else:
+            new_lout.append(point)
+        lout = new_lout
+        new_lout = []
 
-    overlay = [ScatterDrawCmd(np.asarray(lout), (255, 0, 0)), ScatterDrawCmd(np.asarray(lin), (255, 0, 255))]
-    return image, ImageChannelTransformation({'sigma_bg': sigma_bg, 'sigma_obj': sigma_obj}, {'phi': phi, 'lout': lout, 'lin': lin, 'switch': switch}, overlay)
-
-# def multiple_active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.ndarray], active_outline_metrics: List[ActiveOutlineMetrics], phi: np.ndarray, psi: np.ndarray) -> Tuple[np.ndarray, ImageChannelTransformation]:
-
-#     for section in active_outline_metrics:
-#       flag = True
-#     indices_4 = np.array([[-1, 0], [0, -1], [1, 0], [0, 1]])
-#     new_lout = []
-#     new_lin = []
-#     while flag:
-#       flag = False
-#       for point in lout:
-#         norm_lout = np.log(np.linalg.norm(sigma_bg - image[point[0], point[1]]) / np.linalg.norm(sigma_obj - image[point[0], point[1]]))
-#         if np.average(norm_lout) > 0:
-#           lin.append(point)
-#           phi[point[0], point[1]] = -1
-#           new_phi_values(phi, lout, indices_4, point, 3, 1)
-#           flag = True
-#         else:
-#           new_lout.append(point)
-#       lout = new_lout
-#       new_lout = []
-
-#       for point in lin:
-#         if check_surroundings(point, phi, indices_4, is_interior):
-#           phi[point[0], point[1]] = -3
-#         else:
-#           new_lin.append(point)
-#       lin = new_lin
-#       new_lin = []
+      for i in range(5):
       
-#       for point in lin:
-#         norm_lin = np.log(np.linalg.norm(sigma_bg - image[point[0], point[1]])/np.linalg.norm(sigma_obj - image[point[0], point[1]]))
-#         if np.average(norm_lin) < 0:
-#           lout.append(point)
-#           phi[point[0], point[1]] = 1
-#           new_phi_values(phi, lin, indices_4, point, -3, -1)
-#           flag = True
-#         else:
-#           new_lin.append(point)
-#       lin = new_lin
-#       new_lin = []
+        gaussian_phi = gauss_channel(phi, 1, PaddingStrategy.EDGE)
 
-#       for point in lout:
-#         if check_surroundings(point, phi, indices_4, is_exterior):
-#           phi[point[0], point[1]] = 3
-#         else:
-#           new_lout.append(point)
-#       lout = new_lout
-#       new_lout = []
+        for point in lout:
+          if gaussian_phi[point[0], point[1]] < 0:
+              switch(point, lin, lout, phi, indices_4, -1, 3)
+          else:
+            new_lout.append(point)
+        lout = new_lout
+        new_lout = []
 
-#     for i in range(5):
-    
-#       gaussian_phi = gauss_channel(phi, 1, PaddingStrategy.EDGE)
+        for point in lin:
+          if check_surroundings(point, phi, indices_4, is_interior):
+            phi[point[0], point[1]] = -3
+          else:
+            new_lin.append(point)
+        lin = new_lin
+        new_lin = []
+                
+        for point in lin:
+          if gaussian_phi[point[0], point[1]] > 0:
+            switch(point, lout, lin, phi, indices_4, 1, -3)
+            flag = True
+          else:
+            new_lin.append(point)
+        lin = new_lin
+        new_lin = []
 
-#       for point in lout:
-#         if gaussian_phi[point[0], point[1]] < 0:
-#             lin.append(point)
-#             phi[point[0], point[1]] = -1
-#             new_phi_values(phi, lout, indices_4, point, 3, 1)
-#         else:
-#           new_lout.append(point)
-#       lout = new_lout
-#       new_lout = []
+        for point in lout:
+          if check_surroundings(point, phi, indices_4, is_exterior):
+            phi[point[0], point[1]] = 3
+          else:
+            new_lout.append(point)
+        lout = new_lout
+        new_lout = []
 
-#       for point in lin:
-#         if check_surroundings(point, phi, indices_4, is_interior):
-#           phi[point[0], point[1]] = -3
-#         else:
-#           new_lin.append(point)
-#       lin = new_lin
-#       new_lin = []
-              
-#       for point in lin:
-#         if gaussian_phi[point[0], point[1]] > 0:
-#           lout.append(point)
-#           phi[point[0], point[1]] = 1
-#           new_phi_values(phi, lin, indices_4, point, -3, -1)
-#           flag = True
-#         else:
-#           new_lin.append(point)
-#       lin = new_lin
-#       new_lin = []
+      overlay.append(ScatterDrawCmd(np.asarray(lout), section.lout_color))
+      overlay.append(ScatterDrawCmd(np.asarray(lin), section.lin_color))
+      section.lin = lin
+      section.lout = lout
 
-#       for point in lout:
-#         if check_surroundings(point, phi, indices_4, is_exterior):
-#           phi[point[0], point[1]] = 3
-#         else:
-#           new_lout.append(point)
-#       lout = new_lout
-#       new_lout = []
-
-
-    
-#     overlay = [ScatterDrawCmd(np.asarray(first_lout), (255, 0, 0)), ScatterDrawCmd(np.asarray(first_lin), (255, 255, 0)),
-#      ScatterDrawCmd(np.asarray(second_lout), (0, 0, 255)), ScatterDrawCmd(np.asarray(second_lin), (0, 255, 255))]
-#     return image, ImageChannelTransformation({'sigma_bg': sigma_bg, 'sigma_first_obj': sigma_first_obj, 'sigma_second_obj': sigma_second_obj}, {'phi': phi, 'lout': lout, 'lin': lin}, overlay)
+    update_img_channel_transformation(img_channel_transformation, active_outline_metrics, phi, switch, psi, overlay)
+  
+    return image, img_channel_transformation
 
 # ******************* Export Functions ********************** #
 
@@ -701,7 +626,9 @@ def active_outline_base(image: Image, p1: Tuple[int, int], p2: Tuple[int, int]) 
     sigma_bg = (np.sum(image.data, axis=(0,1)) - first_sum) / (img_shape - first_region_size) 
    
     lout, lin, phi = get_initial_boundaries(x, y, image.data.shape[:2])
-    img, tr = active_outline_all_channels(image.data, sigma_bg, sigma_obj, lout, lin, phi, single_switch_io)
+
+    first_section = ActiveOutlineMetrics(lout, lin, sigma_obj, (255, 0, 0), (255, 255, 0))
+    img, tr = active_outline_all_channels(image.data, sigma_bg, [first_section], phi, single_switch_io)
 
     duration = time.thread_time_ns() // 1000000 - start_time
     tr.public_results['duration']           = Measurement(duration, 'ms')
@@ -711,7 +638,7 @@ def active_outline_base(image: Image, p1: Tuple[int, int], p2: Tuple[int, int]) 
 
 def active_outline_inductive(frame: int, prev: Image, current: Image) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
     prev_results = prev.last_transformation.channel_transformations[0].all_results()
-    inputs = map(prev_results.get, ('sigma_bg', 'sigma_obj', 'lout', 'lin', 'phi', 'switch'))
+    inputs = map(prev_results.get, ('sigma_bg', 'active_outline_metrics', 'phi', 'switch', 'psi'))
 
     start_time = time.thread_time_ns() // 1000000
     img, tr = active_outline_all_channels(current.data, *inputs)
