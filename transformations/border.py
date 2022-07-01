@@ -424,6 +424,7 @@ def single_switch_io(point: Tuple[int, int], ap_list: List[Tuple[int, int]], del
   ap_list.append(point)
   phi[point[0], point[1]] = new_value
   new_phi_values(phi, del_list, indices_4, point, target, -new_value)
+  return True
 
 def topology_number(pos_list: List[Tuple[int, int]], max_distance: int) -> int:
   topology_number = 0
@@ -477,11 +478,13 @@ def calculate_tr(point: Tuple[int, int], psi: np.ndarray) -> int:
 
 def multiple_switch_io(point: Tuple[int, int], ap_list: List[Tuple[int, int]], del_list: List[Tuple[int, int]], phi: np.ndarray, indices_4: np.ndarray, new_value: int, target: int, section_number: int, psi: np.ndarray) -> Boolean:
   tr = calculate_tr(point, psi)
-  if tr == 1:
+  if section_number == 0 or tr == 1:
     ap_list.append(point)
     phi[point[0], point[1]] = new_value
     new_phi_values(phi, del_list, indices_4, point, target, -new_value)
-    psi[point[0], point[1]] = tr
+    psi[point[0], point[1]] = section_number
+    return True
+  return False
 
 def in_bounds(x: int, y: int, shape: Tuple[int, int]):
     return 0 <= x < shape[1] and 0 <= y < shape[0]
@@ -550,8 +553,7 @@ def active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.nda
           diff_bg = np.linalg.norm(sigma_bg - image[point[0], point[1]]) 
           diff_obj = np.linalg.norm(sigma_obj - image[point[0], point[1]])
           norm_lout = np.log(diff_bg/diff_obj)
-          if np.average(norm_lout) > 0:
-            switch(point, lin, lout, phi, indices_4, -1, 3, section_number, psi)
+          if np.average(norm_lout) > 0 and switch(point, lin, lout, phi, indices_4, -1, 3, section_number, psi):
             flag = True
           else:
             new_lout.append(point)
@@ -568,9 +570,9 @@ def active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.nda
         
         for point in lin:
           norm_lin = np.log(np.linalg.norm(sigma_bg - image[point[0], point[1]])/np.linalg.norm(sigma_obj - image[point[0], point[1]]))
-          if np.average(norm_lin) < 0:
-            switch(point, lout, lin, phi, indices_4, 1, -3, 0, psi)
+          if np.average(norm_lin) < 0 : 
             flag = True
+            switch(point, lout, lin, phi, indices_4, 1, -3, 0, psi)
           else:
             new_lin.append(point)
         lin = new_lin
@@ -579,8 +581,6 @@ def active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.nda
         for point in lout:
           if check_surroundings(point, phi, indices_4, is_exterior):
             phi[point[0], point[1]] = 3
-            if psi is not None:
-              psi[point[0], point[1]] = 0
           else:
             new_lout.append(point)
         lout = new_lout
@@ -591,8 +591,8 @@ def active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.nda
         gaussian_phi = gauss_channel(phi, 1, PaddingStrategy.EDGE)
 
         for point in lout:
-          if gaussian_phi[point[0], point[1]] < 0:
-              switch(point, lin, lout, phi, indices_4, -1, 3, section_number, psi)
+          if gaussian_phi[point[0], point[1]] < 0 and switch(point, lin, lout, phi, indices_4, -1, 3, section_number, psi):
+              pass
           else:
             new_lout.append(point)
         lout = new_lout
@@ -609,7 +609,6 @@ def active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.nda
         for point in lin:
           if gaussian_phi[point[0], point[1]] > 0:
             switch(point, lout, lin, phi, indices_4, 1, -3, 0, psi)
-            flag = True
           else:
             new_lin.append(point)
         lin = new_lin
@@ -618,8 +617,6 @@ def active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.nda
         for point in lout:
           if check_surroundings(point, phi, indices_4, is_exterior):
             phi[point[0], point[1]] = 3
-            if psi is not None:
-              psi[point[0], point[1]] = 0
           else:
             new_lout.append(point)
         lout = new_lout
