@@ -32,13 +32,15 @@ class Measurement:
 
 @dataclass
 class ActiveOutlineMetrics:
+    section_number = int
     lout = List[Tuple[int, int]]
     lin  = List[Tuple[int, int]]
     sigma = Union[float, np.ndarray]
     lout_color = Tuple[int, int, int]
     lin_color = Tuple[int, int, int]
 
-    def __init__(self, lout: List[Tuple[int, int]], lin: List[Tuple[int, int]], sigma: Union[float, np.ndarray], lout_color: Tuple[int, int, int], lin_color: Tuple[int, int, int]):
+    def __init__(self, section_number: int, lout: List[Tuple[int, int]], lin: List[Tuple[int, int]], sigma: Union[float, np.ndarray], lout_color: Tuple[int, int, int], lin_color: Tuple[int, int, int]):
+        self.section_number     = section_number
         self.lout     = lout
         self.lin   = lin
         self.sigma   = sigma
