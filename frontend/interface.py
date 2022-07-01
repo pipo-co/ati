@@ -53,7 +53,8 @@ def render_image_window(image_name: str, movie: Optional[Movie] = None, pos: Uni
                 build_transformations_menu(image_name)
                 dpg.add_menu_item(label='Histograms', tag=f'hists_toggle_{image_name}', user_data=image_name, callback=lambda s, ad, ud: toggle_hists(ud))
                 dpg.add_menu_item(label='History', tag=f'history_toggle_{image_name}', user_data=image_name, callback=lambda s, ad, ud: toggle_history(ud))
-                dpg.add_menu_item(label='SS', tag=f'push_selection_button_{image_name}', user_data=image_name, callback=lambda s, ad, ud: push_selection(ud))
+                dpg.add_menu_item(label='Ss', tag=f'push_selection_button_{image_name}', user_data=image_name, callback=lambda s, ad, ud: push_selection(ud))
+                dpg.add_menu_item(label='Ds', tag=f'pop_selection_button_{image_name}', user_data=image_name, callback=lambda s, ad, ud: pop_selection(ud))
 
             with dpg.group(horizontal=True):
                 with dpg.group():
@@ -229,15 +230,30 @@ def push_selection(image_name: str) -> None:
         return None
 
     selections.append((p1_ret, p2_ret))
-    selection = f'image_{image_name}_selection'
+    current_selection = f'image_{image_name}_selection'
+    saved_selection = f'saved_selection_{p1_ret}_{p2_ret}'
 
-    if dpg.does_item_exist(selection):
-        dpg.delete_item(selection)
+    if dpg.does_item_exist(current_selection):
+        dpg.delete_item(current_selection)
 
-    dpg.draw_rectangle(p1, p2, parent=window, tag=f'saved_selection_{p1_ret}_{p2_ret}', color=(0xCC, 0x00, 0x66, 200))
+    dpg.draw_rectangle(p1, p2, parent=window, tag=saved_selection, color=(0x00, 0xCC, 0x00, 200))
     
     user_data.pop('init_draw', None)
     user_data.pop('end_draw', None)
+
+@render_error
+def pop_selection(image_name: str) -> None:
+    window = f'image_window_{image_name}'
+    user_data = dpg.get_item_user_data(window)
+    selections = user_data['selections']
+
+    p1_ret, p2_ret = selections.pop()
+    
+    saved_selection = f'saved_selection_{p1_ret}_{p2_ret}'
+
+    if dpg.does_item_exist(saved_selection):
+        dpg.delete_item(saved_selection)
+    
 
 
 def build_hist_themes():
