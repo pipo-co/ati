@@ -539,16 +539,17 @@ def update_img_channel_transformation(img_channel_transformation: ImageChannelTr
   
 
 def active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.ndarray], active_outline_metrics: List[ActiveOutlineMetrics], phi: np.ndarray, switch, psi:np.ndarray = None) -> Tuple[np.ndarray, ImageChannelTransformation]:
-    flag = True
     indices_4 = np.array([[-1, 0], [0, -1], [1, 0], [0, 1]])
     overlay = []
     img_channel_transformation = ImageChannelTransformation({'sigma_bg': sigma_bg}, {}, None)
+    
     for section in active_outline_metrics:
       new_lout = []
       new_lin = []
       lout = section.lout
       lin = section.lin
       sigma_obj = section.sigma
+      flag = True
       while flag:
         flag = False
         for point in lout:
@@ -726,12 +727,12 @@ def multiple_active_outline_base(image: Image, selection: List[Tuple[Tuple[int, 
     first_region_size = (x[1] - x[0]) * (y[1] - y[0])
     sigma_first_obj = first_sum / first_region_size
   
-    second_sum = calculate_sum(image, x, y)
+    second_sum = calculate_sum(image, a, b)
     second_region_size = (a[1] - a[0]) * (b[1] - b[0])
-    sigma_second_obj = second_sum / first_region_size
- 
+    sigma_second_obj = second_sum / second_region_size
 
-    img_shape = np.size(image.data)
+
+    img_shape = np.size(image.data) / image.channels
     sigma_bg = (np.sum(image.data, axis=(0,1)) - first_sum - second_sum) / (img_shape - first_region_size - second_region_size) 
    
     first_lout, first_lin, second_lout, second_lin, phi, psi = get_multiple_initial_boundaries(x, y, a, b, image.data.shape[:2])
