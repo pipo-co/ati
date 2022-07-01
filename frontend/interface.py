@@ -47,12 +47,13 @@ def render_image_window(image_name: str, movie: Optional[Movie] = None, pos: Uni
         hists = image.get_histograms()
 
         window_label = f'Movie: {movie.name} - Frame {movie.current_frame}' if movie else image_name
-        with dpg.window(label=window_label, tag=f'image_window_{image_name}', width=width, height=height, pos=pos, no_scrollbar=False, no_resize=True, user_data={'image_name': image_name, 'hists_toggled': False, 'history_toggled': False}, on_close=lambda: dpg.delete_item(window)) as window:
+        with dpg.window(label=window_label, tag=f'image_window_{image_name}', width=width, height=height, pos=pos, no_scrollbar=False, no_resize=True, user_data={'image_name': image_name, 'hists_toggled': False, 'history_toggled': False, 'selections': []}, on_close=lambda: dpg.delete_item(window)) as window:
             with dpg.menu_bar():
                 dpg.add_menu_item(label='Save', user_data=image_name, callback=lambda s, ad, ud: trigger_save_image_dialog(ud))
                 build_transformations_menu(image_name)
                 dpg.add_menu_item(label='Histograms', tag=f'hists_toggle_{image_name}', user_data=image_name, callback=lambda s, ad, ud: toggle_hists(ud))
                 dpg.add_menu_item(label='History', tag=f'history_toggle_{image_name}', user_data=image_name, callback=lambda s, ad, ud: toggle_history(ud))
+                dpg.add_menu_item(label='SS', tag=f'push_selection_button_{image_name}', user_data=image_name, callback=lambda s, ad, ud: push_selection(ud))
 
             with dpg.group(horizontal=True):
                 with dpg.group():
@@ -209,6 +210,35 @@ def toggle_history(image_name: str) -> None:
     user_data['history_toggled'] = not history_toggled
     if not history_toggled and user_data['hists_toggled']:
         toggle_hists(image_name)
+
+@render_error
+def push_selection(image_name: str) -> None:
+    window = f'image_window_{image_name}'
+    user_data = dpg.get_item_user_data(window)
+    selections = user_data['selections']
+    if 'init_draw' not in user_data or 'end_draw' not in user_data:
+        return None
+
+    p1, p2 = user_data['init_draw'], user_data['end_draw']
+
+    p1_ret = int(min(p2[1], p1[1])), int(min(p2[0], p1[0]))
+    p2_ret = int(max(p2[1], p1[1])), int(max(p2[0], p1[0]))
+
+    if p1_ret[0] == p2_ret[0] or p1_ret[1] == p2_ret[1]:
+        # Son colineares => No hay rectangulo
+        return None
+
+    selections.append((p1_ret, p2_ret))
+    selection = f'image_{image_name}_selection'
+
+    if dpg.does_item_exist(selection):
+        dpg.delete_item(selection)
+
+    dpg.draw_rectangle(p1, p2, parent=window, tag=f'saved_selection_{p1_ret}_{p2_ret}', color=(0xCC, 0x00, 0x66, 200))
+    
+    user_data.pop('init_draw', None)
+    user_data.pop('end_draw', None)
+
 
 def build_hist_themes():
     with dpg.theme(tag='red_hist_theme'):
@@ -422,21 +452,9 @@ def close_all_windows() -> None:
 
 # Retorna los puntos ya normalizados
 # Formato: (y, x); (up_left, down_right); Acordarse: left < right, up < down
-def get_image_window_rect_selection(window: Union[str, int]) -> Optional[Tuple[Tuple[int, int], Tuple[int, int]]]:
-    usr_data = dpg.get_item_user_data(window)
-    if 'init_draw' not in usr_data or 'end_draw' not in usr_data:
-        return None
-
-    p1, p2 = usr_data['init_draw'], usr_data['end_draw']
-
-    p1_ret = int(min(p2[1], p1[1])), int(min(p2[0], p1[0]))
-    p2_ret = int(max(p2[1], p1[1])), int(max(p2[0], p1[0]))
-
-    if p1_ret[0] == p2_ret[0] or p1_ret[1] == p2_ret[1]:
-        # Son colineares => No hay rectangulo
-        return None
-
-    return p1_ret, p2_ret
+def get_image_window_rect_selections(window: Union[str, int]) -> Optional[Tuple[Tuple[int, int], Tuple[int, int]]]:
+    user_data = dpg.get_item_user_data(window)
+    return user_data['selections']
 
 
 def build_image_handler_registry() -> None:
@@ -497,7 +515,14 @@ def build_image_handler_registry() -> None:
 
         usr_data = dpg.get_item_user_data(window)
         image_name: str = usr_data['image_name']
-        usr_data['init_draw'] = get_pixel_pos_in_image(window, image_name) if ('init_draw' not in usr_data or 'end_draw' in usr_data) else usr_data['init_draw']
+        pixel_pos = get_pixel_pos_in_image(window, image_name)
+
+        if pixel_pos[0] < 0 or pixel_pos[1] < 0:
+          return
+
+        usr_data['init_draw'] = pixel_pos if ('init_draw' not in usr_data or 'end_draw' in usr_data) else usr_data['init_draw']
+
+        # print(usr_data['init_draw'])
         usr_data.pop('end_draw', None)
         dpg.set_item_user_data(window, usr_data)
 

@@ -946,11 +946,11 @@ def tr_border_active_outline_base(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image           = img_repo.get_image(image_name)
     new_name        = get_tr_name_value(image)
-    rect_selection  = interface.get_image_window_rect_selection(f'image_window_{image_name}')
+    rect_selection  = interface.get_image_window_rect_selections(f'image_window_{image_name}')
     if rect_selection is None:
         raise ValueError('An initial bounding box on first frame is required in Active Outline')
     # 2. Procesamos
-    new_data, channels_tr = border.active_outline_base(image, *rect_selection)
+    new_data, channels_tr = border.active_outline_base(image, rect_selection)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, ImageTransformation(TR_BORDER_ACTIVE_OUTLINE, {'rect_selection': rect_selection}, {}, channels_tr))
 
@@ -969,16 +969,16 @@ def tr_border_multiple_active_outline_base(image_name: str) -> Image:
     # 1. Obtenemos inputs
     image           = img_repo.get_image(image_name)
     new_name        = get_tr_name_value(image)
-    rect_selection  = interface.get_image_window_rect_selection(f'image_window_{image_name}')
+    rect_selection  = interface.get_image_window_rect_selections(f'image_window_{image_name}')
     if rect_selection is None:
         raise ValueError('An initial bounding box on first frame is required in Active Outline')
     # 2. Procesamos
-    new_data, channels_tr = border.multiple_active_outline_base(image, *rect_selection)
+    new_data, channels_tr = border.multiple_active_outline_base(image, rect_selection)
     # 3. Creamos Imagen
     return image.transform(new_name, new_data, ImageTransformation(TR_BORDER_MULTIPLE_ACTIVE_OUTLINE, {'rect_selection': rect_selection}, {}, channels_tr))
 
 def tr_border_multiple_active_outline_inductive(new_name: str, frame: int, prev: Image, current: Image) -> Image:
-    new_data, channels_tr = border.multiple_active_outline_inductive(frame, prev, current)
+    new_data, channels_tr = border.active_outline_inductive(frame, prev, current)
     return current.transform(new_name, new_data, ImageTransformation(TR_BORDER_MULTIPLE_ACTIVE_OUTLINE, {}, {}, channels_tr))
 
 ########################################################
