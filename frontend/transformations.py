@@ -148,7 +148,7 @@ def unique_name(base_name: str, ext: str = '') -> str:
     if not img_repo.contains_image(base_name + ext) and not mov_repo.contains_movie(base_name):
         return base_name
     for i in itertools.count(start=2):
-        name = f'{base_name}_{i}'
+        name = f'{base_name}({i})'
         if not img_repo.contains_image(name + ext) and not mov_repo.contains_movie(name):
             return name
 
