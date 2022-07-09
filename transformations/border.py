@@ -532,6 +532,7 @@ def active_outline_all_channels(image: np.ndarray, threshold:float, sigma_bg: Un
     indices_4 = np.array([[-1, 0], [0, -1], [1, 0], [0, 1]])
     overlay = []
     img_channel_transformation = ImageChannelTransformation({'threshold': threshold, 'sigma_bg': sigma_bg}, {}, None)
+
     for section in active_outline_metrics:
         new_lout = []
         new_lin = []
@@ -545,8 +546,8 @@ def active_outline_all_channels(image: np.ndarray, threshold:float, sigma_bg: Un
             for point in lout:
                 diff_bg = np.linalg.norm(sigma_bg - image[point[0], point[1]])
                 diff_obj = np.linalg.norm(sigma_obj - image[point[0], point[1]])
-                norm_lout = np.log(diff_bg / diff_obj)
-                if np.all(norm_lout >= threshold) and switch(point, lin, lout, phi, indices_4, -1, 3, section_number, psi):
+              
+                if (diff_obj == 0 or np.log(diff_bg / diff_obj) >= threshold) and switch(point, lin, lout, phi, indices_4, -1, 3, section_number, psi):
                     flag = True
                 else:
                     new_lout.append(point)
@@ -562,12 +563,15 @@ def active_outline_all_channels(image: np.ndarray, threshold:float, sigma_bg: Un
             new_lin = []
 
             for point in lin:
-                norm_lin = np.log(np.linalg.norm(sigma_bg - image[point[0], point[1]]) / np.linalg.norm(sigma_obj - image[point[0], point[1]]))
-                if np.all(norm_lin < threshold):
+                diff_bg = np.linalg.norm(sigma_bg - image[point[0], point[1]])
+                diff_obj = np.linalg.norm(sigma_obj - image[point[0], point[1]])
+
+                if diff_obj == 0 or np.log(diff_bg / diff_obj) >= threshold:
+                    new_lin.append(point)
+                else:
                     flag = True
                     switch(point, lout, lin, phi, indices_4, 1, -3, 0, psi)
-                else:
-                    new_lin.append(point)
+                    
             lin = new_lin
             new_lin = []
 
@@ -583,7 +587,7 @@ def active_outline_all_channels(image: np.ndarray, threshold:float, sigma_bg: Un
             gaussian_phi = gauss_channel(phi, 1, PaddingStrategy.EDGE)
             for point in lout:
                 if gaussian_phi[point[0], point[1]] < 0 and switch(point, lin, lout, phi, indices_4, -1, 3,
-                                                                   section_number, psi):
+                                                                  section_number, psi):
                     pass
                 else:
                     new_lout.append(point)
@@ -614,10 +618,10 @@ def active_outline_all_channels(image: np.ndarray, threshold:float, sigma_bg: Un
             lout = new_lout
             new_lout = []
 
-        overlay.append(ScatterDrawCmd(np.asarray(lout), section.lout_color))
-        overlay.append(ScatterDrawCmd(np.asarray(lin), section.lin_color))
-        section.lin = lin
-        section.lout = lout
+            overlay.append(ScatterDrawCmd(np.asarray(lout), section.lout_color))
+            overlay.append(ScatterDrawCmd(np.asarray(lin), section.lin_color))
+            section.lin = lin
+            section.lout = lout
 
     update_img_channel_transformation(img_channel_transformation, active_outline_metrics, phi, switch, psi, overlay)
 
