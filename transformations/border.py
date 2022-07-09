@@ -1,5 +1,4 @@
 import functools
-from re import L
 import time
 from enum import Enum
 from typing import List, Optional, Tuple, Union
@@ -419,97 +418,93 @@ def update_regions(x: Tuple[int, int], y: Tuple[int, int], section_id: int, phi:
 
     return lout, lin
 
-
 def single_switch_io(point: Tuple[int, int], ap_list: List[Tuple[int, int]], del_list: List[Tuple[int, int]], phi: np.ndarray, indices_4: np.ndarray, new_value: int, target: int, section_number: int, psi: np.ndarray) -> Boolean:
-  ap_list.append(point)
-  phi[point[0], point[1]] = new_value
-  new_phi_values(phi, del_list, indices_4, point, target, -new_value)
-  return True
-
-def topology_number(pos_list: List[Tuple[int, int]], max_distance: int) -> int:
-  topology_number = 0
-  region = []
-  region_size = 0
-  next_candidates = []
-  while pos_list:
-    
-    region.append(pos_list.pop())
-    region_size = 1
-    while region:
-      p1 = region.pop()
-      for p2 in pos_list:
-        if ((p1[0] - p2[0])**2 + (p1[1] - p2[1])**2) < max_distance:
-          region.append(p2)
-          region_size += 1
-        else:
-          next_candidates.append(p2)
-
-      pos_list = next_candidates
-      next_candidates = []
-    if region_size > 1:
-      topology_number += 1
-  return topology_number
-
-def calculate_tr(point: Tuple[int, int], psi: np.ndarray) -> int:
-  indices_8 = np.array([[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]])
-  alpha = []
-  bg = []
-  obj = []
-  for index in indices_8:
-    pos_y = point[0] + index[0]
-    pos_x = point[1] + index[1]
-    if in_bounds(pos_x, pos_y, psi.shape):
-      psi_value = psi[pos_y, pos_x]
-      if psi_value != 0:
-        obj.append((pos_y, pos_x))
-        alpha.append(psi_value)
-      else: 
-        bg.append((pos_y, pos_x))
-
-  tobj = topology_number(obj, 2)
-  tbg = topology_number(bg, 4)
-  alpha = len(set(alpha))
-  max_value = max(tobj, tbg)
-  if max_value == 0:
-    return alpha
-  return min(alpha, max_value)
-
-  # Puede que sea el menor que no sea 0
-
-def multiple_switch_io(point: Tuple[int, int], ap_list: List[Tuple[int, int]], del_list: List[Tuple[int, int]], phi: np.ndarray, indices_4: np.ndarray, new_value: int, target: int, section_number: int, psi: np.ndarray) -> Boolean:
-  tr = calculate_tr(point, psi)
-  if section_number == 0 or tr == 1:
     ap_list.append(point)
     phi[point[0], point[1]] = new_value
     new_phi_values(phi, del_list, indices_4, point, target, -new_value)
-    psi[point[0], point[1]] = section_number
     return True
-  return False
+
+def topology_number(pos_list: List[Tuple[int, int]], max_distance: int) -> int:
+    ret = 0
+    region = []
+    next_candidates = []
+    while pos_list:
+        region.append(pos_list.pop())
+        region_size = 1
+        while region:
+            p1 = region.pop()
+            for p2 in pos_list:
+                if ((p1[0] - p2[0]) ** 2 + (p1[1] - p2[1]) ** 2) < max_distance:
+                    region.append(p2)
+                    region_size += 1
+                else:
+                    next_candidates.append(p2)
+
+            pos_list = next_candidates
+            next_candidates = []
+        if region_size > 1:
+            ret += 1
+    return ret
+
+def calculate_tr(point: Tuple[int, int], psi: np.ndarray) -> int:
+    indices_8 = np.array([[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]])
+    alpha = []
+    bg = []
+    obj = []
+    for index in indices_8:
+        pos_y = point[0] + index[0]
+        pos_x = point[1] + index[1]
+        if in_bounds(pos_x, pos_y, psi.shape):
+            psi_value = psi[pos_y, pos_x]
+            if psi_value != 0:
+                obj.append((pos_y, pos_x))
+                alpha.append(psi_value)
+            else:
+                bg.append((pos_y, pos_x))
+
+    tobj = topology_number(obj, 2)
+    tbg = topology_number(bg, 4)
+    alpha = len(set(alpha))
+    max_value = max(tobj, tbg)
+    if max_value == 0:
+        return alpha
+    # Puede que sea el menor que no sea 0
+    return min(alpha, max_value)
+
+def multiple_switch_io(point: Tuple[int, int], ap_list: List[Tuple[int, int]], del_list: List[Tuple[int, int]], phi: np.ndarray, indices_4: np.ndarray, new_value: int, target: int, section_number: int, psi: np.ndarray) -> Boolean:
+    tr = calculate_tr(point, psi)
+    if section_number == 0 or tr == 1:
+        ap_list.append(point)
+        phi[point[0], point[1]] = new_value
+        new_phi_values(phi, del_list, indices_4, point, target, -new_value)
+        psi[point[0], point[1]] = section_number
+        return True
+    return False
 
 def in_bounds(x: int, y: int, shape: Tuple[int, int]):
     return 0 <= x < shape[1] and 0 <= y < shape[0]
 
 def new_phi_values(phi: np.ndarray, add_collection: List[Tuple[int, int]], indices: np.ndarray, point: Tuple[int, int], target: int, new_value: int):
     for index in indices:
-      phi_y = point[0] + index[0]
-      phi_x = point[1] + index[1]
-      if in_bounds(phi_x, phi_y, phi.shape):
-        if phi[phi_y, phi_x] == target:
-          add_collection.append((phi_y, phi_x))
-          phi[phi_y, phi_x] = new_value
+        phi_y = point[0] + index[0]
+        phi_x = point[1] + index[1]
+        if in_bounds(phi_x, phi_y, phi.shape):
+            if phi[phi_y, phi_x] == target:
+                add_collection.append((phi_y, phi_x))
+                phi[phi_y, phi_x] = new_value
       
 def check_value_state(point: Tuple[int, int], phi: np.ndarray, remove_collection: List[Tuple[int, int]], indices: np.ndarray, condition, new_value: int):
     neighbor: bool = True
     for index in indices:
-      phi_y = point[0] + index[0]
-      phi_x = point[1] + index[1]
-      # Tengo que tener a alguien que sea mi borde contrario al lado
-      if in_bounds(phi_x, phi_y, phi.shape) and condition(phi[phi_y, phi_x]):
-          neighbor = False
+        phi_y = point[0] + index[0]
+        phi_x = point[1] + index[1]
+        # Tengo que tener a alguien que sea mi borde contrario al lado
+        if in_bounds(phi_x, phi_y, phi.shape) and condition(phi[phi_y, phi_x]):
+            neighbor = False
     # si tengo algun vecino que es mi borde contrario y algun vecino que es mi contorno contrario no te borro
     if neighbor:
-      phi[point[0], point[1]] = new_value
-      remove_collection.append((point[0], point[1]))
+        phi[point[0], point[1]] = new_value
+        remove_collection.append((point[0], point[1]))
 
 def is_exterior(val: int) -> bool:
     return val > 0
@@ -532,7 +527,6 @@ def update_img_channel_transformation(img_channel_transformation: ImageChannelTr
     img_channel_transformation.internal_results['psi'] = psi
     img_channel_transformation.internal_results['switch'] = switch
     img_channel_transformation.overlay = overlay
-  
 
 def active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.ndarray], active_outline_metrics: List[ActiveOutlineMetrics], phi: np.ndarray, switch, psi:np.ndarray = None) -> Tuple[np.ndarray, ImageChannelTransformation]:
     indices_4 = np.array([[-1, 0], [0, -1], [1, 0], [0, 1]])
@@ -540,92 +534,92 @@ def active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.nda
     img_channel_transformation = ImageChannelTransformation({'sigma_bg': sigma_bg}, {}, None)
     
     for section in active_outline_metrics:
-      new_lout = []
-      new_lin = []
-      lout = section.lout
-      lin = section.lin
-      sigma_obj = section.sigma
-      section_number = section.section_number
-      flag = True
-      while flag:
-        flag = False
-        for point in lout:
-          diff_bg = np.linalg.norm(sigma_bg - image[point[0], point[1]]) 
-          diff_obj = np.linalg.norm(sigma_obj - image[point[0], point[1]])
-          norm_lout = np.log(diff_bg/diff_obj)
-          if np.average(norm_lout) > 0 and switch(point, lin, lout, phi, indices_4, -1, 3, section_number, psi):
-            flag = True
-          else:
-            new_lout.append(point)
-        lout = new_lout
         new_lout = []
-
-        for point in lin:
-          if check_surroundings(point, phi, indices_4, is_interior):
-            phi[point[0], point[1]] = -3
-          else:
-            new_lin.append(point)
-        lin = new_lin
         new_lin = []
-        
-        for point in lin:
-          norm_lin = np.log(np.linalg.norm(sigma_bg - image[point[0], point[1]])/np.linalg.norm(sigma_obj - image[point[0], point[1]]))
-          if np.average(norm_lin) < 0 : 
-            flag = True
-            switch(point, lout, lin, phi, indices_4, 1, -3, 0, psi)
-          else:
-            new_lin.append(point)
-        lin = new_lin
-        new_lin = []
+        lout = section.lout
+        lin = section.lin
+        sigma_obj = section.sigma
+        section_number = section.section_number
+        flag = True
+        while flag:
+            flag = False
+            for point in lout:
+                diff_bg = np.linalg.norm(sigma_bg - image[point[0], point[1]])
+                diff_obj = np.linalg.norm(sigma_obj - image[point[0], point[1]])
+                norm_lout = np.log(diff_bg / diff_obj)
+                if np.average(norm_lout) > 0 and switch(point, lin, lout, phi, indices_4, -1, 3, section_number, psi):
+                    flag = True
+                else:
+                    new_lout.append(point)
+            lout = new_lout
+            new_lout = []
 
-        for point in lout:
-          if check_surroundings(point, phi, indices_4, is_exterior):
-            phi[point[0], point[1]] = 3
-          else:
-            new_lout.append(point)
-        lout = new_lout
-        new_lout = []
+            for point in lin:
+                if check_surroundings(point, phi, indices_4, is_interior):
+                    phi[point[0], point[1]] = -3
+                else:
+                    new_lin.append(point)
+            lin = new_lin
+            new_lin = []
 
-      for i in range(5):
-      
-        gaussian_phi = gauss_channel(phi, 1, PaddingStrategy.EDGE)
+            for point in lin:
+                norm_lin = np.log(np.linalg.norm(sigma_bg - image[point[0], point[1]]) / np.linalg.norm(
+                    sigma_obj - image[point[0], point[1]]))
+                if np.average(norm_lin) < 0:
+                    flag = True
+                    switch(point, lout, lin, phi, indices_4, 1, -3, 0, psi)
+                else:
+                    new_lin.append(point)
+            lin = new_lin
+            new_lin = []
 
-        for point in lout:
-          if gaussian_phi[point[0], point[1]] < 0 and switch(point, lin, lout, phi, indices_4, -1, 3, section_number, psi):
-              pass
-          else:
-            new_lout.append(point)
-        lout = new_lout
-        new_lout = []
+            for point in lout:
+                if check_surroundings(point, phi, indices_4, is_exterior):
+                    phi[point[0], point[1]] = 3
+                else:
+                    new_lout.append(point)
+            lout = new_lout
+            new_lout = []
 
-        for point in lin:
-          if check_surroundings(point, phi, indices_4, is_interior):
-            phi[point[0], point[1]] = -3
-          else:
-            new_lin.append(point)
-        lin = new_lin
-        new_lin = []
-                
-        for point in lin:
-          if gaussian_phi[point[0], point[1]] > 0:
-            switch(point, lout, lin, phi, indices_4, 1, -3, 0, psi)
-          else:
-            new_lin.append(point)
-        lin = new_lin
-        new_lin = []
+        for i in range(5):
+            gaussian_phi = gauss_channel(phi, 1, PaddingStrategy.EDGE)
+            for point in lout:
+                if gaussian_phi[point[0], point[1]] < 0 and switch(point, lin, lout, phi, indices_4, -1, 3,
+                                                                   section_number, psi):
+                    pass
+                else:
+                    new_lout.append(point)
+            lout = new_lout
+            new_lout = []
 
-        for point in lout:
-          if check_surroundings(point, phi, indices_4, is_exterior):
-            phi[point[0], point[1]] = 3
-          else:
-            new_lout.append(point)
-        lout = new_lout
-        new_lout = []
+            for point in lin:
+                if check_surroundings(point, phi, indices_4, is_interior):
+                    phi[point[0], point[1]] = -3
+                else:
+                    new_lin.append(point)
+            lin = new_lin
+            new_lin = []
 
-      overlay.append(ScatterDrawCmd(np.asarray(lout), section.lout_color))
-      overlay.append(ScatterDrawCmd(np.asarray(lin), section.lin_color))
-      section.lin = lin
-      section.lout = lout
+            for point in lin:
+                if gaussian_phi[point[0], point[1]] > 0:
+                    switch(point, lout, lin, phi, indices_4, 1, -3, 0, psi)
+                else:
+                    new_lin.append(point)
+            lin = new_lin
+            new_lin = []
+
+            for point in lout:
+                if check_surroundings(point, phi, indices_4, is_exterior):
+                    phi[point[0], point[1]] = 3
+                else:
+                    new_lout.append(point)
+            lout = new_lout
+            new_lout = []
+
+        overlay.append(ScatterDrawCmd(np.asarray(lout), section.lout_color))
+        overlay.append(ScatterDrawCmd(np.asarray(lin), section.lin_color))
+        section.lin = lin
+        section.lout = lout
 
     update_img_channel_transformation(img_channel_transformation, active_outline_metrics, phi, switch, psi, overlay)
   
@@ -717,21 +711,21 @@ def multiple_active_outline_base(image: Image, selections: List[Tuple[Tuple[int,
     metrics = []
 
     for i, point in enumerate(selections):
-      section_id = i + 1
-      p1 = point[0]
-      p2 = point[1]
+        section_id = i + 1
+        p1 = point[0]
+        p2 = point[1]
 
-      x = p1[1], p2[1]
-      y = p1[0], p2[0]
+        x = p1[1], p2[1]
+        y = p1[0], p2[0]
 
-      sum = calculate_sum(image, x, y)
-      region_size = (x[1] - x[0]) * (y[1] - y[0])
-      sigma_obj = sum / region_size
-      lout, lin = update_regions(x, y, section_id, phi, psi)
+        sum = calculate_sum(image, x, y)
+        region_size = (x[1] - x[0]) * (y[1] - y[0])
+        sigma_obj = sum / region_size
+        lout, lin = update_regions(x, y, section_id, phi, psi)
 
-      metrics.append(ActiveOutlineMetrics(section_id, lout, lin, sigma_obj, colours[i%3][0], colours[i%3][1]))
-      bg_sum = bg_sum - sum
-      bg_size = bg_size - region_size
+        metrics.append(ActiveOutlineMetrics(section_id, lout, lin, sigma_obj, colours[i % 3][0], colours[i % 3][1]))
+        bg_sum = bg_sum - sum
+        bg_size = bg_size - region_size
 
     sigma_bg = bg_sum / bg_size
 
