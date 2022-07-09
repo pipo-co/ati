@@ -659,45 +659,7 @@ def canny(image: Image, t1: int, t2: int, padding_str: PaddingStrategy) -> Tuple
 def harris(image: Image, sigma: int, k: float, threshold: float, function: HarrisR, padding_str: PaddingStrategy, with_border: bool) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
     return image.apply_over_channels(harris_channel, sigma=sigma, k=k, threshold=threshold, r_function=function, padding_str=padding_str, with_border=with_border)
 
-def active_outline_base(image: Image, selection: List[Tuple[Tuple[int, int], Tuple[int, int]]]) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
-    start_time = time.thread_time_ns() // 1000000
-
-    p1 = selection[0][0]
-    p2 = selection[0][1]
-    x = p1[1], p2[1]
-    y = p1[0], p2[0]
-    first_sum = calculate_sum(image, x, y)
-    first_region_size = (x[1] - x[0]) * (y[1] - y[0])
-    sigma_obj = first_sum / first_region_size
-
-    img_shape = np.size(image.data)
-    sigma_bg = (np.sum(image.data, axis=(0,1)) - first_sum) / (img_shape - first_region_size) 
-   
-    lout, lin, phi = get_initial_boundaries(x, y, image.data.shape[:2])
-
-    first_section = ActiveOutlineMetrics(1, lout, lin, sigma_obj, (255, 0, 0), (255, 255, 0))
-    img, tr = active_outline_all_channels(image.data, sigma_bg, [first_section], phi, single_switch_io)
-
-    duration = time.thread_time_ns() // 1000000 - start_time
-    tr.public_results['duration']           = Measurement(duration, 'ms')
-    tr.public_results['total_duration']     = Measurement(duration, 'ms')
-
-    return img, [tr]
-
-def active_outline_inductive(frame: int, prev: Image, current: Image) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
-    prev_results = prev.last_transformation.channel_transformations[0].all_results()
-    inputs = map(prev_results.get, ('threshold', 'sigma_bg', 'active_outline_metrics', 'phi', 'switch', 'psi'))
-    start_time = time.thread_time_ns() // 1000000
-    img, tr = active_outline_all_channels(current.data, *inputs)
-
-    duration = time.thread_time_ns() // 1000000 - start_time
-    tr.public_results['duration']           = Measurement(duration, 'ms')
-    tr.public_results['total_duration']     = Measurement(prev_results['total_duration'].magnitude + duration, 'ms')
-    tr.public_results['mean_duration']      = Measurement(round(tr.public_results['total_duration'].magnitude / (frame + 1), 2), 'ms')
-
-    return img, [tr]  
-
-def multiple_active_outline_base(image: Image, selections: List[Tuple[Tuple[int, int], Tuple[int, int]]], threshold: float) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+def active_outline_base(image: Image, selections: List[Tuple[Tuple[int, int], Tuple[int, int]]], threshold: float) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
     colours = [((255, 0, 0), (0, 255, 255)), ((0, 0, 255), (255, 255, 0)), ((0, 255, 0), (255, 0, 255))]
     start_time = time.thread_time_ns() // 1000000
     shape = image.data.shape[:2]
@@ -733,5 +695,18 @@ def multiple_active_outline_base(image: Image, selections: List[Tuple[Tuple[int,
     tr.public_results['total_duration']     = Measurement(duration, 'ms')
 
     return img, [tr]
-  
+
+def active_outline_inductive(frame: int, prev: Image, current: Image) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+    prev_results = prev.last_transformation.channel_transformations[0].all_results()
+    inputs = map(prev_results.get, ('threshold', 'sigma_bg', 'active_outline_metrics', 'phi', 'switch', 'psi'))
+    start_time = time.thread_time_ns() // 1000000
+    img, tr = active_outline_all_channels(current.data, *inputs)
+
+    duration = time.thread_time_ns() // 1000000 - start_time
+    tr.public_results['duration']           = Measurement(duration, 'ms')
+    tr.public_results['total_duration']     = Measurement(prev_results['total_duration'].magnitude + duration, 'ms')
+    tr.public_results['mean_duration']      = Measurement(round(tr.public_results['total_duration'].magnitude / (frame + 1), 2), 'ms')
+
+    return img, [tr]  
+
 
