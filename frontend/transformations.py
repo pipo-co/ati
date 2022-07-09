@@ -843,7 +843,7 @@ def build_border_hough_line_dialog(image_name: str) -> None:
         build_tr_value_float_selector('t', 0, 20, default_value=1, tag='threshold')
         build_tr_value_float_selector('ratio', 0, 1, default_value=0.8, tag='ratio')
         build_tr_value_int_list_selector('theta', -90, 90, default_value=0, tag='theta')
-        build_tr_value_range_selector('rho', min_val=0, max_val=255, max_count=256, tag='rho')  # TODO(nacho): mejores defaults
+        build_tr_value_range_selector('rho', min_val=0, max_val=255, max_count=256, tag='rho')
         build_tr_dialog_end_buttons(TR_BORDER_HOUGH_LINE, image_name, tr_border_hough_line, generic_tr_inductive_handle(border.hough_lines))
 
 def tr_border_hough_line(image_name: str) -> Image:

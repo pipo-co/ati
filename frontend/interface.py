@@ -254,8 +254,6 @@ def pop_selection(image_name: str) -> None:
 
     if dpg.does_item_exist(saved_selection):
         dpg.delete_item(saved_selection)
-    
-
 
 def build_hist_themes():
     with dpg.theme(tag='red_hist_theme'):
