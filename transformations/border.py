@@ -376,12 +376,6 @@ def harris_channel(channel: np.ndarray, sigma:int, k: float, threshold: float, r
 
     return channel, ImageChannelTransformation({}, {}, [ScatterDrawCmd(border_points, color=(0, 255, 0)), ScatterDrawCmd(corner_points, color=(255, 0, 0))])
 
-def set_difference(new_values: np.ndarray, removed_values: np.ndarray) -> np.ndarray:
-    nrows, ncols = new_values.shape
-    dtype = {'names': ['f{}'.format(i) for i in range(ncols)], 'formats': ncols * [new_values.dtype]}
-    C = np.setdiff1d(new_values.copy().view(dtype), removed_values.copy().view(dtype))
-    return C.view(new_values.dtype).reshape(-1, ncols)
-
 def get_rectangular_boundary(x: Tuple[int, int], y: Tuple[int, int]) -> List[Tuple[int, int]]:
     boundary = []
     boundary.extend([(y[0], x) for x in range(x[0], x[1] + 1)])
@@ -546,7 +540,7 @@ def active_outline_all_channels(image: np.ndarray, threshold:float, sigma_bg: Un
             for point in lout:
                 diff_bg = np.linalg.norm(sigma_bg - image[point[0], point[1]])
                 diff_obj = np.linalg.norm(sigma_obj - image[point[0], point[1]])
-              
+
                 if (diff_obj == 0 or np.log(diff_bg / diff_obj) >= threshold) and switch(point, lin, lout, phi, indices_4, -1, 3, section_number, psi):
                     flag = True
                 else:
@@ -571,7 +565,7 @@ def active_outline_all_channels(image: np.ndarray, threshold:float, sigma_bg: Un
                 else:
                     flag = True
                     switch(point, lout, lin, phi, indices_4, 1, -3, 0, psi)
-                    
+
             lin = new_lin
             new_lin = []
 
@@ -586,8 +580,7 @@ def active_outline_all_channels(image: np.ndarray, threshold:float, sigma_bg: Un
         for i in range(5):
             gaussian_phi = gauss_channel(phi, 1, PaddingStrategy.EDGE)
             for point in lout:
-                if gaussian_phi[point[0], point[1]] < 0 and switch(point, lin, lout, phi, indices_4, -1, 3,
-                                                                  section_number, psi):
+                if gaussian_phi[point[0], point[1]] < 0 and switch(point, lin, lout, phi, indices_4, -1, 3, section_number, psi):
                     pass
                 else:
                     new_lout.append(point)
