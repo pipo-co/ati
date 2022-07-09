@@ -59,6 +59,7 @@ def render_image_window(image_name: str, movie: Optional[Movie] = None, pos: Uni
             with dpg.group(horizontal=True):
                 with dpg.group():
                     image_item = dpg.add_image(image_name, tag=f'image_{image_name}', width=image.width, height=image.height)
+                    # image_item = dpg.add_image('synth.jpg', tag=f'image_{image_name}', width=image.width, height=image.height)
                     render_image_overlay(image, window, image_item)
                     if movie:
                         render_movie_controls(movie, image.width)
@@ -538,7 +539,6 @@ def build_image_handler_registry() -> None:
 
         usr_data['init_draw'] = pixel_pos if ('init_draw' not in usr_data or 'end_draw' in usr_data) else usr_data['init_draw']
 
-        # print(usr_data['init_draw'])
         usr_data.pop('end_draw', None)
         dpg.set_item_user_data(window, usr_data)
 
