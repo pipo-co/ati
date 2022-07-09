@@ -528,11 +528,10 @@ def update_img_channel_transformation(img_channel_transformation: ImageChannelTr
     img_channel_transformation.internal_results['switch'] = switch
     img_channel_transformation.overlay = overlay
 
-def active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.ndarray], active_outline_metrics: List[ActiveOutlineMetrics], phi: np.ndarray, switch, psi:np.ndarray = None) -> Tuple[np.ndarray, ImageChannelTransformation]:
+def active_outline_all_channels(image: np.ndarray, threshold:float, sigma_bg: Union[float, np.ndarray], active_outline_metrics: List[ActiveOutlineMetrics], phi: np.ndarray, switch, psi:np.ndarray = None) -> Tuple[np.ndarray, ImageChannelTransformation]:
     indices_4 = np.array([[-1, 0], [0, -1], [1, 0], [0, 1]])
     overlay = []
-    img_channel_transformation = ImageChannelTransformation({'sigma_bg': sigma_bg}, {}, None)
-    
+    img_channel_transformation = ImageChannelTransformation({'threshold': threshold, 'sigma_bg': sigma_bg}, {}, None)
     for section in active_outline_metrics:
         new_lout = []
         new_lin = []
@@ -547,7 +546,7 @@ def active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.nda
                 diff_bg = np.linalg.norm(sigma_bg - image[point[0], point[1]])
                 diff_obj = np.linalg.norm(sigma_obj - image[point[0], point[1]])
                 norm_lout = np.log(diff_bg / diff_obj)
-                if np.average(norm_lout) > 0 and switch(point, lin, lout, phi, indices_4, -1, 3, section_number, psi):
+                if np.all(norm_lout >= threshold) and switch(point, lin, lout, phi, indices_4, -1, 3, section_number, psi):
                     flag = True
                 else:
                     new_lout.append(point)
@@ -563,9 +562,8 @@ def active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.nda
             new_lin = []
 
             for point in lin:
-                norm_lin = np.log(np.linalg.norm(sigma_bg - image[point[0], point[1]]) / np.linalg.norm(
-                    sigma_obj - image[point[0], point[1]]))
-                if np.average(norm_lin) < 0:
+                norm_lin = np.log(np.linalg.norm(sigma_bg - image[point[0], point[1]]) / np.linalg.norm(sigma_obj - image[point[0], point[1]]))
+                if np.all(norm_lin < threshold):
                     flag = True
                     switch(point, lout, lin, phi, indices_4, 1, -3, 0, psi)
                 else:
@@ -622,7 +620,7 @@ def active_outline_all_channels(image: np.ndarray, sigma_bg: Union[float, np.nda
         section.lout = lout
 
     update_img_channel_transformation(img_channel_transformation, active_outline_metrics, phi, switch, psi, overlay)
-  
+
     return image, img_channel_transformation
 
 # ******************* Export Functions ********************** #
@@ -688,8 +686,7 @@ def active_outline_base(image: Image, selection: List[Tuple[Tuple[int, int], Tup
 
 def active_outline_inductive(frame: int, prev: Image, current: Image) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
     prev_results = prev.last_transformation.channel_transformations[0].all_results()
-    inputs = map(prev_results.get, ('sigma_bg', 'active_outline_metrics', 'phi', 'switch', 'psi'))
-
+    inputs = map(prev_results.get, ('threshold', 'sigma_bg', 'active_outline_metrics', 'phi', 'switch', 'psi'))
     start_time = time.thread_time_ns() // 1000000
     img, tr = active_outline_all_channels(current.data, *inputs)
 
@@ -700,7 +697,7 @@ def active_outline_inductive(frame: int, prev: Image, current: Image) -> Tuple[n
 
     return img, [tr]  
 
-def multiple_active_outline_base(image: Image, selections: List[Tuple[Tuple[int, int], Tuple[int, int]]]) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
+def multiple_active_outline_base(image: Image, selections: List[Tuple[Tuple[int, int], Tuple[int, int]]], threshold: float) -> Tuple[np.ndarray, List[ImageChannelTransformation]]:
     colours = [((255, 0, 0), (0, 255, 255)), ((0, 0, 255), (255, 255, 0)), ((0, 255, 0), (255, 0, 255))]
     start_time = time.thread_time_ns() // 1000000
     shape = image.data.shape[:2]
@@ -729,7 +726,7 @@ def multiple_active_outline_base(image: Image, selections: List[Tuple[Tuple[int,
 
     sigma_bg = bg_sum / bg_size
 
-    img, tr = active_outline_all_channels(image.data, sigma_bg, metrics, phi, multiple_switch_io, psi)
+    img, tr = active_outline_all_channels(image.data, threshold, sigma_bg, metrics, phi, multiple_switch_io, psi)
 
     duration = time.thread_time_ns() // 1000000 - start_time
     tr.public_results['duration']           = Measurement(duration, 'ms')
