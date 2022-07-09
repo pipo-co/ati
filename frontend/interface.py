@@ -469,10 +469,9 @@ def close_all_windows() -> None:
 
 # Retorna los puntos ya normalizados
 # Formato: (y, x); (up_left, down_right); Acordarse: left < right, up < down
-def get_image_window_rect_selections(window: Union[str, int]) -> Optional[Tuple[Tuple[int, int], Tuple[int, int]]]:
+def get_image_window_rect_selections(window: Union[str, int]) -> List[Tuple[Tuple[int, int], Tuple[int, int]]]:
     user_data = dpg.get_item_user_data(window)
     return user_data['selections']
-
 
 def build_image_handler_registry() -> None:
     @render_error
