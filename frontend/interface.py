@@ -99,7 +99,8 @@ def render_image_overlay(image: Image, window: Union[int, str], image_item: Unio
     # IMPORTANTE: Para conseguir la posicion del image_item tenemos que darle a dpg un frame para que lo renderee
     dpg.split_frame()
     pos = dpg.get_item_pos(image_item)
-
+    scatter_mask = np.zeros((image.height, image.width, 4))
+    
     for tr in image.transformations:
         for tr_channel in tr.channel_transformations:
             if tr_channel.overlay:
@@ -113,14 +114,14 @@ def render_image_overlay(image: Image, window: Union[int, str], image_item: Unio
                     elif isinstance(cmd, ScatterDrawCmd):
                         if cmd.points.size == 0:
                             continue
-                        mask = np.zeros((image.height, image.width, 4))
-                        mask[cmd.points[:, 0], cmd.points[:, 1]] = np.array([*cmd.color, 255]) / 255
-                        mask_tag = dpg.add_static_texture(image.width, image.height, mask.flatten(), parent=TEXTURE_REGISTRY)  # noqa
-
-                        dpg.add_image(mask_tag, width=image.width, height=image.height, pos=pos, parent=window)
-
+                        scatter_mask[cmd.points[:, 0], cmd.points[:, 1]] = np.array([*cmd.color, 255]) / 255
+                        
                     else:
                         raise NotImplementedError()
+
+    mask_tag = dpg.add_static_texture(image.width, image.height, scatter_mask.flatten(), parent=TEXTURE_REGISTRY)  # noqa
+    dpg.add_image(mask_tag, width=image.width, height=image.height, pos=pos, parent=window)
+
 
 def render_movie_controls(movie: Movie, image_width: int):
     name = movie.name
