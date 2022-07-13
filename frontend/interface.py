@@ -96,11 +96,9 @@ def calculate_image_window_size(image: Image) -> Tuple[int, int]:
     return width, height
 
 def render_image_overlay(image: Image, window: Union[int, str], image_item: Union[int, str]):
-    # IMPORTANTE: Para conseguir la posicion del image_item tenemos que darle a dpg un frame para que lo renderee
-    dpg.split_frame()
-    pos = dpg.get_item_pos(image_item)
-    scatter_mask = np.zeros((image.height, image.width, 4))
-    
+    # Inicializamos lazy la mascara de scatter para no crearla si no hay
+    scatter_mask: Optional[np.ndarray] = None
+
     for tr in image.transformations:
         for tr_channel in tr.channel_transformations:
             if tr_channel.overlay:
@@ -114,14 +112,21 @@ def render_image_overlay(image: Image, window: Union[int, str], image_item: Unio
                     elif isinstance(cmd, ScatterDrawCmd):
                         if cmd.points.size == 0:
                             continue
+
+                        if scatter_mask is None:
+                            scatter_mask = np.zeros((image.height, image.width, 4))
+
                         scatter_mask[cmd.points[:, 0], cmd.points[:, 1]] = np.array([*cmd.color, 255]) / 255
                         
                     else:
                         raise NotImplementedError()
 
-    mask_tag = dpg.add_static_texture(image.width, image.height, scatter_mask.flatten(), parent=TEXTURE_REGISTRY)  # noqa
-    dpg.add_image(mask_tag, width=image.width, height=image.height, pos=pos, parent=window)
-
+    if scatter_mask is not None:
+        mask_tag = dpg.add_static_texture(image.width, image.height, scatter_mask.flatten(), parent=TEXTURE_REGISTRY)  # noqa
+        # IMPORTANTE: Para conseguir la posicion del image_item tenemos que darle a dpg un frame para que lo renderee
+        dpg.split_frame()
+        pos = dpg.get_item_pos(image_item)
+        dpg.add_image(mask_tag, width=image.width, height=image.height, pos=pos, parent=window)
 
 def render_movie_controls(movie: Movie, image_width: int):
     name = movie.name
