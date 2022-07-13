@@ -317,12 +317,12 @@ def normalize(data: np.ndarray, as_type=np.uint8) -> np.ndarray:
     elif np.can_cast(data.dtype, np.uint8, casting='safe'):
         return data.astype(as_type, copy=False)
     else:
-        rng = data.max() - data.min()
-        if rng == 0:
-            return np.full(data.shape, min(abs(int(data[0, 0])), MAX_COLOR))
+        amax = data.max()
+        amin = data.min()
+        if amax - amin == 0:
+            return np.full(data.shape, min(abs(int(data[0, 0])), 255))
         else:
-            amin = data.min()
-            ret = (data - amin) * 255 // rng
+            ret = (data - amin) / (amax - amin) * 255
             return ret.astype(as_type, copy=False)
 
 def channel_histogram(channel: np.ndarray) -> Hist:
